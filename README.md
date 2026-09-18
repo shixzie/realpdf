@@ -99,29 +99,62 @@ Export works by walking every stored annotation, inverting the pdf.js viewport t
 ## Deploying to Cloudflare Workers
 
 The whole app is static, so it deploys as a Workers static-assets project — no
-runtime code, no origin server, and the pdf.js WebAssembly decoders, fonts and
-CMaps are served from your own domain (there is no CDN call to a third party).
+origin server, and the pdf.js WebAssembly decoders, fonts and CMaps are served
+from your own domain (there is no CDN call to a third party). A small Worker
+(`worker/index.ts`) sits in front of the assets to log/trace requests and to
+redirect `www` to the apex domain.
 
 ```bash
 npm run deploy      # builds and runs `wrangler deploy`
 # or, to test the Cloudflare runtime locally first:
 npm run cf:dev      # builds and runs `wrangler dev`
+npm run types       # regenerate worker-configuration.d.ts after config changes
 ```
 
-`wrangler.jsonc` points the Worker at `./dist` and attaches the custom domain
-`realpdf.app` on deploy:
+`wrangler.jsonc` points the Worker at `./dist`, attaches the `realpdf.app` and
+`www.realpdf.app` custom domains on deploy, serves assets through the `ASSETS`
+binding (`run_worker_first`) and turns on Workers Logs and Traces:
 
 ```jsonc
 {
   "name": "realpdf",
-  "assets": { "directory": "./dist", "not_found_handling": "single-page-application" },
-  "routes": [{ "pattern": "realpdf.app", "custom_domain": true }]
+  "main": "worker/index.ts",
+  "assets": {
+    "directory": "./dist",
+    "not_found_handling": "single-page-application",
+    "binding": "ASSETS",
+    "run_worker_first": true
+  },
+  "observability": {
+    "enabled": true,
+    "logs": { "enabled": true },
+    "traces": { "enabled": true }
+  },
+  "routes": [
+    { "pattern": "realpdf.app", "custom_domain": true },
+    { "pattern": "www.realpdf.app", "custom_domain": true }
+  ]
 }
 ```
 
-Remove the `routes` block if you prefer to attach the domain from the Cloudflare
-dashboard. `public/_headers` adds long-lived caching for hashed assets and a
-week for `pdfjs-assets/`, plus `nosniff` / frame / referrer hardening.
+Remove the `routes` block if you prefer to attach the domains from the
+Cloudflare dashboard. `public/_headers` adds long-lived caching for hashed
+assets and a week for `pdfjs-assets/`, plus `nosniff` / frame / referrer
+hardening — because `run_worker_first` bypasses `_headers`, the Worker
+re-applies those rules to every asset response.
+
+### Logs and traces
+
+Workers Logs and Traces are visible in the Cloudflare dashboard under
+**Workers & Pages → realpdf → Logs** and **Traces**. The Worker emits one
+structured JSON line per request (`event`, `method`, `host`, `path`, `status`,
+`durationMs`, `colo`, `country`) and wraps request handling in a
+`realpdf:request` span with `http.response.status_code` / `http.response.duration_ms`
+attributes. Every request is sampled (`head_sampling_rate: 1`); lower the rate
+in `wrangler.jsonc` if volume grows. Query strings are never persisted
+(`redact_query_string`), and document contents are never logged — everything
+still happens in the browser. `www.realpdf.app` 301-redirects to
+`https://realpdf.app`, preserving the path and query string.
 
 ## Tests
 
