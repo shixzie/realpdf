@@ -15,11 +15,11 @@ import {
   eraseObjectAt,
   finalizeArrow,
   isShapeTool,
-  TEXT_PLACEHOLDER,
   updateShape,
   type Vec,
 } from '../lib/tools'
 import { imageFileToDataUrl } from '../lib/assets'
+import { useTranslation } from '../i18n'
 import { FormsLayer } from './FormsLayer'
 
 interface PageViewProps {
@@ -35,6 +35,7 @@ interface Draft {
 }
 
 export function PageView({ pageIndex }: PageViewProps) {
+  const { t } = useTranslation()
   const page = useStore((state) => state.pages[pageIndex])
   const zoom = useStore((state) => state.zoom)
   const tool = useStore((state) => state.tool)
@@ -133,7 +134,8 @@ export function PageView({ pageIndex }: PageViewProps) {
       const target = event.target as AnyObject | undefined
       if (!target || target.data?.kind !== 'text') return
       const value = String(target.text ?? '')
-      if (value.trim() === '' || (target.data?.placeholder && value.trim() === TEXT_PLACEHOLDER)) {
+      const placeholderText = target.data?.placeholderText
+      if (value.trim() === '' || (target.data?.placeholder && placeholderText && value.trim() === placeholderText)) {
         canvas.remove(target)
         canvas.requestRenderAll()
         onChange()
@@ -332,10 +334,10 @@ export function PageView({ pageIndex }: PageViewProps) {
         useStore.getState().setTool('select')
       } catch (error) {
         console.error(error)
-        useStore.getState().toastMessage('error', 'Could not add that image.')
+        useStore.getState().toastMessage('error', t('toasts.addImageFailed'))
       }
     },
-    [page, zoom],
+    [page, zoom, t],
   )
 
   if (!page) return null

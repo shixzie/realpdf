@@ -401,6 +401,33 @@ button {
   font-size: 12.5px;
 }
 
+.language-picker {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-muted);
+  flex: none;
+}
+
+.language-picker svg {
+  flex: none;
+}
+
+.select-language {
+  max-width: 132px;
+  padding: 5px 6px;
+}
+
+@media (max-width: 860px) {
+  .language-picker svg {
+    display: none;
+  }
+
+  .select-language {
+    max-width: 92px;
+  }
+}
+
 /* ---------- Viewer ---------- */
 
 .viewer {

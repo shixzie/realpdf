@@ -1,4 +1,5 @@
 import { useStore } from '../store'
+import { t } from '../i18n'
 import { buildPdf, type ExportPageInput } from './export'
 import { hydrateAnnotations } from './serialize'
 import { applyFormValues } from './forms'
@@ -28,11 +29,13 @@ export async function runExport(): Promise<void> {
         const filled = await applyFormValues(sourceBytes, state.formValues, { flatten: state.formFlatten })
         sourceBytes = filled.bytes
         if (filled.errors.length) {
-          useStore.getState().toastMessage('info', `Some fields could not be filled: ${filled.errors[0]}`)
+          useStore
+            .getState()
+            .toastMessage('info', t('toasts.formsPartial', { error: filled.errors[0] }))
         }
       } catch (error) {
         console.error(error)
-        useStore.getState().toastMessage('error', 'Could not apply the form values; exporting without them.')
+        useStore.getState().toastMessage('error', t('toasts.formsApplyFailed'))
       }
     }
     const pages: ExportPageInput[] = state.pages.map((page) => ({
@@ -51,10 +54,11 @@ export async function runExport(): Promise<void> {
     // Keep a local copy (with its editable state) in the browser library.
     await useStore.getState().saveToLibrary(bytes)
     useStore.getState().setExporting(false)
-    useStore.getState().toastMessage('success', 'Saved your edited PDF.')
+    useStore.getState().toastMessage('success', t('toasts.exported'))
   } catch (error) {
     console.error(error)
     useStore.getState().setExporting(false)
-    useStore.getState().toastMessage('error', `Export failed: ${(error as Error)?.message ?? 'unknown error'}`)
+    const message = (error as Error)?.message ?? t('toasts.unknownError')
+    useStore.getState().toastMessage('error', t('toasts.exportFailed', { message }))
   }
 }

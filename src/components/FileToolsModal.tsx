@@ -32,6 +32,7 @@ import { createZip } from '../lib/zip'
 import { imageFileToDataUrl } from '../lib/assets'
 import { bakedCurrentBytes } from '../lib/currentDocument'
 import { openPdfDocumentFromBytes } from '../lib/pdfjs'
+import { formatBytes, t as translate, useTranslation } from '../i18n'
 
 interface DraftSource {
   id: string
@@ -40,20 +41,14 @@ interface DraftSource {
   current?: boolean
 }
 
-const TABS: Array<{ id: ToolsTab; label: string; icon: typeof Combine }> = [
-  { id: 'merge', label: 'Merge', icon: Combine },
-  { id: 'split', label: 'Split', icon: Scissors },
-  { id: 'convert', label: 'Convert', icon: FileDown },
+const TABS: Array<{ id: ToolsTab; labelKey: string; icon: typeof Combine }> = [
+  { id: 'merge', labelKey: 'fileTools.tabMerge', icon: Combine },
+  { id: 'split', labelKey: 'fileTools.tabSplit', icon: Scissors },
+  { id: 'convert', labelKey: 'fileTools.tabConvert', icon: FileDown },
 ]
 
 function baseName(name: string | null): string {
   return (name ?? 'document.pdf').replace(/\.pdf$/i, '')
-}
-
-function formatBytes(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
 }
 
 async function readFiles(files: FileList | File[]): Promise<DraftSource[]> {
@@ -73,6 +68,7 @@ export function FileToolsModal() {
 }
 
 function Modal() {
+  const { t } = useTranslation()
   const tab = useStore((state) => state.toolsTab)
   const setToolsTab = useStore((state) => state.setToolsTab)
   const close = () => useStore.getState().setToolsOpen(false)
@@ -80,8 +76,8 @@ function Modal() {
     <div className="modal-backdrop" role="dialog" aria-modal="true">
       <div className="modal modal-wide">
         <div className="modal-head">
-          <h2>Document tools</h2>
-          <button type="button" className="icon-button" onClick={close} title="Close">
+          <h2>{t('fileTools.title')}</h2>
+          <button type="button" className="icon-button" onClick={close} title={t('common.close')}>
             <X size={17} />
           </button>
         </div>
@@ -95,7 +91,7 @@ function Modal() {
                 className={`tab ${tab === entry.id ? 'is-active' : ''}`}
                 onClick={() => setToolsTab(entry.id)}
               >
-                <Icon size={15} /> {entry.label}
+                <Icon size={15} /> {t(entry.labelKey)}
               </button>
             )
           })}
@@ -128,10 +124,11 @@ const confirmReplace = (): boolean => {
   const state = useStore.getState()
   const hasEdits = state.pages.some((page) => page.annotations.objects.length > 0)
   if (!hasEdits) return true
-  return window.confirm('This replaces the document open in the editor. Unsaved annotations will be lost. Continue?')
+  return window.confirm(translate('fileTools.replaceConfirm'))
 }
 
 function MergeTab() {
+  const { t } = useTranslation()
   const fileName = useStore((state) => state.fileName)
   const { busy, run } = useBusy()
   const inputRef = useRef<HTMLInputElement>(null)
@@ -166,12 +163,10 @@ function MergeTab() {
 
   return (
     <div className="tool-section">
-      <p className="tool-hint">
-        Combine PDFs into a single document. Use the arrows to set the order.
-      </p>
+      <p className="tool-hint">{t('fileTools.mergeHint')}</p>
       <div className="tool-row">
         <button type="button" className="button" onClick={() => inputRef.current?.click()}>
-          <FileUp size={15} /> Add PDFs
+          <FileUp size={15} /> {t('fileTools.addPdfs')}
         </button>
         <input
           ref={inputRef}
@@ -188,22 +183,22 @@ function MergeTab() {
           }}
         />
         {fileName && (
-          <label className="check">
+            <label className="check">
             <input
               type="checkbox"
               checked={includeCurrent}
               onChange={(event) => setIncludeCurrent(event.target.checked)}
             />
-            Include current document (with edits)
+            {t('fileTools.includeCurrent')}
           </label>
         )}
       </div>
 
-      {total === 0 && <p className="tool-empty">No documents yet.</p>}
+      {total === 0 && <p className="tool-empty">{t('fileTools.none')}</p>}
       <ul className="source-list">
         {includeCurrent && fileName && (
           <li className="source-item is-current">
-            <span className="source-name">{fileName} — current document, baked with your annotations</span>
+            <span className="source-name">{t('fileTools.current', { fileName })}</span>
           </li>
         )}
         {sources.map((source, index) => (
@@ -241,11 +236,12 @@ function MergeTab() {
             void run('merge', async () => {
               const merged = await mergePdfs(await resolveSources())
               downloadBlob(new Blob([merged as BlobPart], { type: 'application/pdf' }), 'merged.pdf')
-              useStore.getState().toastMessage('success', 'Merged PDF downloaded.')
+              useStore.getState().toastMessage('success', t('fileTools.merged'))
             })
           }
         >
-          {busy === 'merge' ? <Loader2 size={15} className="spin" /> : <FileDown size={15} />} Merge &amp; download
+          {busy === 'merge' ? <Loader2 size={15} className="spin" /> : <FileDown size={15} />}{' '}
+          {t('fileTools.mergeDownload')}
         </button>
         <button
           type="button"
@@ -260,7 +256,8 @@ function MergeTab() {
             })
           }
         >
-          {busy === 'open' ? <Loader2 size={15} className="spin" /> : <Combine size={15} />} Merge &amp; open
+          {busy === 'open' ? <Loader2 size={15} className="spin" /> : <Combine size={15} />}{' '}
+          {t('fileTools.mergeOpen')}
         </button>
       </div>
     </div>
@@ -268,6 +265,7 @@ function MergeTab() {
 }
 
 function SplitTab() {
+  const { t } = useTranslation()
   const fileName = useStore((state) => state.fileName)
   const pageCount = useStore((state) => state.pages.length)
   const { busy, run } = useBusy()
@@ -290,23 +288,21 @@ function SplitTab() {
   return (
     <div className="tool-section">
       <p className="tool-hint">
-        Extract a page range from the current document ({pageCount} page{pageCount === 1 ? '' : 's'}).
+        {t('fileTools.splitHint', { pages: t('common.pages', { count: pageCount }) })}
       </p>
       <div className="tool-row">
         <input
           className="text-input"
-          placeholder="Pages, e.g. 1-3,5,8-"
+          placeholder={t('fileTools.rangePlaceholder')}
           value={range}
           onChange={(event) => setRange(event.target.value)}
         />
         <button type="button" className="button button-ghost" onClick={() => setRange('all')}>
-          All pages
+          {t('fileTools.allPages')}
         </button>
       </div>
       {parsed.error && <p className="tool-error">{parsed.error}</p>}
-      <p className="tool-hint">
-        {parsed.indices.length} page{parsed.indices.length === 1 ? '' : 's'} selected
-      </p>
+      <p className="tool-hint">{t('fileTools.selected', { count: parsed.indices.length })}</p>
       <div className="tool-actions">
         <button
           type="button"
@@ -319,11 +315,12 @@ function SplitTab() {
                 new Blob([bytes as BlobPart], { type: 'application/pdf' }),
                 `${baseName(fileName)}-pages.pdf`,
               )
-              useStore.getState().toastMessage('success', 'Extracted pages downloaded.')
+              useStore.getState().toastMessage('success', t('fileTools.extracted'))
             })
           }
         >
-          {busy === 'extract-download' ? <Loader2 size={15} className="spin" /> : <FileDown size={15} />} Download
+          {busy === 'extract-download' ? <Loader2 size={15} className="spin" /> : <FileDown size={15} />}{' '}
+          {t('fileTools.download')}
         </button>
         <button
           type="button"
@@ -338,7 +335,8 @@ function SplitTab() {
             })
           }
         >
-          {busy === 'extract-open' ? <Loader2 size={15} className="spin" /> : <Scissors size={15} />} Extract &amp; open
+          {busy === 'extract-open' ? <Loader2 size={15} className="spin" /> : <Scissors size={15} />}{' '}
+          {t('fileTools.extractOpen')}
         </button>
         <button
           type="button"
@@ -355,21 +353,21 @@ function SplitTab() {
               }
               const zip = await createZip(entries)
               downloadBlob(zip, `${baseName(fileName)}-split.zip`)
-              useStore.getState().toastMessage('success', 'Split pages downloaded as a ZIP.')
+              useStore.getState().toastMessage('success', t('fileTools.splitDone'))
             })
           }
         >
-          {busy === 'split-zip' ? <Loader2 size={15} className="spin" /> : <FileDown size={15} />} Split all (ZIP)
+          {busy === 'split-zip' ? <Loader2 size={15} className="spin" /> : <FileDown size={15} />}{' '}
+          {t('fileTools.splitZip')}
         </button>
       </div>
-      <p className="tool-note">
-        Tip: extracted files include your annotations, form values are applied when you save.
-      </p>
+      <p className="tool-note">{t('fileTools.splitTip')}</p>
     </div>
   )
 }
 
 function ConvertTab() {
+  const { t } = useTranslation()
   const fileName = useStore((state) => state.fileName)
   const pdf = useStore((state) => state.pdf)
   const pageCount = useStore((state) => state.pages.length)
@@ -392,7 +390,7 @@ function ConvertTab() {
     <div className="tool-section">
       <section className="tool-block">
         <h3>
-          <ImageIcon size={15} /> PDF → Images
+          <ImageIcon size={15} /> {t('fileTools.pdfToImages')}
         </h3>
         <div className="tool-row">
           <select className="select" value={format} onChange={(event) => setFormat(event.target.value as 'png' | 'jpeg')}>
@@ -423,7 +421,8 @@ function ConvertTab() {
               })
             }
           >
-            {busy === 'img-current' ? <Loader2 size={15} className="spin" /> : <FileDown size={15} />} Current page
+            {busy === 'img-current' ? <Loader2 size={15} className="spin" /> : <FileDown size={15} />}{' '}
+            {t('fileTools.currentPage')}
           </button>
           <button
             type="button"
@@ -441,21 +440,22 @@ function ConvertTab() {
                   )
                   const zip = await createZip(rendered.map((page) => ({ name: page.name, data: page.blob })))
                   downloadBlob(zip, `${baseName(fileName)}-images.zip`)
-                  useStore.getState().toastMessage('success', 'Page images downloaded as a ZIP.')
+                  useStore.getState().toastMessage('success', t('fileTools.imagesDone'))
                 } finally {
                   void scratch.loadingTask.destroy()
                 }
               })
             }
           >
-            {busy === 'img-zip' ? <Loader2 size={15} className="spin" /> : <FileDown size={15} />} All pages (ZIP)
+            {busy === 'img-zip' ? <Loader2 size={15} className="spin" /> : <FileDown size={15} />}{' '}
+            {t('fileTools.allPagesZip')}
           </button>
         </div>
       </section>
 
       <section className="tool-block">
         <h3>
-          <FileText size={15} /> PDF → Text
+          <FileText size={15} /> {t('fileTools.pdfToText')}
         </h3>
         <div className="tool-row">
           <button
@@ -474,19 +474,20 @@ function ConvertTab() {
               })
             }
           >
-            {busy === 'text-out' ? <Loader2 size={15} className="spin" /> : <FileDown size={15} />} Download .txt
+            {busy === 'text-out' ? <Loader2 size={15} className="spin" /> : <FileDown size={15} />}{' '}
+            {t('fileTools.downloadTxt')}
           </button>
-          <span className="tool-hint">Extracts the text layer; scanned pages have no text.</span>
+          <span className="tool-hint">{t('fileTools.textHint')}</span>
         </div>
       </section>
 
       <section className="tool-block">
         <h3>
-          <FileUp size={15} /> Images → PDF
+          <FileUp size={15} /> {t('fileTools.imagesToPdf')}
         </h3>
         <div className="tool-row">
           <button type="button" className="button" onClick={() => imageInputRef.current?.click()}>
-            <ImageIcon size={15} /> Add images
+            <ImageIcon size={15} /> {t('fileTools.addImages')}
           </button>
           <input
             ref={imageInputRef}
@@ -515,8 +516,8 @@ function ConvertTab() {
             value={imagePageSize}
             onChange={(event) => setImagePageSize(event.target.value as ImagePageSize)}
           >
-            <option value="a4">Fit on A4</option>
-            <option value="image">Page = image size</option>
+            <option value="a4">{t('fileTools.fitA4')}</option>
+            <option value="image">{t('fileTools.pageImageSize')}</option>
           </select>
         </div>
         {imageSources.length > 0 && (
@@ -585,18 +586,19 @@ function ConvertTab() {
               })
             }
           >
-            {busy === 'images-pdf' ? <Loader2 size={15} className="spin" /> : <Combine size={15} />} Create PDF &amp; open
+            {busy === 'images-pdf' ? <Loader2 size={15} className="spin" /> : <Combine size={15} />}{' '}
+            {t('fileTools.createOpen')}
           </button>
         </div>
       </section>
 
       <section className="tool-block">
         <h3>
-          <FileText size={15} /> Text → PDF
+          <FileText size={15} /> {t('fileTools.textToPdf')}
         </h3>
         <textarea
           className="text-area"
-          placeholder="Paste text here…"
+          placeholder={t('fileTools.pasteText')}
           value={text}
           onChange={(event) => setText(event.target.value)}
         />
@@ -615,14 +617,13 @@ function ConvertTab() {
               })
             }
           >
-            {busy === 'text-pdf' ? <Loader2 size={15} className="spin" /> : <Combine size={15} />} Create PDF &amp; open
+            {busy === 'text-pdf' ? <Loader2 size={15} className="spin" /> : <Combine size={15} />}{' '}
+            {t('fileTools.createOpen')}
           </button>
         </div>
       </section>
 
-      <p className="tool-note">
-        Everything is converted on this device. Office formats (Word/Excel/PPT) are not supported yet.
-      </p>
+      <p className="tool-note">{t('fileTools.convertNote')}</p>
     </div>
   )
 }
