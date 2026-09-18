@@ -51,6 +51,7 @@ export const fr: Dictionary = {
   tools: {
     select: 'Sélectionner',
     text: 'Texte',
+    textedit: 'Modifier le texte',
     pen: 'Dessiner',
     highlighter: 'Surligner',
     rect: 'Rectangle',
@@ -74,6 +75,8 @@ export const fr: Dictionary = {
     selectHint:
       'Cliquez pour sélectionner · Maj+clic pour plusieurs · faites glisser les poignées pour redimensionner',
     whiteoutHint: 'Faites glisser sur le contenu existant pour le masquer, puis ajoutez du texte par-dessus.',
+    texteditHint:
+      'Cliquez sur le texte existant du PDF pour le modifier. La police, la taille et la couleur d’origine sont reproduites automatiquement.',
     eraserHint: 'Cliquez sur une annotation pour la supprimer.',
     imageHint: 'Choisissez un fichier image à placer sur la page actuelle.',
     signatureHint: 'Dessinez votre signature dans la boîte de dialogue.',

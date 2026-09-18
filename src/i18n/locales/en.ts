@@ -56,6 +56,7 @@ export const en = {
   tools: {
     select: 'Select',
     text: 'Text',
+    textedit: 'Edit text',
     pen: 'Draw',
     highlighter: 'Highlight',
     rect: 'Rectangle',
@@ -78,6 +79,8 @@ export const en = {
     clearPage: 'Clear page',
     selectHint: 'Click to select · Shift-click for multiple · drag handles to resize',
     whiteoutHint: 'Drag over existing content to cover it, then add text on top.',
+    texteditHint:
+      'Click existing PDF text to edit it. The original font, size and colour are matched automatically.',
     eraserHint: 'Click any annotation to remove it.',
     imageHint: 'Pick an image file to place it on the current page.',
     signatureHint: 'Draw your signature in the dialog.',

@@ -11,6 +11,7 @@ import {
   Pen,
   Signature,
   Square,
+  TextCursorInput,
   Type,
   type LucideIcon,
 } from 'lucide-react'
@@ -30,6 +31,7 @@ interface ToolDef {
 export const TOOL_DEFS: ToolDef[] = [
   { id: 'select', labelKey: 'tools.select', shortcut: 'V', icon: MousePointer2 },
   { id: 'text', labelKey: 'tools.text', shortcut: 'T', icon: Type },
+  { id: 'textedit', labelKey: 'tools.textedit', shortcut: 'X', icon: TextCursorInput },
   { id: 'pen', labelKey: 'tools.pen', shortcut: 'P', icon: Pen },
   { id: 'highlighter', labelKey: 'tools.highlighter', shortcut: 'H', icon: Highlighter },
   { id: 'rect', labelKey: 'tools.rect', shortcut: 'R', icon: Square },

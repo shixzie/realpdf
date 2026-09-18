@@ -18,6 +18,15 @@ import {
   updateShape,
   type Vec,
 } from '../lib/tools'
+import {
+  createPdfTextEditObject,
+  loadPageTextRuns,
+  registerCanvasFonts,
+  runAtPoint,
+  sampleRunColors,
+  updateTextHighlight,
+  type TextRun,
+} from '../lib/textEdit'
 import { imageFileToDataUrl } from '../lib/assets'
 import { useTranslation } from '../i18n'
 import { FormsLayer } from './FormsLayer'
@@ -41,6 +50,7 @@ export function PageView({ pageIndex }: PageViewProps) {
   const tool = useStore((state) => state.tool)
   const settings = useStore((state) => state.settings)
   const formMode = useStore((state) => state.formMode)
+  const pdf = useStore((state) => state.pdf)
 
   const slotRef = useRef<HTMLDivElement>(null)
   const baseRef = useRef<HTMLCanvasElement>(null)
@@ -53,6 +63,9 @@ export function PageView({ pageIndex }: PageViewProps) {
   const draftRef = useRef<Draft | null>(null)
   const commitTimerRef = useRef<number | null>(null)
   const loadTokenRef = useRef(0)
+  const textRunsRef = useRef<TextRun[] | null>(null)
+  const hoverRectRef = useRef<FabricObject | null>(null)
+  const textEditTokenRef = useRef(0)
 
   const latest = useRef({ tool, settings, pageId: page?.id ?? '' })
   latest.current = { tool, settings, pageId: page?.id ?? '' }
@@ -79,6 +92,64 @@ export function PageView({ pageIndex }: PageViewProps) {
     if (commitTimerRef.current != null) window.clearTimeout(commitTimerRef.current)
     commitTimerRef.current = window.setTimeout(commitNow, 350)
   }, [commitNow])
+
+  /** Draws the hover highlight without recording it as an annotation change. */
+  const setHighlight = useCallback((canvas: Canvas, bounds: TextRun['bounds'] | null) => {
+    suppressRef.current = true
+    try {
+      hoverRectRef.current = updateTextHighlight(canvas, hoverRectRef.current, bounds)
+    } finally {
+      suppressRef.current = false
+    }
+  }, [])
+
+  /**
+   * Selects the whole replacement text once the pointer interaction is over;
+   * fabric positions the caret on mouse-up, after this handler has run.
+   */
+  const selectAllWhenEditing = useCallback((target: AnyObject, canvas: Canvas) => {
+    const focus = () => {
+      if (!(target as { isEditing?: boolean }).isEditing) return
+      target.selectAll?.()
+      canvas.requestRenderAll()
+    }
+    focus()
+    window.setTimeout(focus, 50)
+  }, [])
+
+  const onTextEditClick = useCallback(async (canvas: Canvas, event: TPointerEventInfo) => {
+    const token = textEditTokenRef.current + 1
+    textEditTokenRef.current = token
+    const target = canvas.findTarget(event.e).target as (FabricObject & Record<string, any>) | undefined
+    if (target?.data?.kind === 'pdftext') {
+      if (target.isEditing) return
+      canvas.setActiveObject(target)
+      target.enterEditing?.()
+      selectAllWhenEditing(target, canvas)
+      canvas.requestRenderAll()
+      return
+    }
+    const store = useStore.getState()
+    const current = store.pages.find((candidate) => candidate.id === latest.current.pageId)
+    if (!current || current.sourceIndex == null || !store.pdf) return
+    const scene = canvas.getScenePoint(event.e)
+    const runs = await loadPageTextRuns(store.pdf, current.sourceIndex, current.transform)
+    if (token !== textEditTokenRef.current || canvasRef.current !== canvas) return
+    const run = runs.find((candidate) => runAtPoint(candidate, scene.x, scene.y))
+    if (!run) return
+    const pdfPage = await store.pdf.getPage(current.sourceIndex + 1)
+    const colors = await sampleRunColors(pdfPage, run)
+    if (token !== textEditTokenRef.current || canvasRef.current !== canvas) return
+    useStore.getState().beginChange()
+    const object = createPdfTextEditObject(run, colors)
+    canvas.add(object)
+    setHighlight(canvas, null)
+    canvas.setActiveObject(object)
+    object.enterEditing()
+    selectAllWhenEditing(object, canvas)
+    canvas.requestRenderAll()
+    scheduleCommit()
+  }, [scheduleCommit, setHighlight, selectAllWhenEditing])
 
   const viewWidth = Math.max(1, (page?.width ?? 1) * zoom)
   const viewHeight = Math.max(1, (page?.height ?? 1) * zoom)
@@ -132,7 +203,27 @@ export function PageView({ pageIndex }: PageViewProps) {
 
     canvas.on('text:editing:exited', (event) => {
       const target = event.target as AnyObject | undefined
-      if (!target || target.data?.kind !== 'text') return
+      if (!target) return
+      if (target.data?.kind === 'pdftext') {
+        const value = String(target.text ?? '')
+        const spawn = target.data?.spawn as
+          | { left: number; top: number; width: number; angle: number }
+          | undefined
+        const untouched =
+          spawn != null &&
+          value === target.data?.originalText &&
+          Math.abs((target.left ?? 0) - spawn.left) < 0.75 &&
+          Math.abs((target.top ?? 0) - spawn.top) < 0.75 &&
+          Math.abs((target.width ?? 0) - spawn.width) < 0.75 &&
+          Math.abs((target.angle ?? 0) - spawn.angle) < 0.5
+        if (!value.trim() || untouched) {
+          canvas.remove(target)
+          canvas.requestRenderAll()
+          onChange()
+        }
+        return
+      }
+      if (target.data?.kind !== 'text') return
       const value = String(target.text ?? '')
       const placeholderText = target.data?.placeholderText
       if (value.trim() === '' || (target.data?.placeholder && placeholderText && value.trim() === placeholderText)) {
@@ -146,6 +237,10 @@ export function PageView({ pageIndex }: PageViewProps) {
 
     canvas.on('mouse:down', (opt: TPointerEventInfo) => {
       const { tool: activeTool, settings: activeSettings } = latest.current
+      if (activeTool === 'textedit') {
+        void onTextEditClick(canvas, opt)
+        return
+      }
       if (activeTool === 'text') {
         useStore.getState().beginChange()
         const point = canvas.getScenePoint(opt.e)
@@ -165,6 +260,17 @@ export function PageView({ pageIndex }: PageViewProps) {
     })
 
     canvas.on('mouse:move', (opt: TPointerEventInfo) => {
+      if (latest.current.tool === 'textedit') {
+        const target = canvas.findTarget(opt.e).target as AnyObject | undefined
+        const point = canvas.getScenePoint(opt.e)
+        let bounds: TextRun['bounds'] | null = null
+        if (target?.data?.kind !== 'pdftext') {
+          const run = textRunsRef.current?.find((candidate) => runAtPoint(candidate, point.x, point.y))
+          if (run) bounds = run.bounds
+        }
+        setHighlight(canvas, bounds)
+        return
+      }
       const draft = draftRef.current
       if (!draft) return
       const point = canvas.getScenePoint(opt.e)
@@ -214,6 +320,7 @@ export function PageView({ pageIndex }: PageViewProps) {
       canvas.setZoom(zoomRef.current)
       applyToolToCanvas(canvas, latest.current.tool, latest.current.settings)
       canvas.requestRenderAll()
+      void registerCanvasFonts(canvas)
     })
 
     return () => {
@@ -221,6 +328,7 @@ export function PageView({ pageIndex }: PageViewProps) {
       commitNow()
       unregisterCanvas(page.id, canvas)
       canvasRef.current = null
+      hoverRectRef.current = null
       void canvas.dispose()
       suppressRef.current = false
       readyRef.current = false
@@ -263,9 +371,32 @@ export function PageView({ pageIndex }: PageViewProps) {
       canvas.setZoom(zoom)
       applyToolToCanvas(canvas, latest.current.tool, latest.current.settings)
       canvas.requestRenderAll()
+      void registerCanvasFonts(canvas)
     })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [page?.externalRev])
+
+  // Pre-load the page's existing text while the edit tool is active.
+  useEffect(() => {
+    if (tool !== 'textedit' || !page || page.sourceIndex == null || !pdf) {
+      textRunsRef.current = null
+      return
+    }
+    let cancelled = false
+    void loadPageTextRuns(pdf, page.sourceIndex, page.transform).then((runs) => {
+      if (!cancelled) textRunsRef.current = runs
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [tool, page?.id, page?.sourceIndex, pdf])
+
+  // Drop the hover highlight when leaving the edit tool.
+  useEffect(() => {
+    const canvas = canvasRef.current
+    if (!canvas || tool === 'textedit') return
+    setHighlight(canvas, null)
+  }, [tool, setHighlight])
 
   // Apply the active tool.
   useEffect(() => {
@@ -275,7 +406,6 @@ export function PageView({ pageIndex }: PageViewProps) {
   }, [tool, settings])
 
   // Render the PDF page bitmap.
-  const pdf = useStore((state) => state.pdf)
   const sourceIndex = page?.sourceIndex ?? null
   useEffect(() => {
     const element = baseRef.current

@@ -11,6 +11,7 @@ const HIGHLIGHT_COLORS = ['#facc15', '#4ade80', '#60a5fa', '#f472b6', '#fb923c']
 const TOOL_LABEL_KEY: Record<Tool, string> = {
   select: 'tools.select',
   text: 'tools.text',
+  textedit: 'tools.textedit',
   pen: 'tools.pen',
   highlighter: 'tools.highlighter',
   rect: 'tools.rect',
@@ -169,6 +170,8 @@ export function ToolOptions() {
       )}
 
       {tool === 'whiteout' && <span className="options-hint">{t('options.whiteoutHint')}</span>}
+
+      {tool === 'textedit' && <span className="options-hint">{t('options.texteditHint')}</span>}
 
       {tool === 'eraser' && <span className="options-hint">{t('options.eraserHint')}</span>}
 

@@ -51,6 +51,7 @@ export const de: Dictionary = {
   tools: {
     select: 'Auswählen',
     text: 'Text',
+    textedit: 'Text bearbeiten',
     pen: 'Zeichnen',
     highlighter: 'Hervorheben',
     rect: 'Rechteck',
@@ -75,6 +76,8 @@ export const de: Dictionary = {
       'Klicken zum Auswählen · Umschalt+Klick für mehrere · Griffe zum Größe ändern ziehen',
     whiteoutHint:
       'Ziehen Sie über vorhandene Inhalte, um sie abzudecken, und fügen Sie dann Text darüber ein.',
+    texteditHint:
+      'Klicken Sie auf vorhandenen PDF-Text, um ihn zu bearbeiten. Schriftart, Größe und Farbe werden automatisch übernommen.',
     eraserHint: 'Klicken Sie auf eine Anmerkung, um sie zu entfernen.',
     imageHint: 'Wählen Sie eine Bilddatei, um sie auf der aktuellen Seite zu platzieren.',
     signatureHint: 'Zeichnen Sie Ihre Unterschrift im Dialog.',
