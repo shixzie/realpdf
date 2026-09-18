@@ -61,10 +61,15 @@ export function TopBar() {
 
   return (
     <header className="topbar">
-      <div className="brand">
+      <button
+        type="button"
+        className="brand brand-home"
+        title={t('topbar.homeTitle')}
+        onClick={() => useStore.getState().close()}
+      >
         <FileText size={19} />
         <span>RealPDF</span>
-      </div>
+      </button>
 
       <div className="topbar-group">
         <button type="button" className="button" onClick={() => fileInputRef.current?.click()} disabled={loading}>
