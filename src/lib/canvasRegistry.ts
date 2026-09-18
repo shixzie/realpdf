@@ -1,6 +1,7 @@
 import { FabricImage, type Canvas, type FabricObject } from 'fabric'
 import { addAsset } from './assets'
 import { serializeCanvas } from './serialize'
+import { isTextObject } from './tools'
 import { useStore } from '../store'
 
 const byCanvas = new Map<Canvas, string>()
@@ -29,6 +30,21 @@ export function activeCanvas(): Canvas | undefined {
   for (const canvas of byCanvas.keys()) {
     const active = canvas.getActiveObjects()
     if (active.length) return canvas
+  }
+  return undefined
+}
+
+/**
+ * The text object (annotation or PDF-text replacement) currently selected, if
+ * any. The page of the last text selection is preferred so that selections on
+ * other pages do not shadow it.
+ */
+export function activeTextSelection(): { canvas: Canvas; object: FabricObject } | undefined {
+  const preferred = getCanvas(useStore.getState().textSelectionPage)
+  const canvases = preferred ? [preferred, ...byCanvas.keys()] : Array.from(byCanvas.keys())
+  for (const canvas of canvases) {
+    const object = canvas.getActiveObject()
+    if (object && isTextObject(object)) return { canvas, object }
   }
   return undefined
 }
