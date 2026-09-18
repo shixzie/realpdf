@@ -9,6 +9,7 @@
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
+    "types": "wrangler types",
     "sample": "node scripts/make-sample.mjs",
     "test": "node scripts/e2e.mjs && node scripts/e2e-tools.mjs && node scripts/e2e-ui.mjs && node scripts/e2e-library.mjs",
     "test:editor": "node scripts/e2e.mjs",

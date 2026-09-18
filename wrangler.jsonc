@@ -1,15 +1,42 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "realpdf",
+  "main": "worker/index.ts",
   "compatibility_date": "2026-01-01",
   "assets": {
     // The whole app is static: html, js, css, the pdf.js worker, wasm decoders,
-    // standard fonts, cmaps and ICC profiles. There is no worker script —
-    // Cloudflare serves the assets directly at the edge.
+    // standard fonts, cmaps and ICC profiles. The Worker serves them through
+    // the ASSETS binding so every request can be logged and traced.
     "directory": "./dist",
-    "not_found_handling": "single-page-application"
+    "not_found_handling": "single-page-application",
+    "binding": "ASSETS",
+    // Route requests through the Worker before the assets layer so Workers
+    // Logs and Traces capture all traffic (the Worker re-applies the rules
+    // from public/_headers to the asset responses).
+    "run_worker_first": true
   },
-  // Attaches the custom domain to this Worker on deploy. Remove this block if
-  // you prefer to add the domain in the Cloudflare dashboard instead.
-  "routes": [{ "pattern": "realpdf.app", "custom_domain": true }]
+  // Workers Logs and Workers Traces, queried in the Cloudflare dashboard
+  // under Workers & Pages > realpdf > Logs / Traces.
+  "observability": {
+    "enabled": true,
+    // Never persist query strings in request URLs.
+    "redact_query_string": true,
+    "logs": {
+      "enabled": true,
+      "head_sampling_rate": 1,
+      "invocation_logs": true
+    },
+    "traces": {
+      "enabled": true,
+      "head_sampling_rate": 1
+    }
+  },
+  // Attaches the custom domains to this Worker on deploy. Remove this block if
+  // you prefer to add the domains in the Cloudflare dashboard instead.
+  // www is attached here and 301-redirects to the apex domain in the Worker
+  // (see worker/index.ts) so https://realpdf.app stays the canonical origin.
+  "routes": [
+    { "pattern": "realpdf.app", "custom_domain": true },
+    { "pattern": "www.realpdf.app", "custom_domain": true }
+  ]
 }
