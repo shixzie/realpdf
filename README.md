@@ -12,7 +12,7 @@ A real PDF editor that runs **entirely in your browser**. No uploads, no servers
 
 - Freehand pen, highlighter (multiplied blend, like a real marker) and eraser
 - Text boxes with font family/size/color, rectangles, ellipses, lines and arrows
-- **Edit existing text in place**: click any text and retype it — the original font, size, colour and position are matched, the run is covered with the colour sampled from the page behind it, and the replacement is embedded with the same font program (subset per font). Re-click an edit to keep changing it, or erase it to reveal the original.
+- **Edit existing text in place**: click any text and retype it — the original font, size, colour and position are matched and the original glyphs are **deleted from the page's content stream** (the text layer, search and copy see the new text only), with the replacement embedded using the same font program (subset per font). Re-click an edit to keep changing it, or erase it to reveal the original.
 - Cover existing content with white boxes and type over it to "replace" text
 - Insert images (drag & drop or file picker) and signatures — draw them or **upload a photo/scan** (with automatic white-background removal)
 - Select, move, resize, rotate and delete annotations, multi-select with Shift
@@ -87,7 +87,7 @@ npm run preview
 | --- | --- |
 | PDF rendering | [pdf.js](https://mozilla.github.io/pdf.js/) — Web Worker + **WebAssembly** decoders for JPEG 2000/ICC/JBIG2 (`wasm/`), plus CMaps and standard font data, all served from your own origin |
 | Editing surface | [fabric.js](https://fabricjs.com/) canvas overlays (one per visible page), coordinates stored in PDF points |
-| Saving | [pdf-lib](https://pdf-lib.js.org/) — annotations are re-drawn as native PDF operators, images embedded, new text mapped to Standard-14, edited text embedded with its original font (subset), highlights exported with a real Multiply blend mode |
+| Saving | [pdf-lib](https://pdf-lib.js.org/) — annotations are re-drawn as native PDF operators, images embedded, new text mapped to Standard-14, edited text embedded with its original font (subset) after rewriting the page's content streams to delete the original glyphs, highlights exported with a real Multiply blend mode |
 | State | [zustand](https://zustand.docs.pmnd.rs/) store with snapshot-based undo/redo |
 | ZIP export | dependency-free STORE-method zip writer (`src/lib/zip.ts`) |
 | Localization | dependency-free typed dictionaries (`src/i18n/`) with `Intl.PluralRules` plurals and locale-aware number/date formatting |
@@ -193,7 +193,7 @@ Cloudflare Workers runtime (`npm run cf:dev`).
 
 ## Limitations (honest list)
 
-- **Existing text is replaced, not re-flowed.** Editing a run keeps the rest of the page exactly where it is: the original is covered with the page's own background colour and the replacement is drawn on top with the matched font, so surrounding lines never move. Reflowing paragraphs would require a real content-stream layout engine.
+- **Existing text is replaced, not re-flowed.** Editing a run deletes the matching text-showing operators from the page's content stream (including inside form XObjects) and draws the replacement at the original position, so surrounding lines never move. Reflowing paragraphs would require a real content-stream layout engine. When a run cannot be located with certainty (shared form XObjects drawn at different transforms, `TJ` arrays that pdf.js splits, encrypted streams), the exporter falls back to the older behaviour: the original is covered with the colour sampled from the page behind it.
 - The replacement font comes from the font program pdf.js rebuilds from the embedded font (the same outlines the viewer shows). Fonts pdf.js cannot hand over (Type 3, some non-embedded standard fonts) fall back to the closest Standard-14 family. Characters that are not part of a subsetted font are written as `?`.
 - **Office formats are not supported** (Word/Excel/PPT in or out) — they cannot be done faithfully client-side without heavy native engines.
 - Text you add is exported with the Standard-14 fonts (Helvetica/Times/Courier). Characters outside WinAnsi (CJK, emoji, …) are replaced with `?`. Existing text rendering supports embedded fonts and CJK via pdf.js CMaps.
@@ -213,6 +213,7 @@ src/
     pdfjs.ts      pdf.js setup + local wasm/font/cmap assets
     export.ts     fabric → pdf-lib annotation drawing
     textEdit.ts   existing-text hit-testing, font reuse, colour sampling
+    contentEdit.ts  content-stream walk that deletes edited text runs
     forms.ts      AcroForm discovery + value writing
     pdfOps.ts     merge, extract, image/text conversion
     currentDocument.ts  "bake" the edited document for tools/export

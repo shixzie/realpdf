@@ -6,13 +6,40 @@
  *
  * It edits embedded-font text and standard-font text through the UI, then
  * re-opens the exported files and verifies the pixels (replacement present,
- * original covered, colours kept) and the embedded font programs.
+ * original gone, colours kept), the text layer (the original run is really
+ * deleted, not covered) and the embedded font programs.
  */
 import fs from 'node:fs'
 import path from 'node:path'
 import { chromium } from 'playwright'
-import { PDFDocument, PDFName, PDFDict, rgb } from 'pdf-lib'
+import { PDFDocument, PDFName, PDFDict, StandardFonts, rgb } from 'pdf-lib'
 import fontkit from '@pdf-lib/fontkit'
+import * as pdfjs from 'pdfjs-dist'
+
+// pdf.js uses the newest typed-array helpers, which older Node builds lack.
+if (typeof Uint8Array.prototype.toHex !== 'function') {
+  Object.defineProperty(Uint8Array.prototype, 'toHex', {
+    value() {
+      return Buffer.from(this).toString('hex')
+    },
+    configurable: true,
+  })
+}
+if (typeof Uint8Array.prototype.toBase64 !== 'function') {
+  Object.defineProperty(Uint8Array.prototype, 'toBase64', {
+    value() {
+      return Buffer.from(this).toString('base64')
+    },
+    configurable: true,
+  })
+}
+if (typeof Math.sumPrecise !== 'function') {
+  Math.sumPrecise = (values) => {
+    let total = 0
+    for (const value of values) total += value
+    return total
+  }
+}
 
 const APP_URL = process.env.APP_URL ?? 'http://127.0.0.1:5173/'
 const OUT_DIR = process.env.OUT_DIR ?? '/tmp/opencode'
@@ -57,6 +84,32 @@ function buildStandardFontPdf() {
   for (const offset of offsets) pdf += `${String(offset).padStart(10, '0')} 00000 n \n`
   pdf += `trailer\n<< /Size ${bodies.length + 1} /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF\n`
   return Buffer.from(pdf, 'latin1')
+}
+
+/** Page whose text sits on coloured stripes, so a cover would be visible. */
+async function buildStripedPdf() {
+  const doc = await PDFDocument.create()
+  const font = await doc.embedFont(StandardFonts.Helvetica)
+  const page = doc.addPage([400, 200])
+  const colors = [rgb(0.86, 0.2, 0.2), rgb(0.2, 0.65, 0.3), rgb(0.2, 0.3, 0.85)]
+  for (let index = 0; index < 13; index += 1) {
+    page.drawRectangle({ x: 30 + index * 14, y: 100, width: 14, height: 30, color: colors[index % 3] })
+  }
+  page.drawText('Replace this', { x: 34, y: 110, size: 16, font, color: rgb(0, 0, 0) })
+  fs.writeFileSync(path.join(OUT_DIR, 'textedit-striped.pdf'), await doc.save())
+}
+
+/** The text layer of the first page, as pdf.js reads it back. */
+async function pdfText(filePath) {
+  const bytes = new Uint8Array(fs.readFileSync(filePath))
+  const document = await pdfjs.getDocument({
+    data: bytes,
+    isEvalSupported: false,
+    standardFontDataUrl: `${path.resolve('node_modules/pdfjs-dist/standard_fonts')}/`,
+  }).promise
+  const page = await document.getPage(1)
+  const content = await page.getTextContent()
+  return content.items.map((item) => item.str).join('')
 }
 
 /** Font entries (with whether a font program is embedded) of a PDF page. */
@@ -166,8 +219,10 @@ async function baseStats(filePath, local, index = 0) {
             Math.round(h * scale),
           ).data
         let dark = 0
+        let black = 0
         let reddish = 0
         const columns = new Array(Math.round(w * scale)).fill(0)
+        const saturatedBins = new Set()
         for (let i = 0; i < data.length; i += 4) {
           const pixel = i / 4
           const column = pixel % Math.round(w * scale)
@@ -175,7 +230,13 @@ async function baseStats(filePath, local, index = 0) {
             dark += 1
             columns[column] += 1
           }
+          if (data[i] < 90 && data[i + 1] < 90 && data[i + 2] < 90) black += 1
           if (data[i] > 120 && data[i + 1] < 120 && data[i + 2] < 120) reddish += 1
+          const max = Math.max(data[i], data[i + 1], data[i + 2])
+          const min = Math.min(data[i], data[i + 1], data[i + 2])
+          if (data[i + 3] > 200 && max > 60 && max - min > 50) {
+            saturatedBins.add(((data[i] >> 4) << 8) | ((data[i + 1] >> 4) << 4) | (data[i + 2] >> 4))
+          }
         }
         let clusters = 0
         let inked = false
@@ -187,7 +248,7 @@ async function baseStats(filePath, local, index = 0) {
             inked = false
           }
         }
-        return { dark, reddish, clusters }
+        return { dark, black, reddish, clusters, saturatedBins: saturatedBins.size }
       },
       { x: local.x, y: local.y, w: local.w, h: local.h, index },
     )
@@ -295,6 +356,19 @@ try {
   const secondLine = await baseStats(exported, { x: 56, y: 162, w: 110, h: 46 })
   check(secondLine.dark > 8, `exported PDF shows the wrapped replacement (${secondLine.dark} dark pixels)`)
 
+  // The old text must be deleted from the text layer, not just covered.
+  const exportedLayer = await pdfText(exported)
+  check(
+    !exportedLayer.includes('The quick brown fox'),
+    `the text layer no longer contains the original run (${exportedLayer})`,
+  )
+  check(!exportedLayer.includes('Second line stays'), 'the text layer no longer contains the second run')
+  check(exportedLayer.includes('Ship it now'), 'the replacement is real text in the exported layer')
+  check(
+    exportedLayer.includes('Second line') && exportedLayer.includes('changed'),
+    'the wrapped replacement is real text too',
+  )
+
   // --------------------------------------------------- local library round trip
   await page.click('button:has-text("Library")')
   await page.waitForSelector('.library-item', { timeout: 15000 })
@@ -309,6 +383,11 @@ try {
   check(
     rebuiltUnique.filter((font) => font.embedded).length === 2,
     `the library keeps the original font program (${rebuiltUnique.length} fonts)`,
+  )
+  const rebuiltLayer = await pdfText(rebuilt)
+  check(
+    !rebuiltLayer.includes('The quick brown fox') && rebuiltLayer.includes('Ship it now'),
+    `library rebuild also deletes the original glyphs (${rebuiltLayer})`,
   )
 
   // Reopen from browser storage: the font asset must be restored.
@@ -352,7 +431,46 @@ try {
   const standardText = await baseStats(standardExported, { x: 35, y: 70, w: 220, h: 40 })
   check(standardText.dark > 10, `standard-font replacement renders (${standardText.dark} dark pixels)`)
   const standardCovered = await baseStats(standardExported, { x: 242, y: 70, w: 22, h: 40 })
-  check(standardCovered.dark === 0, 'standard-font original is covered')
+  check(standardCovered.dark === 0, 'standard-font original is gone from the export')
+  const standardLayer = await pdfText(standardExported)
+  check(
+    !standardLayer.includes('Standard font test'),
+    `the standard-font original is deleted, not covered (${standardLayer})`,
+  )
+  check(standardLayer.includes('Standard edited'), 'the standard-font replacement is real text in the layer')
+
+  // --------------------------------------------- no background cover
+  // Text over coloured stripes: if the exporter painted a sampled background
+  // rectangle over the original run, the stripes would be flattened.
+  await buildStripedPdf()
+  await page.goto(APP_URL, { waitUntil: 'domcontentloaded' })
+  await page.waitForSelector('.empty-card')
+  await openPdf(page, path.join(OUT_DIR, 'textedit-striped.pdf'))
+  await page.click('.tool[title^="Edit text"]')
+  const stripedBox = await pageBox()
+  await page.mouse.click(stripedBox.x + 60, stripedBox.y + 84)
+  await page.waitForTimeout(700)
+  await page.keyboard.type('Go')
+  await page.keyboard.press('Escape')
+  await page.waitForTimeout(400)
+  await page.mouse.click(stripedBox.x + 350, stripedBox.y + 180)
+  await page.waitForTimeout(300)
+
+  const [stripedDownload] = await Promise.all([
+    page.waitForEvent('download', { timeout: 30000 }),
+    page.click('button:has-text("Save PDF")'),
+  ])
+  const stripedExported = path.join(OUT_DIR, 'textedit-striped-exported.pdf')
+  await stripedDownload.saveAs(stripedExported)
+  const stripedLayer = await pdfText(stripedExported)
+  check(!stripedLayer.includes('Replace this'), `striped original is deleted (${stripedLayer})`)
+  check(stripedLayer.includes('Go'), 'striped replacement is real text')
+  const stripes = await baseStats(stripedExported, { x: 60, y: 74, w: 55, h: 24 })
+  check(stripes.black === 0, 'no original glyphs remain over the stripes')
+  check(
+    stripes.saturatedBins >= 3,
+    `the striped background is intact — no cover rectangle (${stripes.saturatedBins} colours)`,
+  )
 
   if (pageErrors.length) {
     failures.push(`FAIL - page errors during the run: ${pageErrors.join(' | ')}`)

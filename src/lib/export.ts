@@ -26,6 +26,7 @@ import fontkit from '@pdf-lib/fontkit'
 import { Point, util, type FabricObject } from 'fabric'
 import { parseColor, toPdfRgb } from './color'
 import { dataUrlBytes, dataUrlMime, flipDataUrl, getAsset } from './assets'
+import { removeTextRuns, type TextRemovalTarget } from './contentEdit'
 import type { FontFamily } from '../types'
 
 /** fabric's line-box and baseline fractions (see lib/textEdit.ts). */
@@ -387,8 +388,24 @@ export async function buildPdf(
     }
     const inv = makeInverse(input.transform)
     const objects = await enliven(input.objects)
+    const realEdits = new WeakSet<FabricObject>()
+    if (input.sourceIndex != null) {
+      const edits = objects.filter((object) => {
+        const edit = object as AnyObject
+        return edit.data?.kind === 'pdftext' && String(edit.text ?? '').trim()
+      })
+      if (edits.length) {
+        const targets = edits.map((object) => pdfTextTarget(object as AnyObject, inv))
+        try {
+          for (const index of removeTextRuns(page, targets)) realEdits.add(edits[index])
+        } catch (error) {
+          // Fall back to covering the original run.
+          console.warn('Could not remove the original text from the page', error)
+        }
+      }
+    }
     for (const obj of objects) {
-      await drawObject(obj as AnyObject, page, inv, { getFont, getImage, getCustomFontInfo })
+      await drawObject(obj as AnyObject, page, inv, { getFont, getImage, getCustomFontInfo, realEdits })
     }
     options.onProgress?.(index + 1, total)
   }
@@ -418,6 +435,38 @@ interface DrawContext {
   getFont: (family: FontFamily, bold: boolean, italic: boolean) => Promise<PDFFont>
   getImage: (src: string) => Promise<PDFImage>
   getCustomFontInfo: (assetId: string) => Promise<CustomFontInfo | null>
+  /** Edited runs whose original glyphs were deleted from the content stream. */
+  realEdits: WeakSet<FabricObject>
+}
+
+/**
+ * Location of a retyped run, in PDF user space. The spawn box is stored in
+ * scene coordinates; undo the fabric baseline offset and the viewport transform
+ * to get back to the content-stream coordinate system.
+ */
+function pdfTextTarget(obj: AnyObject, inv: Inverted): TextRemovalTarget {
+  const spawn = (obj.data?.spawn ?? {}) as { left?: number; top?: number; width?: number; angle?: number }
+  const fontSize = Number(obj.fontSize) || 16
+  const angle = Number(spawn.angle) || 0
+  const radians = (angle * Math.PI) / 180
+  const baselineFromTop = fontSize * FONT_SIZE_MULT * (1 - FONT_SIZE_FRACTION)
+  const sceneX = (Number(spawn.left) || 0) - Math.sin(radians) * baselineFromTop
+  const sceneY = (Number(spawn.top) || 0) + Math.cos(radians) * baselineFromTop
+  const origin = inv.point(sceneX, sceneY)
+  const direction = inv.dir(Math.cos(radians), Math.sin(radians))
+  const spawnWidth = Number(spawn.width) || fontSize
+  const width =
+    typeof obj.data?.originalWidth === 'number'
+      ? obj.data.originalWidth
+      : Math.max(fontSize, (spawnWidth - 2) / 1.02)
+  return {
+    text: String(obj.data?.originalText ?? ''),
+    x: origin.x,
+    y: origin.y,
+    width,
+    fontSize,
+    angle: Math.atan2(direction.y, direction.x),
+  }
 }
 
 function makeCustomFontMetrics(fk: ReturnType<typeof fontkit.create>): CustomFontMetrics {
@@ -705,22 +754,25 @@ async function drawTextObject(obj: AnyObject, page: PDFPage, inv: Inverted, ctx:
   const lines = wrapText(sanitized, boxWidth, measure)
   const angle = dirAngle(obj, inv)
   if (editing) {
-    // The replacement text sits on its own sampled background so the original
-    // glyphs underneath are covered.
-    const background = parseColor(obj.backgroundColor)
-    if (background.a > 0) {
-      const coverHeight = (lines.length - 1) * lineAdvance + heightImpl
-      const box = boxOf(obj, inv, coverHeight)
-      if (box.width > 0 && box.height > 0) {
-        page.drawRectangle({
-          x: box.anchor.x,
-          y: box.anchor.y,
-          width: box.width,
-          height: box.height,
-          rotate: degrees(box.angle),
-          color: toPdfRgb(background),
-          opacity: Math.max(0, Math.min(1, (obj.opacity ?? 1) * background.a)),
-        })
+    // When the original run was deleted from the content stream there is
+    // nothing left to cover; only fall back to a sampled background rectangle
+    // when the run could not be located in the saved content.
+    if (!ctx.realEdits.has(obj)) {
+      const background = parseColor(obj.backgroundColor)
+      if (background.a > 0) {
+        const coverHeight = (lines.length - 1) * lineAdvance + heightImpl
+        const box = boxOf(obj, inv, coverHeight)
+        if (box.width > 0 && box.height > 0) {
+          page.drawRectangle({
+            x: box.anchor.x,
+            y: box.anchor.y,
+            width: box.width,
+            height: box.height,
+            rotate: degrees(box.angle),
+            color: toPdfRgb(background),
+            opacity: Math.max(0, Math.min(1, (obj.opacity ?? 1) * background.a)),
+          })
+        }
       }
     }
   }
