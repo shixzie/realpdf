@@ -1,6 +1,6 @@
 import * as pdfjs from 'pdfjs-dist'
 import workerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url'
-import type { PDFDocumentProxy } from 'pdfjs-dist'
+import type { PDFDocumentProxy, PDFWorker } from 'pdfjs-dist'
 import type { PageSourceInfo } from '../types'
 
 pdfjs.GlobalWorkerOptions.workerSrc = workerUrl
@@ -35,6 +35,28 @@ function documentOptions(bytes: Uint8Array) {
 /** Opens arbitrary PDF bytes (used for rendering exported/converted documents). */
 export async function openPdfDocumentFromBytes(bytes: Uint8Array): Promise<PDFDocumentProxy> {
   return await pdfjs.getDocument(documentOptions(bytes)).promise
+}
+
+/** Starts a worker that outlives any single document (preview rebuilds). */
+export function createPdfWorker(): PDFWorker | null {
+  try {
+    return new pdfjs.PDFWorker()
+  } catch (error) {
+    console.warn('Could not start a pdf.js worker', error)
+    return null
+  }
+}
+
+/**
+ * Like `openPdfDocumentFromBytes`, but on a caller-provided worker so repeated
+ * documents (live previews) share one worker instead of starting a new one.
+ */
+export async function openPdfDocumentOnWorker(
+  bytes: Uint8Array,
+  worker: PDFWorker | null,
+): Promise<PDFDocumentProxy> {
+  const options = documentOptions(bytes)
+  return await pdfjs.getDocument(worker ? { ...options, worker } : options).promise
 }
 
 export function loadPdfDocument(

@@ -4,6 +4,7 @@ import fontkit from '@pdf-lib/fontkit'
 import { pdfjs } from './pdfjs'
 import { addAsset, dataUrlBytes, getAsset } from './assets'
 import { normalizeFamily } from './export'
+import { uid } from './uid'
 import type { FontFamily } from '../types'
 
 /**
@@ -528,13 +529,54 @@ export async function sampleRunColors(pdfPage: PDFPageProxy, run: TextRun): Prom
 
 export interface PdfTextData {
   kind: 'pdftext'
+  /** Stable id so previews can tell one edit from another across reloads. */
+  editId: string
   originalText: string
   spawn: { left: number; top: number; width: number; angle: number }
   /** Advance width of the original run, used to find it in the content stream. */
   originalWidth: number
   font: { assetId?: string; family: FontFamily; bold: boolean; italic: boolean; spaceEm?: number }
+  /** Sampled background of the run, used when its glyphs cannot be deleted. */
+  cover?: string
   /** True once the colour, size or family was changed by hand. */
   styled?: boolean
+}
+
+/** Scene-space spawn box of an existing text edit. */
+export interface EditSpawn {
+  left: number
+  top: number
+  width: number
+  fontSize: number
+  angle: number
+}
+
+/** Reads the spawn box stored on a `pdftext` object, if it is one. */
+export function spawnBoxOf(object: FabricObject): EditSpawn | null {
+  const target = object as AnyObject
+  if (target.data?.kind !== 'pdftext') return null
+  const spawn = target.data?.spawn as Partial<EditSpawn> | undefined
+  if (!spawn || typeof spawn.left !== 'number' || typeof spawn.top !== 'number') return null
+  return {
+    left: spawn.left,
+    top: spawn.top,
+    width: typeof spawn.width === 'number' ? spawn.width : Number(target.width) || 1,
+    fontSize: Number(target.fontSize) || 16,
+    angle: typeof spawn.angle === 'number' ? spawn.angle : Number(target.angle) || 0,
+  }
+}
+
+/** True when a run's baseline origin falls inside an edit's spawn box. */
+export function runCoveredByEdit(run: TextRun, spawn: EditSpawn): boolean {
+  const radians = (spawn.angle * Math.PI) / 180
+  const cos = Math.cos(radians)
+  const sin = Math.sin(radians)
+  const dx = run.x - spawn.left
+  const dy = run.y - spawn.top
+  const u = dx * cos + dy * sin
+  const v = -dx * sin + dy * cos
+  const height = Math.max(1, spawn.fontSize) * FONT_SIZE_MULT
+  return u >= -2 && u <= spawn.width + 2 && v >= -2 && v <= height + 2
 }
 
 /** Builds the editable replacement for a run (same font, size, colour and place). */
@@ -548,10 +590,12 @@ export function createPdfTextEditObject(run: TextRun, colors: RunColors): Textbo
   const width = Math.max(fontSize, run.width + Math.max(2, run.width * 0.02))
   const data: PdfTextData = {
     kind: 'pdftext',
+    editId: uid(),
     originalText: run.str,
     spawn: { left, top, width, angle: run.angle },
     originalWidth: run.width,
     font: { assetId: run.assetId, family: run.fallback, bold: run.bold, italic: run.italic, spaceEm: run.spaceEm },
+    cover: colors.background,
   }
   return new Textbox(run.str, {
     left,
