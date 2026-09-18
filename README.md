@@ -171,23 +171,27 @@ still happens in the browser. `www.realpdf.app` 301-redirects to
 
 ## Tests
 
-The repo ships headless-browser end-to-end tests (Playwright) that drive real pointer input and verify the exported PDFs by re-rendering and inspecting pixels and text.
+The suites run on [Vitest](https://vitest.dev/): headless-browser end-to-end
+tests (Playwright) drive real pointer input and verify the exported PDFs by
+re-rendering them, and unit tests exercise the content-stream rewriting without
+a browser. The global setup writes the shared fixtures and starts its own Vite
+server, so a single command is enough:
 
 ```bash
-npm run sample       # writes sample.pdf used by the tests
-npm run dev          # in one terminal
-npm test             # in another: editor + tools suites
-# or target the production build:
+npm test             # vitest run: unit + all end-to-end suites
+npm run test:watch   # the same, in watch mode
+npm test -- tests/e2e/text-edit.test.mjs   # one suite
+# or target a running server (for example the production build):
 APP_URL=http://localhost:4173/ npm test
 ```
 
-- `scripts/e2e.mjs` — load, annotate with every tool, eraser, undo/redo, virtualization, page ops, export → reopen verification, non-embedded standard font rendering
-- `scripts/e2e-tools.mjs` — merge, split range, PDF→PNG, PDF→text, images→PDF, text→PDF, form filling → exported value verification
-
-- `scripts/e2e-ui.mjs` — theme toggle, homepage tool cards, signature image upload, Ko-fi button, language switch (persistence, translated strings, `<html lang>`/title)
-- `scripts/e2e-library.mjs` — save to the local library, rename, persistence across a reload, restore annotations, rebuild the PDF, delete
-- `scripts/e2e-textedit.mjs` — edit embedded-font and standard-font text, font/colour matching, hover highlight, wrapping, undo/redo, library round trip, exported font-program verification
-- `scripts/e2e-textselect.mjs` — selecting text activates the text tool, its options reflect and restyle the selected text, and the changes survive export
+- `tests/unit/content-edit.test.mjs` — text-run matching and content-stream rewriting (form XObjects, rotated text, split `TJ` arrays)
+- `tests/e2e/editor.test.mjs` — load, annotate with every tool, eraser, undo/redo, virtualization, page ops, export → reopen verification, non-embedded standard font rendering
+- `tests/e2e/tools.test.mjs` — merge, split range, PDF→PNG, PDF→text, images→PDF, text→PDF, form filling → exported value verification
+- `tests/e2e/ui.test.mjs` — theme toggle, homepage tool cards, signature image upload, Ko-fi button, language switch (persistence, translated strings, `<html lang>`/title)
+- `tests/e2e/library.test.mjs` — save to the local library, rename, persistence across a reload, restore annotations, rebuild the PDF, delete
+- `tests/e2e/text-edit.test.mjs` — edit embedded-font and standard-font text: text layer deletion, exported font programs, coloured backgrounds
+- `tests/e2e/text-select.test.mjs` — selecting text activates the text tool, its options reflect and restyle the selected text, and the changes survive export
 
 All suites pass against the Vite dev server, the production build and the local
 Cloudflare Workers runtime (`npm run cf:dev`).
@@ -221,5 +225,6 @@ src/
     serialize.ts  annotation JSON (assets kept out of undo snapshots)
     zip.ts        minimal ZIP writer
   store.ts        single zustand store (pages, history, tools, forms)
-scripts/          sample generator, e2e tests, screenshots
+scripts/          sample generator, screenshots, visual checks
+tests/            vitest suites: helpers, unit tests, browser end-to-end tests
 ```
