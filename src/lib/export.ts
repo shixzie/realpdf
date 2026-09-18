@@ -3,22 +3,34 @@ import {
   LineCapStyle,
   PDFDocument,
   StandardFonts,
+  beginText,
   closePath,
   degrees,
+  endText,
   fill,
   lineTo,
+  moveText,
   moveTo,
   popGraphicsState,
   pushGraphicsState,
+  rotateAndSkewTextDegreesAndTranslate,
   setFillingColor,
+  setFontAndSize,
+  showText,
   type PDFFont,
+  type PDFName,
   type PDFImage,
   type PDFPage,
 } from 'pdf-lib'
+import fontkit from '@pdf-lib/fontkit'
 import { Point, util, type FabricObject } from 'fabric'
 import { parseColor, toPdfRgb } from './color'
-import { dataUrlBytes, dataUrlMime, flipDataUrl } from './assets'
+import { dataUrlBytes, dataUrlMime, flipDataUrl, getAsset } from './assets'
 import type { FontFamily } from '../types'
+
+/** fabric's line-box and baseline fractions (see lib/textEdit.ts). */
+const FONT_SIZE_MULT = 1.13
+const FONT_SIZE_FRACTION = 0.222
 
 export interface ExportPageInput {
   sourceIndex: number | null
@@ -73,9 +85,9 @@ interface Box {
   angle: number
 }
 
-function boxOf(obj: AnyObject, inv: Inverted): Box {
+function boxOf(obj: AnyObject, inv: Inverted, localHeight?: number): Box {
   const w = obj.width
-  const h = obj.height
+  const h = localHeight ?? obj.height
   const tl = localToScene(obj, 0, 0)
   const tr = localToScene(obj, w, 0)
   const bl = localToScene(obj, 0, h)
@@ -130,7 +142,7 @@ const FONT_MAP: Record<FontFamily, { normal: StandardFonts; bold: StandardFonts;
   },
 }
 
-function normalizeFamily(family: unknown): FontFamily {
+export function normalizeFamily(family: unknown): FontFamily {
   if (typeof family !== 'string') return 'Helvetica'
   const f = family.toLowerCase()
   if (f.includes('times') || f.includes('serif') || f.includes('georgia')) return 'Times New Roman'
@@ -170,7 +182,7 @@ function sanitizeText(text: string, font: PDFFont): string {
   return out
 }
 
-function wrapText(text: string, maxWidth: number, font: PDFFont, size: number): string[] {
+function wrapText(text: string, maxWidth: number, measure: (value: string) => number): string[] {
   const lines: string[] = []
   for (const paragraph of text.split('\n')) {
     if (!paragraph) {
@@ -183,27 +195,16 @@ function wrapText(text: string, maxWidth: number, font: PDFFont, size: number): 
     }
     const words = paragraph.split(' ')
     let current = ''
-    for (let word of words) {
+    for (const word of words) {
       const candidate = current ? `${current} ${word}` : word
-      let candidateWidth = 0
-      try {
-        candidateWidth = font.widthOfTextAtSize(candidate, size)
-      } catch {
-        candidateWidth = candidate.length * size * 0.5
-      }
+      const candidateWidth = measure(candidate)
       if (candidateWidth <= maxWidth || !current) {
         if (candidateWidth > maxWidth && !current) {
           // Single word too long: hard-break it.
           let chunk = ''
           for (const ch of word) {
             const next = chunk + ch
-            let w = 0
-            try {
-              w = font.widthOfTextAtSize(next, size)
-            } catch {
-              w = next.length * size * 0.5
-            }
-            if (w > maxWidth && chunk) {
+            if (measure(next) > maxWidth && chunk) {
               lines.push(chunk)
               chunk = ch
             } else {
@@ -302,6 +303,7 @@ export async function buildPdf(
 ): Promise<Uint8Array> {
   const source = await PDFDocument.load(originalBytes, { ignoreEncryption: true, updateMetadata: false })
   const out = await PDFDocument.create()
+  out.registerFontkit(fontkit)
   try {
     const title = source.getTitle()
     if (title) out.setTitle(title)
@@ -326,6 +328,35 @@ export async function buildPdf(
     const font = await out.embedFont(FONT_MAP[family][variant], { subset: false })
     fonts.set(key, font)
     return font
+  }
+
+  // Font programs collected while editing existing text (see lib/textEdit.ts).
+  const customFonts = new Map<string, CustomFontInfo | null>()
+  const getCustomFontInfo = async (assetId: string): Promise<CustomFontInfo | null> => {
+    const hit = customFonts.get(assetId)
+    if (hit !== undefined) return hit
+    const src = getAsset(assetId)
+    if (!src) {
+      customFonts.set(assetId, null)
+      return null
+    }
+    try {
+      const bytes = dataUrlBytes(src)
+      const font = await out.embedFont(bytes, { subset: true })
+      let metrics: CustomFontMetrics | null = null
+      try {
+        metrics = makeCustomFontMetrics(fontkit.create(bytes))
+      } catch (error) {
+        console.warn('Could not read the original font metrics', error)
+      }
+      const info = { font, metrics }
+      customFonts.set(assetId, info)
+      return info
+    } catch (error) {
+      console.warn('Could not embed the original font; falling back to a standard font', error)
+      customFonts.set(assetId, null)
+      return null
+    }
   }
 
   const images = new Map<string, PDFImage>()
@@ -357,7 +388,7 @@ export async function buildPdf(
     const inv = makeInverse(input.transform)
     const objects = await enliven(input.objects)
     for (const obj of objects) {
-      await drawObject(obj as AnyObject, page, inv, { getFont, getImage })
+      await drawObject(obj as AnyObject, page, inv, { getFont, getImage, getCustomFontInfo })
     }
     options.onProgress?.(index + 1, total)
   }
@@ -365,9 +396,76 @@ export async function buildPdf(
   return out.save({ useObjectStreams: true })
 }
 
+interface CustomFontMetrics {
+  /** Space advance in em fractions. */
+  spaceEm: number
+  /** True when the font can draw this code point (space and newlines always can). */
+  hasGlyph: (codePoint: number) => boolean
+  /**
+   * Width of a string in em fractions, from the raw glyph advances. PDF
+   * viewers position glyphs with the widths array, not with kerning, so this
+   * matches what the saved file will render.
+   */
+  advanceEm: (value: string) => number
+}
+
+interface CustomFontInfo {
+  font: PDFFont
+  metrics: CustomFontMetrics | null
+}
+
 interface DrawContext {
   getFont: (family: FontFamily, bold: boolean, italic: boolean) => Promise<PDFFont>
   getImage: (src: string) => Promise<PDFImage>
+  getCustomFontInfo: (assetId: string) => Promise<CustomFontInfo | null>
+}
+
+function makeCustomFontMetrics(fk: ReturnType<typeof fontkit.create>): CustomFontMetrics {
+  const unitsPerEm = fk.unitsPerEm || 1000
+  let spaceEm = 0
+  if (fk.hasGlyphForCodePoint(0x20)) {
+    spaceEm = fk.glyphForCodePoint(0x20).advanceWidth / unitsPerEm
+  } else {
+    // pdf.js rebuilds embedded fonts without their empty glyphs, so space has
+    // no cmap entry; use the most common empty-glyph advance instead.
+    const counts = new Map<number, number>()
+    for (let id = 1; id < (fk.numGlyphs ?? 0); id += 1) {
+      let glyph
+      try {
+        glyph = fk.getGlyph(id)
+      } catch {
+        continue
+      }
+      if (!glyph || glyph.advanceWidth <= 0) continue
+      const { numberOfContours } = glyph as unknown as { numberOfContours?: number | null }
+      if (numberOfContours !== 0 && numberOfContours != null) continue
+      const key = Math.round((glyph.advanceWidth / unitsPerEm) * 1000)
+      counts.set(key, (counts.get(key) ?? 0) + 1)
+    }
+    let best = 0
+    let bestCount = 0
+    for (const [key, count] of counts) {
+      if (count > bestCount) {
+        best = key
+        bestCount = count
+      }
+    }
+    spaceEm = best / 1000
+  }
+  if (!(spaceEm > 0.05 && spaceEm < 2)) spaceEm = 0.25
+  return {
+    spaceEm,
+    hasGlyph: (codePoint) =>
+      codePoint === 0x20 || codePoint === 0x0a || codePoint === 0x0d || fk.hasGlyphForCodePoint(codePoint),
+    advanceEm: (value) => {
+      let units = 0
+      for (const ch of value) {
+        const code = ch.codePointAt(0) ?? 0
+        units += fk.glyphForCodePoint(code).advanceWidth
+      }
+      return units / unitsPerEm
+    },
+  }
 }
 
 async function enliven(objects: unknown[]): Promise<FabricObject[]> {
@@ -389,6 +487,10 @@ async function drawObject(obj: AnyObject, page: PDFPage, inv: Inverted, ctx: Dra
     return
   }
 
+  if (kind === 'pdftext') {
+    await drawTextObject(obj, page, inv, ctx)
+    return
+  }
   if (kind === 'text' || type === 'i-text' || type === 'textbox' || type === 'text') {
     await drawTextObject(obj, page, inv, ctx)
     return
@@ -556,36 +658,93 @@ function drawPathObject(obj: AnyObject, page: PDFPage, inv: Inverted): void {
 async function drawTextObject(obj: AnyObject, page: PDFPage, inv: Inverted, ctx: DrawContext): Promise<void> {
   const text = typeof obj.text === 'string' ? obj.text : ''
   if (!text.trim()) return
+  const data = (obj.data ?? {}) as {
+    kind?: string
+    font?: { assetId?: string; family?: FontFamily; bold?: boolean; italic?: boolean; spaceEm?: number }
+  }
+  const editing = data.kind === 'pdftext'
   const fontSize = Number(obj.fontSize) || 16
-  const family = normalizeFamily(obj.fontFamily)
-  const bold = String(obj.fontWeight ?? '').toLowerCase() === 'bold' || Number(obj.fontWeight) >= 600
-  const italic = String(obj.fontStyle ?? '').toLowerCase() === 'italic'
-  const font = await ctx.getFont(family, bold, italic)
-  const sanitized = sanitizeText(text, font)
-  const lineAdvance = fontSize * (Number(obj.lineHeightFactor) || 1.16)
-  const ascent = fontSize * 0.8
+  let font: PDFFont
+  let custom: CustomFontInfo | null = null
+  if (editing && typeof data.font?.assetId === 'string') {
+    custom = await ctx.getCustomFontInfo(data.font.assetId)
+  }
+  if (custom) {
+    font = custom.font
+  } else {
+    const family = editing && data.font?.family ? data.font.family : normalizeFamily(obj.fontFamily)
+    const bold = editing
+      ? Boolean(data.font?.bold)
+      : String(obj.fontWeight ?? '').toLowerCase() === 'bold' || Number(obj.fontWeight) >= 600
+    const italic = editing
+      ? Boolean(data.font?.italic)
+      : String(obj.fontStyle ?? '').toLowerCase() === 'italic'
+    font = await ctx.getFont(family, bold, italic)
+  }
+  const sanitized = custom
+    ? sanitizeCustomText(text, custom.metrics)
+    : sanitizeText(text, font)
+  const lineHeight = Number(obj.lineHeight) || 1.16
+  const heightImpl = fontSize * FONT_SIZE_MULT
+  const lineAdvance = editing ? heightImpl * lineHeight : fontSize * (Number(obj.lineHeightFactor) || 1.16)
+  const baseline = editing ? heightImpl * (1 - FONT_SIZE_FRACTION) : fontSize * 0.8
   const align = String(obj.textAlign ?? 'left')
   const color = parseColor(obj.fill)
   const opacity = Math.max(0, Math.min(1, (obj.opacity ?? 1) * (color.a === 0 ? 1 : color.a)))
   const paint = color.a === 0 ? parseColor('#000000') : color
   const boxWidth = obj.width
-  const lines = wrapText(sanitized, boxWidth, font, fontSize)
+  const spaceEm = custom ? clampSpaceEm(data.font?.spaceEm ?? custom.metrics?.spaceEm) : 0
+  const measure = (value: string): number => {
+    if (custom) return measureCustomText(custom, value, fontSize, spaceEm)
+    try {
+      return font.widthOfTextAtSize(value, fontSize)
+    } catch {
+      return value.length * fontSize * 0.5
+    }
+  }
+  const lines = wrapText(sanitized, boxWidth, measure)
   const angle = dirAngle(obj, inv)
+  if (editing) {
+    // The replacement text sits on its own sampled background so the original
+    // glyphs underneath are covered.
+    const background = parseColor(obj.backgroundColor)
+    if (background.a > 0) {
+      const coverHeight = (lines.length - 1) * lineAdvance + heightImpl
+      const box = boxOf(obj, inv, coverHeight)
+      if (box.width > 0 && box.height > 0) {
+        page.drawRectangle({
+          x: box.anchor.x,
+          y: box.anchor.y,
+          width: box.width,
+          height: box.height,
+          rotate: degrees(box.angle),
+          color: toPdfRgb(background),
+          opacity: Math.max(0, Math.min(1, (obj.opacity ?? 1) * background.a)),
+        })
+      }
+    }
+  }
+  if (custom && align === 'left' && opacity >= 1) {
+    drawCustomFontText(obj, page, inv, custom, lines, {
+      fontSize,
+      lineAdvance,
+      baseline,
+      angle,
+      color: toPdfRgb(paint),
+      spaceEm,
+    })
+    return
+  }
   for (let i = 0; i < lines.length; i += 1) {
     const line = lines[i]
     if (!line) continue
-    let lineWidth = 0
-    try {
-      lineWidth = font.widthOfTextAtSize(line, fontSize)
-    } catch {
-      lineWidth = line.length * fontSize * 0.5
-    }
+    const lineWidth = measure(line)
     let lx = 0
     if (align === 'center') lx = (boxWidth - lineWidth) / 2
     else if (align === 'right' || align === 'justify' || align === 'justify-center' || align === 'justify-right') {
       lx = boxWidth - lineWidth
     }
-    const scene = localToScene(obj, lx, ascent + i * lineAdvance)
+    const scene = localToScene(obj, lx, baseline + i * lineAdvance)
     const point = inv.point(scene.x, scene.y)
     page.drawText(line, {
       x: point.x,
@@ -599,6 +758,99 @@ async function drawTextObject(obj: AnyObject, page: PDFPage, inv: Inverted, ctx:
   }
 }
 
+function clampSpaceEm(value: number | undefined): number {
+  return typeof value === 'number' && value > 0.05 && value < 2 ? value : 0.25
+}
+
+/** Replaces characters the embedded font cannot draw with a question mark. */
+function sanitizeCustomText(text: string, metrics: CustomFontMetrics | null): string {
+  if (!metrics) return text
+  let out = ''
+  for (const ch of text) {
+    if (ch === '\t') {
+      out += '    '
+      continue
+    }
+    const code = ch.codePointAt(0) ?? 0
+    if (code < 32 && ch !== '\n') continue
+    out += metrics.hasGlyph(code) ? ch : '?'
+  }
+  return out
+}
+
+/** Width of a string when spaces advance by `spaceEm` instead of a glyph. */
+function measureCustomText(
+  custom: CustomFontInfo,
+  text: string,
+  size: number,
+  spaceEm: number,
+): number {
+  if (!custom.metrics) {
+    try {
+      return custom.font.widthOfTextAtSize(text, size)
+    } catch {
+      return text.length * size * 0.5
+    }
+  }
+  const parts = text.split(' ')
+  let width = 0
+  for (let i = 0; i < parts.length; i += 1) {
+    if (i > 0) width += spaceEm * size
+    if (parts[i]) width += custom.metrics.advanceEm(parts[i]) * size
+  }
+  return width
+}
+
+/**
+ * Draws text with an embedded font at the operator level. Spaces are emitted
+ * as positioning offsets: pdf.js removes empty glyphs when rebuilding fonts,
+ * so the embedded space glyph may not exist. `Td` is relative to the line
+ * matrix, which only moves when we move it, so each gap adds the previous
+ * word's width plus the space advance.
+ */
+function drawCustomFontText(
+  obj: AnyObject,
+  page: PDFPage,
+  inv: Inverted,
+  custom: CustomFontInfo,
+  lines: string[],
+  options: { fontSize: number; lineAdvance: number; baseline: number; angle: number; color: ReturnType<typeof toPdfRgb>; spaceEm: number },
+): void {
+  const { font, metrics } = custom
+  const { newFontKey: fontKey } = (
+    page as unknown as {
+      setOrEmbedFont: (value: PDFFont) => { newFont: PDFFont; newFontKey: PDFName }
+    }
+  ).setOrEmbedFont(font)
+  const spaceWidth = options.spaceEm * options.fontSize
+  const advance = (word: string): number => {
+    if (metrics) return metrics.advanceEm(word) * options.fontSize
+    try {
+      return font.widthOfTextAtSize(word, options.fontSize)
+    } catch {
+      return word.length * options.fontSize * 0.5
+    }
+  }
+  for (let i = 0; i < lines.length; i += 1) {
+    const line = lines[i]
+    if (!line) continue
+    const scene = localToScene(obj, 0, options.baseline + i * options.lineAdvance)
+    const point = inv.point(scene.x, scene.y)
+    const operators = [
+      beginText(),
+      setFillingColor(options.color),
+      setFontAndSize(fontKey, options.fontSize),
+      rotateAndSkewTextDegreesAndTranslate(options.angle, 0, 0, point.x, point.y),
+    ]
+    const words = line.split(' ')
+    for (let w = 0; w < words.length; w += 1) {
+      if (words[w]) operators.push(showText(font.encodeText(words[w])))
+      if (w < words.length - 1) operators.push(moveText(advance(words[w]) + spaceWidth, 0))
+    }
+    operators.push(endText())
+    page.pushOperators(...operators)
+  }
+}
 async function drawImageObject(obj: AnyObject, page: PDFPage, inv: Inverted, ctx: DrawContext): Promise<void> {
   let src = typeof obj.getSrc === 'function' ? obj.getSrc() : (obj.src as string | undefined)
   if (!src) return

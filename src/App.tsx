@@ -19,6 +19,7 @@ import type { Tool } from './types'
 const TOOL_SHORTCUTS: Record<string, Tool> = {
   v: 'select',
   t: 'text',
+  x: 'textedit',
   p: 'pen',
   h: 'highlighter',
   r: 'rect',

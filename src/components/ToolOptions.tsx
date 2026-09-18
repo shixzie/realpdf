@@ -10,6 +10,7 @@ const HIGHLIGHT_COLORS = ['#facc15', '#4ade80', '#60a5fa', '#f472b6', '#fb923c']
 const TOOL_LABEL: Record<Tool, string> = {
   select: 'Select',
   text: 'Text',
+  textedit: 'Edit text',
   pen: 'Draw',
   highlighter: 'Highlight',
   rect: 'Rectangle',
@@ -168,6 +169,12 @@ export function ToolOptions() {
       {tool === 'whiteout' && (
         <span className="options-hint">
           Drag over existing content to cover it, then add text on top.
+        </span>
+      )}
+
+      {tool === 'textedit' && (
+        <span className="options-hint">
+          Click existing PDF text to edit it. The original font, size and colour are matched automatically.
         </span>
       )}
 

@@ -25,8 +25,10 @@ export function applyToolToCanvas(canvas: Canvas, tool: Tool, settings: Settings
   const drawing = tool === 'pen' || tool === 'highlighter'
   canvas.isDrawingMode = drawing
   canvas.selection = tool === 'select'
-  canvas.defaultCursor = tool === 'select' ? 'default' : 'crosshair'
-  canvas.skipTargetFind = drawing || (tool !== 'select' && tool !== 'eraser')
+  canvas.defaultCursor = tool === 'select' ? 'default' : tool === 'textedit' ? 'text' : 'crosshair'
+  // `textedit` keeps hit-testing on (to re-edit replacements) but nothing is
+  // selectable, so clicks are handled by the page itself.
+  canvas.skipTargetFind = drawing || (tool !== 'select' && tool !== 'eraser' && tool !== 'textedit')
   if (drawing) {
     const brush = new PencilBrush(canvas)
     if (tool === 'pen') {
@@ -39,10 +41,11 @@ export function applyToolToCanvas(canvas: Canvas, tool: Tool, settings: Settings
     canvas.freeDrawingBrush = brush
   }
   const selectable = tool === 'select'
-  const evented = tool === 'select' || tool === 'eraser'
+  const evented = tool === 'select' || tool === 'eraser' || tool === 'textedit'
   canvas.forEachObject((obj) => {
     // `evented` must stay true for the eraser so hit-testing can find objects.
     obj.set({ selectable, evented })
+    obj.set({ hoverCursor: tool === 'textedit' ? 'text' : undefined })
   })
   canvas.requestRenderAll()
 }

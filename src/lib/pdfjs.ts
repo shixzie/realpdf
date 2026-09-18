@@ -26,6 +26,9 @@ function documentOptions(bytes: Uint8Array) {
     standardFontDataUrl: `${ASSET_BASE}standard_fonts/`,
     wasmUrl: `${ASSET_BASE}wasm/`,
     iccUrl: `${ASSET_BASE}iccs/`,
+    // Keeps the raw font programs on `page.commonObjs` so existing text can be
+    // edited with its original font (see lib/textEdit.ts).
+    fontExtraProperties: true,
   }
 }
 

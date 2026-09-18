@@ -1,6 +1,7 @@
 export type Tool =
   | 'select'
   | 'text'
+  | 'textedit'
   | 'pen'
   | 'highlighter'
   | 'rect'

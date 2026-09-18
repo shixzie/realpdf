@@ -107,6 +107,9 @@ function collectAssetIds(pages: PageState[]): Set<string> {
       const obj = item as Record<string, any>
       const assetId = obj.data?.assetId
       if (typeof assetId === 'string') ids.add(assetId)
+      // Existing-text edits keep the original font program in `data.font`.
+      const fontAssetId = obj.data?.font?.assetId
+      if (typeof fontAssetId === 'string') ids.add(fontAssetId)
       if (Array.isArray(obj.objects)) walk(obj.objects)
     }
   }
