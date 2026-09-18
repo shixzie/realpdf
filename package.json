@@ -1,0 +1,41 @@
+{
+  "name": "realpdf",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "description": "A fully client-side PDF editor: annotate, draw, add text and images, then export.",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit",
+    "sample": "node scripts/make-sample.mjs",
+    "test": "node scripts/e2e.mjs && node scripts/e2e-tools.mjs && node scripts/e2e-ui.mjs && node scripts/e2e-library.mjs",
+    "test:editor": "node scripts/e2e.mjs",
+    "test:tools": "node scripts/e2e-tools.mjs",
+    "visual": "node scripts/visual-check.mjs",
+    "deploy": "npm run build && wrangler deploy",
+    "cf:dev": "npm run build && wrangler dev",
+    "test:ui": "node scripts/e2e-ui.mjs",
+    "test:library": "node scripts/e2e-library.mjs"
+  },
+  "dependencies": {
+    "fabric": "^7.4.0",
+    "lucide-react": "^1.47.0",
+    "pdf-lib": "^1.17.1",
+    "pdfjs-dist": "^6.3.289",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0",
+    "zustand": "^5.0.15"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.1",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@vitejs/plugin-react": "^6.1.1",
+    "playwright": "^1.63.0",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.0",
+    "wrangler": "^4.134.0"
+  }
+}

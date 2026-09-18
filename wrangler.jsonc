@@ -1,0 +1,15 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "realpdf",
+  "compatibility_date": "2026-01-01",
+  "assets": {
+    // The whole app is static: html, js, css, the pdf.js worker, wasm decoders,
+    // standard fonts, cmaps and ICC profiles. There is no worker script —
+    // Cloudflare serves the assets directly at the edge.
+    "directory": "./dist",
+    "not_found_handling": "single-page-application"
+  },
+  // Attaches the custom domain to this Worker on deploy. Remove this block if
+  // you prefer to add the domain in the Cloudflare dashboard instead.
+  "routes": [{ "pattern": "realpdf.app", "custom_domain": true }]
+}

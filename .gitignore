@@ -1,0 +1,11 @@
+node_modules
+dist
+dist-ssr
+sample.pdf
+*.local
+.DS_Store
+.vite
+tsconfig.tsbuildinfo
+
+.wrangler
+.dev.vars
