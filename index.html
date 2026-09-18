@@ -24,6 +24,19 @@
     <meta name="twitter:card" content="summary_large_image" />
     <title>RealPDF — local PDF editor</title>
     <script>
+      // Apply the stored (or system) language and theme before first paint to
+      // avoid a flash of wrong-language/theme content. Translations live in
+      // src/i18n and are applied on boot (see initLocale in src/main.tsx).
+      ;(function () {
+        try {
+          var stored = localStorage.getItem('realpdf-locale')
+          document.documentElement.lang = stored || navigator.language || 'en'
+        } catch (error) {
+          document.documentElement.lang = 'en'
+        }
+      })()
+    </script>
+    <script>
       // Apply the stored (or system) theme before first paint to avoid flashes.
       ;(function () {
         try {
@@ -44,17 +57,7 @@
   <body>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
-    <!-- Ko-fi support widget -->
+    <!-- Ko-fi support widget (configured in src/lib/kofi.ts so its label follows the locale) -->
     <script src="https://storage.ko-fi.com/cdn/scripts/overlay-widget.js"></script>
-    <script>
-      if (window.kofiWidgetOverlay && typeof window.kofiWidgetOverlay.draw === 'function') {
-        window.kofiWidgetOverlay.draw('shixzie', {
-          type: 'floating-chat',
-          'floating-chat.donateButton.text': 'Support me',
-          'floating-chat.donateButton.background-color': '#fcbf47',
-          'floating-chat.donateButton.text-color': '#323842',
-        })
-      }
-    </script>
   </body>
 </html>

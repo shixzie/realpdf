@@ -59,6 +59,14 @@ default, with a one-click toggle in the toolbar.
 
 ![Warm light mode](docs/editor-light.png)
 
+## Languages
+
+The interface ships in English, Spanish, French and German, with a picker in
+the toolbar. The browser language is detected on the first visit, the chosen
+language is remembered, and `<html lang>` / `dir`, the document title and
+number/date formatting follow it. Adding a language is one dictionary file plus
+one registry entry — see [docs/localization.md](docs/localization.md).
+
 ## Quick start
 
 ```bash
@@ -82,6 +90,7 @@ npm run preview
 | Saving | [pdf-lib](https://pdf-lib.js.org/) — annotations are re-drawn as native PDF operators, images embedded, new text mapped to Standard-14, edited text embedded with its original font (subset), highlights exported with a real Multiply blend mode |
 | State | [zustand](https://zustand.docs.pmnd.rs/) store with snapshot-based undo/redo |
 | ZIP export | dependency-free STORE-method zip writer (`src/lib/zip.ts`) |
+| Localization | dependency-free typed dictionaries (`src/i18n/`) with `Intl.PluralRules` plurals and locale-aware number/date formatting |
 
 Export works by walking every stored annotation, inverting the pdf.js viewport transform to get PDF user-space coordinates, and drawing lines/rectangles/ellipses/text/images with pdf-lib. Rotation and non-standard page boxes are handled by the same inverse transform, so what you see is what gets written.
 
@@ -172,7 +181,7 @@ APP_URL=http://localhost:4173/ npm test
 - `scripts/e2e.mjs` — load, annotate with every tool, eraser, undo/redo, virtualization, page ops, export → reopen verification, non-embedded standard font rendering
 - `scripts/e2e-tools.mjs` — merge, split range, PDF→PNG, PDF→text, images→PDF, text→PDF, form filling → exported value verification
 
-- `scripts/e2e-ui.mjs` — theme toggle, homepage tool cards, signature image upload, Ko-fi button
+- `scripts/e2e-ui.mjs` — theme toggle, homepage tool cards, signature image upload, Ko-fi button, language switch (persistence, translated strings, `<html lang>`/title)
 - `scripts/e2e-library.mjs` — save to the local library, rename, persistence across a reload, restore annotations, rebuild the PDF, delete
 - `scripts/e2e-textedit.mjs` — edit embedded-font and standard-font text, font/colour matching, hover highlight, wrapping, undo/redo, library round trip, exported font-program verification
 
@@ -196,6 +205,7 @@ Cloudflare Workers runtime (`npm run cf:dev`).
 ```
 src/
   components/     UI: toolbar, tool rail, viewer, page sidebar, modals, form overlay
+  i18n/           locale registry, detection, plurals, t() and the language picker
   lib/
     pdfjs.ts      pdf.js setup + local wasm/font/cmap assets
     export.ts     fabric → pdf-lib annotation drawing

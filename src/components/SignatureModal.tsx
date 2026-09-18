@@ -3,6 +3,7 @@ import { Check, Eraser, Image as ImageIcon, PenLine, Upload, X } from 'lucide-re
 import { useStore } from '../store'
 import { commitCanvas, getCanvas, insertImageObject } from '../lib/canvasRegistry'
 import { loadImage } from '../lib/assets'
+import { useTranslation } from '../i18n'
 
 const WIDTH = 640
 const HEIGHT = 240
@@ -65,6 +66,7 @@ async function prepareUploadedSignature(src: string, removeWhite: boolean): Prom
 }
 
 export function SignatureModal() {
+  const { t } = useTranslation()
   const open = useStore((state) => state.tool === 'signature')
   const padRef = useRef<HTMLCanvasElement>(null)
   const fileRef = useRef<HTMLInputElement>(null)
@@ -168,12 +170,12 @@ export function SignatureModal() {
       dataUrl = previewSrc
     }
     if (!dataUrl) {
-      state.toastMessage('error', mode === 'draw' ? 'Draw a signature first.' : 'Choose a signature image first.')
+      state.toastMessage('error', mode === 'draw' ? t('signature.needDraw') : t('signature.needImage'))
       return
     }
     const target = getCanvas(state.currentPageId)
     if (!target) {
-      state.toastMessage('error', 'Scroll to a page first, then add the signature.')
+      state.toastMessage('error', t('signature.needPage'))
       close()
       return
     }
@@ -181,15 +183,15 @@ export function SignatureModal() {
     await insertImageObject(target, dataUrl, { maxWidth: 220 })
     if (state.currentPageId) commitCanvas(state.currentPageId)
     close()
-    state.toastMessage('success', 'Signature added — drag to position it.')
+    state.toastMessage('success', t('signature.added'))
   }
 
   return (
     <div className="modal-backdrop" role="dialog" aria-modal="true">
       <div className="modal">
         <div className="modal-head">
-          <h2>Add your signature</h2>
-          <button type="button" className="icon-button" onClick={close} title="Close">
+          <h2>{t('signature.title')}</h2>
+          <button type="button" className="icon-button" onClick={close} title={t('common.close')}>
             <X size={17} />
           </button>
         </div>
@@ -200,14 +202,14 @@ export function SignatureModal() {
             className={mode === 'draw' ? 'is-active' : ''}
             onClick={() => setMode('draw')}
           >
-            <PenLine size={15} /> Draw
+            <PenLine size={15} /> {t('signature.draw')}
           </button>
           <button
             type="button"
             className={mode === 'upload' ? 'is-active' : ''}
             onClick={() => setMode('upload')}
           >
-            <ImageIcon size={15} /> Upload image
+            <ImageIcon size={15} /> {t('signature.upload')}
           </button>
         </div>
 
@@ -225,13 +227,13 @@ export function SignatureModal() {
         ) : (
           <div className="signature-upload">
             {previewSrc ? (
-              <img className="signature-preview" src={previewSrc} alt="Signature preview" />
+              <img className="signature-preview" src={previewSrc} alt={t('signature.previewAlt')} />
             ) : (
               <div className="signature-drop">
                 <ImageIcon size={26} />
-                <span>{processing ? 'Processing…' : 'PNG or JPEG of your signature on a light background'}</span>
+                <span>{processing ? t('common.processing') : t('signature.uploadHint')}</span>
                 <button type="button" className="button" onClick={() => fileRef.current?.click()}>
-                  <Upload size={15} /> Choose image
+                  <Upload size={15} /> {t('signature.chooseImage')}
                 </button>
               </div>
             )}
@@ -243,7 +245,7 @@ export function SignatureModal() {
                     checked={removeWhite}
                     onChange={(event) => setRemoveWhite(event.target.checked)}
                   />
-                  Remove white background
+                  {t('signature.removeWhite')}
                 </label>
                 <button
                   type="button"
@@ -254,7 +256,7 @@ export function SignatureModal() {
                     fileRef.current?.click()
                   }}
                 >
-                  <Upload size={15} /> Replace
+                  <Upload size={15} /> {t('signature.replace')}
                 </button>
               </div>
             )}
@@ -269,7 +271,7 @@ export function SignatureModal() {
                 if (!file) return
                 const reader = new FileReader()
                 reader.onload = () => setUploadSrc(String(reader.result))
-                reader.onerror = () => useStore.getState().toastMessage('error', 'Could not read that image.')
+                reader.onerror = () => useStore.getState().toastMessage('error', t('signature.readFailed'))
                 reader.readAsDataURL(file)
               }}
             />
@@ -308,13 +310,13 @@ export function SignatureModal() {
                   if (canvas && context) context.clearRect(0, 0, canvas.width, canvas.height)
                 }}
               >
-                <Eraser size={15} /> Clear
+                <Eraser size={15} /> {t('common.clear')}
               </button>
             </>
           )}
           <div className="modal-spacer" />
           <button type="button" className="button" onClick={close}>
-            Cancel
+            {t('common.cancel')}
           </button>
           <button
             type="button"
@@ -322,7 +324,7 @@ export function SignatureModal() {
             onClick={() => void apply()}
             disabled={processing || (mode === 'upload' && !previewSrc)}
           >
-            <Check size={16} /> Add signature
+            <Check size={16} /> {t('signature.add')}
           </button>
         </div>
       </div>

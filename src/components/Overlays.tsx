@@ -1,5 +1,6 @@
 import { AlertTriangle, CheckCircle2, Info, Loader2, X } from 'lucide-react'
 import { useStore } from '../store'
+import { useTranslation } from '../i18n'
 
 export function Toast() {
   const toast = useStore((state) => state.toast)
@@ -17,6 +18,7 @@ export function Toast() {
 }
 
 export function ExportOverlay() {
+  const { t } = useTranslation()
   const exporting = useStore((state) => state.exporting)
   const progress = useStore((state) => state.exportProgress)
   if (!exporting) return null
@@ -25,8 +27,8 @@ export function ExportOverlay() {
       <div className="export-card">
         <Loader2 size={22} className="spin" />
         <div>
-          <strong>Building your PDF</strong>
-          <span>{Math.round(progress * 100)}% — everything happens on this device.</span>
+          <strong>{t('overlays.building')}</strong>
+          <span>{t('overlays.progress', { percent: Math.round(progress * 100) })}</span>
         </div>
       </div>
     </div>

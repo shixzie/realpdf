@@ -2,25 +2,26 @@ import { Trash2, X } from 'lucide-react'
 import { useStore } from '../store'
 import { activeCanvas, commitCanvas, deleteSelection, getCanvas } from '../lib/canvasRegistry'
 import { toHexColor } from '../lib/color'
+import { useTranslation } from '../i18n'
 import type { Tool } from '../types'
 
 const INK_COLORS = ['#111827', '#dc2626', '#ea580c', '#16a34a', '#2563eb', '#7c3aed', '#db2777', '#ffffff']
 const HIGHLIGHT_COLORS = ['#facc15', '#4ade80', '#60a5fa', '#f472b6', '#fb923c']
 
-const TOOL_LABEL: Record<Tool, string> = {
-  select: 'Select',
-  text: 'Text',
-  textedit: 'Edit text',
-  pen: 'Draw',
-  highlighter: 'Highlight',
-  rect: 'Rectangle',
-  ellipse: 'Ellipse',
-  line: 'Line',
-  arrow: 'Arrow',
-  whiteout: 'Cover',
-  image: 'Image',
-  signature: 'Signature',
-  eraser: 'Erase',
+const TOOL_LABEL_KEY: Record<Tool, string> = {
+  select: 'tools.select',
+  text: 'tools.text',
+  textedit: 'tools.textedit',
+  pen: 'tools.pen',
+  highlighter: 'tools.highlighter',
+  rect: 'tools.rect',
+  ellipse: 'tools.ellipse',
+  line: 'tools.line',
+  arrow: 'tools.arrow',
+  whiteout: 'tools.whiteoutShort',
+  image: 'tools.image',
+  signature: 'tools.signature',
+  eraser: 'tools.eraserShort',
 }
 
 const COLOR_TOOLS: Tool[] = ['pen', 'text', 'rect', 'ellipse', 'line', 'arrow']
@@ -35,6 +36,7 @@ function Swatches({
   colors: string[]
   onChange: (color: string) => void
 }) {
+  const { t } = useTranslation()
   const current = toHexColor(value).toLowerCase()
   return (
     <div className="swatches">
@@ -48,7 +50,7 @@ function Swatches({
           onClick={() => onChange(color)}
         />
       ))}
-      <label className="swatch swatch-custom" title="Custom color">
+      <label className="swatch swatch-custom" title={t('options.customColor')}>
         <input type="color" value={toHexColor(value)} onChange={(event) => onChange(event.target.value)} />
       </label>
     </div>
@@ -56,24 +58,25 @@ function Swatches({
 }
 
 export function ToolOptions() {
+  const { t } = useTranslation()
   const tool = useStore((state) => state.tool)
   const settings = useStore((state) => state.settings)
   const updateSettings = useStore((state) => state.updateSettings)
 
   return (
     <div className="options">
-      <span className="options-title">{TOOL_LABEL[tool]}</span>
+      <span className="options-title">{t(TOOL_LABEL_KEY[tool])}</span>
 
       {COLOR_TOOLS.includes(tool) && (
         <>
-          <span className="options-label">Color</span>
+          <span className="options-label">{t('options.color')}</span>
           <Swatches value={settings.color} colors={INK_COLORS} onChange={(color) => updateSettings({ color })} />
         </>
       )}
 
       {WIDTH_TOOLS.includes(tool) && (
         <>
-          <span className="options-label">Width</span>
+          <span className="options-label">{t('options.width')}</span>
           <input
             className="slider"
             type="range"
@@ -89,7 +92,7 @@ export function ToolOptions() {
 
       {tool === 'text' && (
         <>
-          <span className="options-label">Font</span>
+          <span className="options-label">{t('options.font')}</span>
           <select
             className="select"
             value={settings.fontFamily}
@@ -114,13 +117,13 @@ export function ToolOptions() {
 
       {tool === 'highlighter' && (
         <>
-          <span className="options-label">Color</span>
+          <span className="options-label">{t('options.color')}</span>
           <Swatches
             value={settings.highlightColor}
             colors={HIGHLIGHT_COLORS}
             onChange={(highlightColor) => updateSettings({ highlightColor })}
           />
-          <span className="options-label">Width</span>
+          <span className="options-label">{t('options.width')}</span>
           <input
             className="slider"
             type="range"
@@ -144,7 +147,7 @@ export function ToolOptions() {
               if (canvas) deleteSelection(canvas)
             }}
           >
-            <Trash2 size={15} /> Delete selected
+            <Trash2 size={15} /> {t('options.deleteSelected')}
           </button>
           <button
             type="button"
@@ -160,29 +163,21 @@ export function ToolOptions() {
               if (state.currentPageId) commitCanvas(state.currentPageId)
             }}
           >
-            <X size={15} /> Clear page
+            <X size={15} /> {t('options.clearPage')}
           </button>
-          <span className="options-hint">Click to select · Shift-click for multiple · drag handles to resize</span>
+          <span className="options-hint">{t('options.selectHint')}</span>
         </>
       )}
 
-      {tool === 'whiteout' && (
-        <span className="options-hint">
-          Drag over existing content to cover it, then add text on top.
-        </span>
-      )}
+      {tool === 'whiteout' && <span className="options-hint">{t('options.whiteoutHint')}</span>}
 
-      {tool === 'textedit' && (
-        <span className="options-hint">
-          Click existing PDF text to edit it. The original font, size and colour are matched automatically.
-        </span>
-      )}
+      {tool === 'textedit' && <span className="options-hint">{t('options.texteditHint')}</span>}
 
-      {tool === 'eraser' && <span className="options-hint">Click any annotation to remove it.</span>}
+      {tool === 'eraser' && <span className="options-hint">{t('options.eraserHint')}</span>}
 
-      {tool === 'image' && <span className="options-hint">Pick an image file to place it on the current page.</span>}
+      {tool === 'image' && <span className="options-hint">{t('options.imageHint')}</span>}
 
-      {tool === 'signature' && <span className="options-hint">Draw your signature in the dialog.</span>}
+      {tool === 'signature' && <span className="options-hint">{t('options.signatureHint')}</span>}
     </div>
   )
 }

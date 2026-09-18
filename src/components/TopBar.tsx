@@ -22,8 +22,11 @@ import { useStore } from '../store'
 import { openPdfFile } from '../lib/openDocument'
 import { runExport } from '../lib/exportController'
 import { getCanvas } from '../lib/canvasRegistry'
+import { useTranslation } from '../i18n'
+import { LanguagePicker } from './LanguagePicker'
 
 export function TopBar() {
+  const { t } = useTranslation()
   const fileName = useStore((state) => state.fileName)
   const pages = useStore((state) => state.pages)
   const currentPageId = useStore((state) => state.currentPageId)
@@ -65,7 +68,7 @@ export function TopBar() {
 
       <div className="topbar-group">
         <button type="button" className="button" onClick={() => fileInputRef.current?.click()} disabled={loading}>
-          {loading ? <Loader2 size={16} className="spin" /> : <FolderOpen size={16} />} Open PDF
+          {loading ? <Loader2 size={16} className="spin" /> : <FolderOpen size={16} />} {t('topbar.openPdf')}
         </button>
         <input
           id="open-pdf-input"
@@ -83,24 +86,24 @@ export function TopBar() {
         <button
           type="button"
           className="button"
-          title="Merge, split and convert documents"
+          title={t('topbar.toolsTitle')}
           onClick={() => useStore.getState().setToolsOpen(true)}
         >
-          <Wrench size={15} /> Tools
+          <Wrench size={15} /> {t('topbar.tools')}
         </button>
         <button
           type="button"
           className="button"
-          title="Documents saved in this browser"
+          title={t('topbar.libraryTitle')}
           onClick={() => void useStore.getState().openLibrary()}
         >
-          <BookOpen size={15} /> Library
+          <BookOpen size={15} /> {t('topbar.library')}
         </button>
         {(hasForms || formMode) && (
           <button
             type="button"
             className={`button ${formMode ? 'button-primary' : ''}`}
-            title="Fill interactive form fields"
+            title={t('topbar.fillFormsTitle')}
             onClick={() => {
               const state = useStore.getState()
               if (state.formMode) state.exitFormMode()
@@ -110,7 +113,7 @@ export function TopBar() {
               }
             }}
           >
-            <ClipboardList size={15} /> {formMode ? 'Filling forms' : 'Fill forms'}
+            <ClipboardList size={15} /> {formMode ? t('topbar.fillingForms') : t('topbar.fillForms')}
           </button>
         )}
       </div>
@@ -121,7 +124,7 @@ export function TopBar() {
             <button
               type="button"
               className="icon-button"
-              title="Undo (Ctrl+Z)"
+              title={t('topbar.undo')}
               disabled={!undoCount}
               onClick={() => useStore.getState().undo()}
             >
@@ -130,7 +133,7 @@ export function TopBar() {
             <button
               type="button"
               className="icon-button"
-              title="Redo (Ctrl+Shift+Z)"
+              title={t('topbar.redo')}
               disabled={!redoCount}
               onClick={() => useStore.getState().redo()}
             >
@@ -142,7 +145,7 @@ export function TopBar() {
             <button
               type="button"
               className="icon-button"
-              title="Previous page"
+              title={t('topbar.previousPage')}
               disabled={currentIndex <= 0}
               onClick={() => goTo(currentIndex - 1)}
             >
@@ -154,7 +157,7 @@ export function TopBar() {
             <button
               type="button"
               className="icon-button"
-              title="Next page"
+              title={t('topbar.nextPage')}
               disabled={currentIndex >= pages.length - 1}
               onClick={() => goTo(currentIndex + 1)}
             >
@@ -166,21 +169,21 @@ export function TopBar() {
             <button
               type="button"
               className="icon-button"
-              title="Zoom out"
+              title={t('topbar.zoomOut')}
               onClick={() => zoomTo(zoom / 1.2)}
             >
               <ZoomOut size={17} />
             </button>
-            <button type="button" className="zoom-label" onClick={() => zoomTo(1)} title="Reset zoom">
+            <button type="button" className="zoom-label" onClick={() => zoomTo(1)} title={t('topbar.resetZoom')}>
               {Math.round(zoom * 100)}%
             </button>
-            <button type="button" className="icon-button" title="Zoom in" onClick={() => zoomTo(zoom * 1.2)}>
+            <button type="button" className="icon-button" title={t('topbar.zoomIn')} onClick={() => zoomTo(zoom * 1.2)}>
               <ZoomIn size={17} />
             </button>
             <button
               type="button"
               className="icon-button"
-              title="Fit page width"
+              title={t('topbar.fitWidth')}
               onClick={() => useStore.getState().requestFit()}
             >
               <Maximize size={17} />
@@ -192,11 +195,13 @@ export function TopBar() {
 
       <div className="topbar-spacer" />
 
+      <LanguagePicker />
+
       <button
         type="button"
         className="icon-button"
-        title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
-        aria-label="Toggle color theme"
+        title={theme === 'dark' ? t('topbar.switchToLight') : t('topbar.switchToDark')}
+        aria-label={t('topbar.toggleTheme')}
         onClick={() => useStore.getState().toggleTheme()}
       >
         {theme === 'dark' ? <Sun size={17} /> : <Moon size={17} />}
@@ -206,9 +211,9 @@ export function TopBar() {
         href="https://ko-fi.com/shixzie"
         target="_blank"
         rel="noreferrer noopener"
-        title="Support RealPDF on Ko-fi"
+        title={t('topbar.supportTitle')}
       >
-        <Heart size={15} /> Support
+        <Heart size={15} /> {t('topbar.support')}
       </a>
 
       {pages.length > 0 && (
@@ -218,7 +223,7 @@ export function TopBar() {
           onClick={() => void runExport()}
           disabled={exporting}
         >
-          {exporting ? <Loader2 size={16} className="spin" /> : <Download size={16} />} Save PDF
+          {exporting ? <Loader2 size={16} className="spin" /> : <Download size={16} />} {t('topbar.savePdf')}
         </button>
       )}
     </header>

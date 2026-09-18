@@ -1,6 +1,7 @@
 import { PDFDocument, StandardFonts, rgb } from 'pdf-lib'
 import type { PDFDocumentProxy } from 'pdfjs-dist'
 import { dataUrlBytes, dataUrlMime } from './assets'
+import { t } from '../i18n'
 import type { FontFamily } from '../types'
 
 export interface MergeSource {
@@ -10,7 +11,7 @@ export interface MergeSource {
 
 /** Concatenates PDFs in the given order. */
 export async function mergePdfs(sources: MergeSource[]): Promise<Uint8Array> {
-  if (!sources.length) throw new Error('No documents to merge')
+  if (!sources.length) throw new Error(t('errors.noDocumentsToMerge'))
   const out = await PDFDocument.create()
   for (const source of sources) {
     const doc = await PDFDocument.load(source.bytes, { ignoreEncryption: true, updateMetadata: false })
@@ -22,7 +23,7 @@ export async function mergePdfs(sources: MergeSource[]): Promise<Uint8Array> {
 
 /** Copies the given 0-based page indices into a new PDF. */
 export async function extractPages(bytes: Uint8Array, indices: number[]): Promise<Uint8Array> {
-  if (!indices.length) throw new Error('Select at least one page')
+  if (!indices.length) throw new Error(t('errors.selectPage'))
   const source = await PDFDocument.load(bytes, { ignoreEncryption: true, updateMetadata: false })
   const out = await PDFDocument.create()
   const pages = await out.copyPages(source, indices)
@@ -53,7 +54,7 @@ export function parsePageRanges(input: string, pageCount: number): number[] {
     if (range) {
       const start = Number(range[1])
       const end = range[2] ? Number(range[2]) : pageCount
-      if (start > end) throw new Error(`Invalid range "${part}"`)
+      if (start > end) throw new Error(t('errors.invalidRange', { part }))
       for (let i = start; i <= end; i += 1) add(i)
       continue
     }
@@ -61,7 +62,7 @@ export function parsePageRanges(input: string, pageCount: number): number[] {
       add(Number(part))
       continue
     }
-    throw new Error(`Could not understand "${part}"`)
+    throw new Error(t('errors.rangeUnparsed', { part }))
   }
   return result
 }
@@ -77,7 +78,7 @@ export type ImagePageSize = 'image' | 'a4'
 
 /** Builds a PDF from images, one per page. */
 export async function imagesToPdf(images: ImageSource[], pageSize: ImagePageSize = 'a4'): Promise<Uint8Array> {
-  if (!images.length) throw new Error('Add at least one image')
+  if (!images.length) throw new Error(t('errors.noImages'))
   const doc = await PDFDocument.create()
   const a4: [number, number] = [595.28, 841.89]
   for (const image of images) {
@@ -212,7 +213,7 @@ export async function renderPdfPageToBlob(
   }).promise
   return await new Promise<Blob>((resolve, reject) => {
     canvas.toBlob(
-      (blob) => (blob ? resolve(blob) : reject(new Error('Could not encode the page'))),
+      (blob) => (blob ? resolve(blob) : reject(new Error(t('errors.encodeFailed')))),
       format === 'jpeg' ? 'image/jpeg' : 'image/png',
       format === 'jpeg' ? 0.92 : undefined,
     )

@@ -4,7 +4,11 @@ import App from './App'
 import { useStore } from './store'
 import { getCanvas } from './lib/canvasRegistry'
 import { serializeCanvas } from './lib/serialize'
+import { initLocale } from './i18n'
+import { initKofiWidget } from './lib/kofi'
 import './styles.css'
+
+initLocale()
 
 const container = document.getElementById('root')
 if (!container) throw new Error('Missing #root element')
@@ -18,3 +22,5 @@ createRoot(container).render(
     <App />
   </StrictMode>,
 )
+
+initKofiWidget()

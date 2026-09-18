@@ -12,8 +12,7 @@ import {
 } from 'fabric'
 import type { Settings, Tool } from '../types'
 import { useStore } from '../store'
-
-export const TEXT_PLACEHOLDER = 'Type here'
+import { t } from '../i18n'
 
 const SHAPE_TOOLS: Tool[] = ['rect', 'ellipse', 'line', 'arrow', 'whiteout']
 
@@ -153,7 +152,8 @@ export function finalizeArrow(canvas: Canvas, line: Line, settings: Settings): G
 }
 
 export function createTextObject(canvas: Canvas, point: Vec, settings: Settings): IText {
-  const text = new IText(TEXT_PLACEHOLDER, {
+  const placeholder = t('canvas.textPlaceholder')
+  const text = new IText(placeholder, {
     left: point.x,
     top: point.y,
     originX: 'left',
@@ -161,7 +161,7 @@ export function createTextObject(canvas: Canvas, point: Vec, settings: Settings)
     fontSize: settings.fontSize,
     fill: settings.color,
     fontFamily: settings.fontFamily,
-    data: { kind: 'text', placeholder: true },
+    data: { kind: 'text', placeholder: true, placeholderText: placeholder },
     selectable: true,
     evented: true,
   })

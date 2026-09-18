@@ -1,9 +1,11 @@
 import { useEffect, useRef, useState } from 'react'
 import { GripVertical, Plus, Trash2 } from 'lucide-react'
 import { useStore } from '../store'
+import { useTranslation } from '../i18n'
 import type { PageState } from '../types'
 
 function Thumbnail({ page }: { page: PageState }) {
+  const { t } = useTranslation()
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const pdf = useStore((state) => state.pdf)
   const [rendered, setRendered] = useState(false)
@@ -55,12 +57,13 @@ function Thumbnail({ page }: { page: PageState }) {
   return (
     <div className="thumb-frame">
       <canvas ref={canvasRef} className="thumb-canvas" data-blank={page.sourceIndex == null || !rendered} />
-      {page.sourceIndex == null && <span className="thumb-blank">Blank</span>}
+      {page.sourceIndex == null && <span className="thumb-blank">{t('sidebar.blank')}</span>}
     </div>
   )
 }
 
 export function PageSidebar() {
+  const { t } = useTranslation()
   const pages = useStore((state) => state.pages)
   const currentPageId = useStore((state) => state.currentPageId)
   const [dragIndex, setDragIndex] = useState<number | null>(null)
@@ -69,11 +72,11 @@ export function PageSidebar() {
   return (
     <aside className="sidebar">
       <div className="sidebar-head">
-        <span>Pages</span>
+        <span>{t('sidebar.pages')}</span>
         <button
           type="button"
           className="icon-button"
-          title="Add a blank page after the current page"
+          title={t('sidebar.addBlank')}
           onClick={() => {
             const state = useStore.getState()
             const index = Math.max(
@@ -128,7 +131,7 @@ export function PageSidebar() {
               <button
                 type="button"
                 className="thumb-delete"
-                title="Delete page"
+                title={t('sidebar.deletePage')}
                 onClick={(event) => {
                   event.stopPropagation()
                   useStore.getState().deletePage(page.id)

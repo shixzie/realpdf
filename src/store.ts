@@ -17,6 +17,7 @@ import {
   type LibraryMeta,
 } from './lib/library'
 import { restoreAssets } from './lib/assets'
+import { t } from './i18n'
 
 export type ToolsTab = 'merge' | 'split' | 'convert'
 export type PendingAction = ToolsTab | 'forms'
@@ -290,7 +291,7 @@ export const useStore = create<AppState>()((set, get) => ({
   deletePage: (pageId) => {
     const { pages, currentPageId } = get()
     if (pages.length <= 1) {
-      get().toastMessage('error', 'A document needs at least one page.')
+      get().toastMessage('error', t('toasts.lastPage'))
       return
     }
     const index = pages.findIndex((p) => p.id === pageId)
@@ -373,7 +374,7 @@ export const useStore = create<AppState>()((set, get) => ({
     } catch (error) {
       console.error(error)
       set({ libraryBusy: false })
-      get().toastMessage('error', 'Could not read the local library.')
+      get().toastMessage('error', t('toasts.libraryReadFailed'))
     }
   },
 
@@ -413,12 +414,7 @@ export const useStore = create<AppState>()((set, get) => ({
       const quota =
         error instanceof DOMException &&
         (error.name === 'QuotaExceededError' || error.name === 'NS_ERROR_DOM_QUOTA_REACHED')
-      get().toastMessage(
-        'error',
-        quota
-          ? 'Browser storage is full — remove old items from your library and try again.'
-          : 'Could not save this document to the local library.',
-      )
+      get().toastMessage('error', quota ? t('toasts.libraryFull') : t('toasts.librarySaveFailed'))
     }
   },
 
@@ -428,7 +424,7 @@ export const useStore = create<AppState>()((set, get) => ({
       const entry = await getProject(id)
       if (!entry) {
         set({ libraryBusy: false })
-        get().toastMessage('error', 'That library item no longer exists.')
+        get().toastMessage('error', t('toasts.libraryMissing'))
         return
       }
       restoreAssets(entry.assets)
@@ -457,11 +453,11 @@ export const useStore = create<AppState>()((set, get) => ({
         libraryOpen: false,
         libraryBusy: false,
       })
-      get().toastMessage('success', `Restored “${entry.title}”`)
+      get().toastMessage('success', t('toasts.restored', { title: entry.title }))
     } catch (error) {
       console.error(error)
       set({ libraryBusy: false })
-      get().toastMessage('error', 'Could not restore that document.')
+      get().toastMessage('error', t('toasts.restoreFailed'))
     }
   },
 
@@ -482,7 +478,7 @@ export const useStore = create<AppState>()((set, get) => ({
       setTimeout(() => URL.revokeObjectURL(url), 10_000)
     } catch (error) {
       console.error(error)
-      get().toastMessage('error', 'Could not rebuild that PDF.')
+      get().toastMessage('error', t('toasts.rebuildFailed'))
     } finally {
       set({ libraryBusy: false })
     }
@@ -560,7 +556,7 @@ export const useStore = create<AppState>()((set, get) => ({
     } catch (error) {
       console.error(error)
       set({ formLoading: false })
-      get().toastMessage('error', 'Could not read the form fields of this PDF.')
+      get().toastMessage('error', t('toasts.formsReadFailed'))
     }
   },
 
