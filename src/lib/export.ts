@@ -48,13 +48,13 @@ interface Vec {
   y: number
 }
 
-interface Inverted {
+export interface Inverted {
   point: (x: number, y: number) => Vec
   dir: (x: number, y: number) => Vec
 }
 
 /** Inverts the pdf.js viewport transform (view space -> PDF user space). */
-function makeInverse(t: number[]): Inverted {
+export function makeInverse(t: number[]): Inverted {
   const [a, b, c, d, e, f] = t
   const det = a * d - b * c || 1
   return {
@@ -444,7 +444,7 @@ interface DrawContext {
  * scene coordinates; undo the fabric baseline offset and the viewport transform
  * to get back to the content-stream coordinate system.
  */
-function pdfTextTarget(obj: AnyObject, inv: Inverted): TextRemovalTarget {
+export function pdfTextTarget(obj: AnyObject, inv: Inverted): TextRemovalTarget {
   const spawn = (obj.data?.spawn ?? {}) as { left?: number; top?: number; width?: number; angle?: number }
   const fontSize = Number(obj.fontSize) || 16
   const angle = Number(spawn.angle) || 0

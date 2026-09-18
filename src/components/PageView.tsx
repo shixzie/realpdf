@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, type DragEvent } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent } from 'react'
 import { Canvas, Line, type FabricObject, type TPointerEventInfo } from 'fabric'
 import { useStore } from '../store'
 import { hydrateAnnotations, serializeCanvas } from '../lib/serialize'
@@ -24,10 +24,18 @@ import {
   loadPageTextRuns,
   registerCanvasFonts,
   runAtPoint,
+  runCoveredByEdit,
   sampleRunColors,
+  spawnBoxOf,
   updateTextHighlight,
   type TextRun,
 } from '../lib/textEdit'
+import {
+  applyTextEditPreviewBackgrounds,
+  buildTextEditPreview,
+  textEditSignature,
+  type TextEditPreviewState,
+} from '../lib/textEditPreview'
 import { imageFileToDataUrl } from '../lib/assets'
 import { useTranslation } from '../i18n'
 import { FormsLayer } from './FormsLayer'
@@ -52,6 +60,7 @@ export function PageView({ pageIndex }: PageViewProps) {
   const settings = useStore((state) => state.settings)
   const formMode = useStore((state) => state.formMode)
   const pdf = useStore((state) => state.pdf)
+  const bytes = useStore((state) => state.bytes)
 
   const slotRef = useRef<HTMLDivElement>(null)
   const baseRef = useRef<HTMLCanvasElement>(null)
@@ -68,6 +77,12 @@ export function PageView({ pageIndex }: PageViewProps) {
   const hoverRectRef = useRef<FabricObject | null>(null)
   const textEditTokenRef = useRef(0)
   const downTextRef = useRef<{ hadActiveText: boolean; target: AnyObject | null } | null>(null)
+  const previewRef = useRef<TextEditPreviewState | null>(null)
+  const previewPageRef = useRef<string | null>(null)
+  const previewBuildRef = useRef<{ pageId: string; signature: string } | null>(null)
+  const previewTokenRef = useRef(0)
+  // Bumps when the live preview changes so the base canvas re-renders.
+  const [previewRev, setPreviewRev] = useState(0)
 
   const latest = useRef({ tool, settings, pageId: page?.id ?? '' })
   latest.current = { tool, settings, pageId: page?.id ?? '' }
@@ -119,6 +134,13 @@ export function PageView({ pageIndex }: PageViewProps) {
     window.setTimeout(focus, 50)
   }, [])
 
+  /** Runs that no existing replacement already consumed (deleted or covered). */
+  const runsAvailableForEdit = useCallback((canvas: Canvas, runs: TextRun[]): TextRun[] => {
+    const spawns = canvas.getObjects().map(spawnBoxOf).filter((spawn): spawn is NonNullable<typeof spawn> => spawn != null)
+    if (!spawns.length) return runs
+    return runs.filter((run) => !spawns.some((spawn) => runCoveredByEdit(run, spawn)))
+  }, [])
+
   const onTextEditClick = useCallback(async (canvas: Canvas, event: TPointerEventInfo) => {
     const token = textEditTokenRef.current + 1
     textEditTokenRef.current = token
@@ -135,9 +157,9 @@ export function PageView({ pageIndex }: PageViewProps) {
     const current = store.pages.find((candidate) => candidate.id === latest.current.pageId)
     if (!current || current.sourceIndex == null || !store.pdf) return
     const scene = canvas.getScenePoint(event.e)
-    const runs = await loadPageTextRuns(store.pdf, current.sourceIndex, current.transform)
+    const available = await loadPageTextRuns(store.pdf, current.sourceIndex, current.transform)
     if (token !== textEditTokenRef.current || canvasRef.current !== canvas) return
-    const run = runs.find((candidate) => runAtPoint(candidate, scene.x, scene.y))
+    const run = runsAvailableForEdit(canvas, available).find((candidate) => runAtPoint(candidate, scene.x, scene.y))
     if (!run) return
     const pdfPage = await store.pdf.getPage(current.sourceIndex + 1)
     const colors = await sampleRunColors(pdfPage, run)
@@ -145,13 +167,15 @@ export function PageView({ pageIndex }: PageViewProps) {
     useStore.getState().beginChange()
     const object = createPdfTextEditObject(run, colors)
     canvas.add(object)
+    // Publish the edit right away so the final-result preview starts building.
+    commitCanvas(latest.current.pageId)
     setHighlight(canvas, null)
     canvas.setActiveObject(object)
     object.enterEditing()
     selectAllWhenEditing(object, canvas)
     canvas.requestRenderAll()
     scheduleCommit()
-  }, [scheduleCommit, setHighlight, selectAllWhenEditing])
+  }, [runsAvailableForEdit, scheduleCommit, setHighlight, selectAllWhenEditing])
 
   const viewWidth = Math.max(1, (page?.width ?? 1) * zoom)
   const viewHeight = Math.max(1, (page?.height ?? 1) * zoom)
@@ -327,7 +351,8 @@ export function PageView({ pageIndex }: PageViewProps) {
         const point = canvas.getScenePoint(opt.e)
         let bounds: TextRun['bounds'] | null = null
         if (target?.data?.kind !== 'pdftext') {
-          const run = textRunsRef.current?.find((candidate) => runAtPoint(candidate, point.x, point.y))
+          const runs = runsAvailableForEdit(canvas, textRunsRef.current ?? [])
+          const run = runs.find((candidate) => runAtPoint(candidate, point.x, point.y))
           if (run) bounds = run.bounds
         }
         setHighlight(canvas, bounds)
@@ -381,6 +406,10 @@ export function PageView({ pageIndex }: PageViewProps) {
       canvas.setDimensions({ width: initialSize.width, height: initialSize.height })
       canvas.setZoom(zoomRef.current)
       applyToolToCanvas(canvas, latest.current.tool, latest.current.settings)
+      applyTextEditPreviewBackgrounds(
+        canvas,
+        previewPageRef.current === page.id ? (previewRef.current?.removedIds ?? new Set<string>()) : null,
+      )
       canvas.requestRenderAll()
       void registerCanvasFonts(canvas)
     })
@@ -433,6 +462,10 @@ export function PageView({ pageIndex }: PageViewProps) {
       canvas.setDimensions({ width: viewWidth, height: viewHeight })
       canvas.setZoom(zoom)
       applyToolToCanvas(canvas, latest.current.tool, latest.current.settings)
+      applyTextEditPreviewBackgrounds(
+        canvas,
+        previewPageRef.current === page.id ? (previewRef.current?.removedIds ?? new Set<string>()) : null,
+      )
       canvas.requestRenderAll()
       void registerCanvasFonts(canvas)
     })
@@ -468,7 +501,47 @@ export function PageView({ pageIndex }: PageViewProps) {
     applyToolToCanvas(canvas, tool, settings)
   }, [tool, settings])
 
-  // Render the PDF page bitmap.
+  /**
+   * Rebuild the final-result preview whenever the page's real text edits
+   * change. The exporter deletes the original runs from the content stream;
+   * the preview applies the exact same rewrite to a scratch copy of the page
+   * and renders it, so what is on screen is what will be saved.
+   *
+   * Commits that do not change the removal set (typing, styling the overlay)
+   * keep the in-flight or finished build instead of restarting it.
+   */
+  useEffect(() => {
+    const pageId = page?.id
+    const sourceIndex = page?.sourceIndex
+    if (!pageId || sourceIndex == null || !bytes) return
+    const annotations = page.annotations
+    const signature = textEditSignature(annotations.objects)
+    if (!signature) {
+      const hadPreview = previewPageRef.current != null || previewRef.current != null || previewBuildRef.current != null
+      if (!hadPreview) return
+      previewTokenRef.current += 1
+      previewRef.current = null
+      previewPageRef.current = null
+      previewBuildRef.current = null
+      setPreviewRev((value) => value + 1)
+      return
+    }
+    const building = previewBuildRef.current
+    if (building && building.pageId === pageId && building.signature === signature) return
+    if (previewPageRef.current === pageId && previewRef.current?.signature === signature) return
+    const token = previewTokenRef.current + 1
+    previewTokenRef.current = token
+    previewBuildRef.current = { pageId, signature }
+    void buildTextEditPreview(bytes, { sourceIndex, transform: page.transform }, annotations.objects).then((state) => {
+      if (previewTokenRef.current !== token) return
+      previewRef.current = state
+      previewPageRef.current = pageId
+      previewBuildRef.current = null
+      setPreviewRev((value) => value + 1)
+    })
+  }, [page?.id, page?.sourceIndex, page?.transform, page?.annotations, bytes])
+
+  // Render the PDF page bitmap, from the preview copy when one exists.
   const sourceIndex = page?.sourceIndex ?? null
   useEffect(() => {
     const element = baseRef.current
@@ -482,10 +555,12 @@ export function PageView({ pageIndex }: PageViewProps) {
       element.style.height = `${page.height * zoom}px`
       return
     }
+    const preview = previewPageRef.current === page.id ? previewRef.current : null
+    const previewDoc = preview?.pdf ?? null
     const dpr = Math.min(window.devicePixelRatio || 1, 2)
     void (async () => {
       try {
-        const pdfPage = await pdf.getPage(sourceIndex + 1)
+        const pdfPage = previewDoc ? await previewDoc.getPage(1) : await pdf.getPage(sourceIndex + 1)
         if (cancelled) return
         const viewport = pdfPage.getViewport({ scale: zoom * dpr })
         element.width = Math.max(1, Math.floor(viewport.width))
@@ -495,6 +570,8 @@ export function PageView({ pageIndex }: PageViewProps) {
         const renderTask = pdfPage.render({ canvas: element, viewport })
         task = renderTask as unknown as { cancel: () => void; promise: Promise<void> }
         await renderTask.promise
+        // Only drop the covers once the patched bitmap is actually painted.
+        if (!cancelled) applyTextEditPreviewBackgrounds(canvasRef.current, preview ? preview.removedIds : null)
       } catch (error) {
         if ((error as Error)?.name !== 'RenderingCancelledException') console.error(error)
       }
@@ -503,7 +580,7 @@ export function PageView({ pageIndex }: PageViewProps) {
       cancelled = true
       task?.cancel()
     }
-  }, [pdf, sourceIndex, zoom, page?.width, page?.height])
+  }, [pdf, sourceIndex, zoom, page?.width, page?.height, previewRev])
 
   const onDrop = useCallback(
     async (event: DragEvent<HTMLDivElement>) => {

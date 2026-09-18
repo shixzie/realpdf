@@ -51,6 +51,9 @@ describe('text editing', () => {
     await page.waitForTimeout(350)
     const hover = await pixelStats(page, { x: 148, y: 128, w: 4, h: 4 })
     check(hover.alpha > 20, `hovering existing text shows a highlight (alpha ${hover.alpha})`)
+    // Untouched text is the reference for the preview's font fidelity.
+    const secondLineRegion = { x: 56, y: 156, w: 110, h: 20 }
+    const secondLineBefore = await pixelStats(page, secondLineRegion, { selector: 'canvas.page-base' })
 
     // Edit the first line: original is "The quick brown fox" in red 18pt.
     await page.mouse.click(first.x + 150, first.y + 134)
@@ -62,11 +65,23 @@ describe('text editing', () => {
     await page.mouse.click(first.x + 520, first.y + 760)
     await page.waitForTimeout(400)
     const editedText = await pixelStats(page, { x: 56, y: 124, w: 60, h: 24 })
-    const editedCover = await pixelStats(page, { x: 140, y: 130, w: 40, h: 8 })
     check(editedText.dark > 5, `replacement text renders on the overlay (${editedText.dark} dark pixels)`)
+    // The live preview is the final page: the original glyphs are deleted from
+    // the rendered page and no cover rectangle stands in for them.
+    const editedBase = await pixelStats(page, { x: 140, y: 124, w: 62, h: 24 }, { selector: 'canvas.page-base' })
     check(
-      editedCover.alpha > 200 && editedCover.dark === 0,
-      `the original run is covered behind the replacement (alpha ${editedCover.alpha})`,
+      editedBase.dark === 0,
+      `the live preview deletes the original glyphs (${editedBase.dark} dark pixels)`,
+    )
+    const editedCover = await pixelStats(page, { x: 140, y: 130, w: 40, h: 8 })
+    check(editedCover.alpha === 0, `no cover rectangle remains on the overlay (alpha ${editedCover.alpha})`)
+    // Re-rendering the patched page must keep every other run in its original
+    // font program, not substitute it.
+    const secondLineAfter = await pixelStats(page, secondLineRegion, { selector: 'canvas.page-base' })
+    check(
+      Math.abs(secondLineAfter.dark - secondLineBefore.dark) <= 2 &&
+        Math.abs(secondLineAfter.ink - secondLineBefore.ink) <= 2,
+      `the preview keeps untouched text in the original font (dark ${secondLineBefore.dark} -> ${secondLineAfter.dark})`,
     )
 
     // Undo/redo around the edit (typing may add extra history steps).
@@ -78,12 +93,16 @@ describe('text editing', () => {
       if (undone.dark === 0 && undone.alpha === 0) break
     }
     check(undos > 0 && undos < 4, `undo removes the text replacement (${undos} step(s))`)
+    const undidBase = await pixelStats(page, { x: 140, y: 124, w: 62, h: 24 }, { selector: 'canvas.page-base' })
+    check(undidBase.dark > 5, `undo brings the original glyphs back to the preview (${undidBase.dark} dark pixels)`)
     for (let i = 0; i < undos; i += 1) {
       await page.keyboard.press('Control+Shift+z')
       await page.waitForTimeout(350)
     }
     const redone = await pixelStats(page, { x: 56, y: 124, w: 60, h: 24 })
     check(redone.dark > 5, 'redo restores the text replacement')
+    const redoneBase = await pixelStats(page, { x: 140, y: 124, w: 62, h: 24 }, { selector: 'canvas.page-base' })
+    check(redoneBase.dark === 0, `redo deletes the original glyphs again (${redoneBase.dark} dark pixels)`)
 
     // Re-edit the replacement: clicking it edits in place.
     await page.mouse.click(first.x + 70, first.y + 134)
@@ -118,6 +137,10 @@ describe('text editing', () => {
     check(
       uniqueFonts.length === 2,
       `replacement text shares a single font subset (${uniqueFonts.map((font) => font.key).join(', ')})`,
+    )
+    check(
+      uniqueFonts.every((font) => /liberation/i.test(font.base)),
+      `the replacement reuses the original font program (${uniqueFonts.map((font) => font.base).join(', ')})`,
     )
 
     const replacement = await exportedPixelStats(context, exported, { x: 56, y: 124, w: 95, h: 24 })
@@ -175,6 +198,11 @@ describe('text editing', () => {
     await page.waitForTimeout(300)
     const restored = await pixelStats(page, { x: 56, y: 124, w: 95, h: 24 })
     check(restored.dark > 5, `restored document renders the replacement (${restored.dark} dark pixels)`)
+    const restoredBase = await pixelStats(page, { x: 152, y: 124, w: 62, h: 24 }, { selector: 'canvas.page-base' })
+    check(
+      restoredBase.dark === 0,
+      `restored document previews the deleted original (${restoredBase.dark} dark pixels)`,
+    )
 
     // ------------------------------------------------------- standard fonts
     await gotoHome(page)
@@ -224,6 +252,17 @@ describe('text editing', () => {
     await page.waitForTimeout(400)
     await page.mouse.click(stripedBox.x + 350, stripedBox.y + 180)
     await page.waitForTimeout(300)
+
+    // The live preview must already show the final result: the original glyphs
+    // are gone from the rendered page and the stripes are not covered.
+    const stripesPreview = await pixelStats(page, { x: 60, y: 74, w: 55, h: 24 }, { selector: 'canvas.page-base' })
+    check(stripesPreview.black === 0, `the live preview deletes the striped original (${stripesPreview.black} black pixels)`)
+    check(
+      stripesPreview.saturatedBins >= 3,
+      `the live preview keeps the stripes — no cover (${stripesPreview.saturatedBins} colours)`,
+    )
+    const stripesOverlay = await pixelStats(page, { x: 60, y: 74, w: 55, h: 24 })
+    check(stripesOverlay.alpha === 0, `no cover rectangle on the striped run (alpha ${stripesOverlay.alpha})`)
 
     const stripedExported = path.join(OUT_DIR, 'textedit-striped-exported.pdf')
     await savePdf(page, stripedExported)

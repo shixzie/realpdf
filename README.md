@@ -12,7 +12,7 @@ A real PDF editor that runs **entirely in your browser**. No uploads, no servers
 
 - Freehand pen, highlighter (multiplied blend, like a real marker) and eraser
 - Text boxes with font family/size/color, rectangles, ellipses, lines and arrows. Selecting any text activates the text tool, so its font, size and colour can be edited right away — the options always reflect and update the selected text.
-- **Edit existing text in place**: click any text and retype it — the original font, size, colour and position are matched and the original glyphs are **deleted from the page's content stream** (the text layer, search and copy see the new text only), with the replacement embedded using the same font program (subset per font). Re-click an edit to keep changing it, or erase it to reveal the original. A replacement that is selected can also be restyled with the text options.
+- **Edit existing text in place**: click any text and retype it — the original font, size, colour and position are matched and the original glyphs are **deleted from the page's content stream** (the text layer, search and copy see the new text only), with the replacement embedded using the same font program (subset per font). The canvas **previews the final page automatically**: the original glyphs disappear from the rendered page as you edit (no fake background box, so text over artwork/stripes previews correctly), and undo brings them back. Re-click an edit to keep changing it, or erase it to reveal the original. A replacement that is selected can also be restyled with the text options.
 - Cover existing content with white boxes and type over it to "replace" text
 - Insert images (drag & drop or file picker) and signatures — draw them or **upload a photo/scan** (with automatic white-background removal)
 - Select, move, resize, rotate and delete annotations, multi-select with Shift
@@ -87,7 +87,7 @@ npm run preview
 | --- | --- |
 | PDF rendering | [pdf.js](https://mozilla.github.io/pdf.js/) — Web Worker + **WebAssembly** decoders for JPEG 2000/ICC/JBIG2 (`wasm/`), plus CMaps and standard font data, all served from your own origin |
 | Editing surface | [fabric.js](https://fabricjs.com/) canvas overlays (one per visible page), coordinates stored in PDF points |
-| Saving | [pdf-lib](https://pdf-lib.js.org/) — annotations are re-drawn as native PDF operators, images embedded, new text mapped to Standard-14, edited text embedded with its original font (subset) after rewriting the page's content streams to delete the original glyphs, highlights exported with a real Multiply blend mode |
+| Saving | [pdf-lib](https://pdf-lib.js.org/) — annotations are re-drawn as native PDF operators, images embedded, new text mapped to Standard-14, edited text embedded with its original font (subset) after rewriting the page's content streams to delete the original glyphs, highlights exported with a real Multiply blend mode. The same content-stream rewrite is applied to a scratch page and re-rendered with pdf.js while editing, so the on-screen preview matches the saved file |
 | State | [zustand](https://zustand.docs.pmnd.rs/) store with snapshot-based undo/redo |
 | ZIP export | dependency-free STORE-method zip writer (`src/lib/zip.ts`) |
 | Localization | dependency-free typed dictionaries (`src/i18n/`) with `Intl.PluralRules` plurals and locale-aware number/date formatting |
