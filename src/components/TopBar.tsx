@@ -61,7 +61,6 @@ export function TopBar() {
       <div className="brand">
         <FileText size={19} />
         <span>RealPDF</span>
-        <span className="brand-tag">100% local</span>
       </div>
 
       <div className="topbar-group">
