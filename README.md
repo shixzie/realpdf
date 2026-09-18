@@ -123,7 +123,9 @@ npm run types       # regenerate worker-configuration.d.ts after config changes
 
 `wrangler.jsonc` points the Worker at `./dist`, attaches the `realpdf.app` and
 `www.realpdf.app` custom domains on deploy, serves assets through the `ASSETS`
-binding (`run_worker_first`) and turns on Workers Logs and Traces:
+binding (`run_worker_first`), turns on Workers Logs and Traces, and declares an
+empty `previews` block so Workers Builds can create branch previews with
+`npx wrangler preview`:
 
 ```jsonc
 {
@@ -135,6 +137,7 @@ binding (`run_worker_first`) and turns on Workers Logs and Traces:
     "binding": "ASSETS",
     "run_worker_first": true
   },
+  "previews": {},
   "observability": {
     "enabled": true,
     "logs": { "enabled": true },
