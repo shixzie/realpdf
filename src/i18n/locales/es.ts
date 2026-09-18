@@ -26,6 +26,7 @@ export const es: Dictionary = {
   },
   topbar: {
     openPdf: 'Abrir PDF',
+    homeTitle: 'Ir a la pantalla de inicio',
     tools: 'Herramientas',
     toolsTitle: 'Combinar, dividir y convertir documentos',
     library: 'Biblioteca',

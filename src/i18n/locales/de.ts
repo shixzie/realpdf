@@ -26,6 +26,7 @@ export const de: Dictionary = {
   },
   topbar: {
     openPdf: 'PDF öffnen',
+    homeTitle: 'Zum Startbildschirm',
     tools: 'Werkzeuge',
     toolsTitle: 'Dokumente zusammenfügen, teilen und konvertieren',
     library: 'Bibliothek',

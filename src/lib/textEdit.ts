@@ -533,6 +533,8 @@ export interface PdfTextData {
   /** Advance width of the original run, used to find it in the content stream. */
   originalWidth: number
   font: { assetId?: string; family: FontFamily; bold: boolean; italic: boolean; spaceEm?: number }
+  /** True once the colour, size or family was changed by hand. */
+  styled?: boolean
 }
 
 /** Builds the editable replacement for a run (same font, size, colour and place). */
@@ -570,6 +572,44 @@ export function createPdfTextEditObject(run: TextRun, colors: RunColors): Textbo
     hoverCursor: 'text',
     data,
   })
+}
+
+export interface TextStylePatch {
+  color?: string
+  fontSize?: number
+  fontFamily?: FontFamily
+}
+
+/** Family shown in the font picker for a text object (PDF edits keep theirs). */
+export function textFontFamily(object: FabricObject): FontFamily {
+  const data = (object as AnyObject).data as PdfTextData | undefined
+  if (data?.kind === 'pdftext' && data.font?.family) return data.font.family
+  return normalizeFamily((object as AnyObject).fontFamily)
+}
+
+/** Applies a colour/size/family change to an existing text object in place. */
+export function styleTextObject(object: FabricObject, patch: TextStylePatch): void {
+  const target = object as AnyObject
+  if (patch.color !== undefined) target.set({ fill: patch.color })
+  if (patch.fontSize !== undefined) {
+    target.set({ fontSize: Math.max(1, Math.min(400, patch.fontSize)) })
+  }
+  if (patch.fontFamily !== undefined) {
+    target.set({ fontFamily: patch.fontFamily })
+  }
+  if (target.data?.kind === 'pdftext') {
+    const font = { ...(target.data.font ?? {}) }
+    if (patch.fontFamily !== undefined) {
+      // Picking a family replaces the embedded original so the export uses it.
+      font.family = patch.fontFamily
+      font.assetId = undefined
+      font.spaceEm = undefined
+    }
+    target.set({ data: { ...target.data, font, styled: true } })
+  }
+  target.setCoords()
+  target.dirty = true
+  target.canvas?.requestRenderAll()
 }
 
 const HIGHLIGHT_FILL = 'rgba(59, 130, 246, 0.16)'

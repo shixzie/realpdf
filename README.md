@@ -11,8 +11,8 @@ A real PDF editor that runs **entirely in your browser**. No uploads, no servers
 **Edit & annotate**
 
 - Freehand pen, highlighter (multiplied blend, like a real marker) and eraser
-- Text boxes with font family/size/color, rectangles, ellipses, lines and arrows
-- **Edit existing text in place**: click any text and retype it — the original font, size, colour and position are matched and the original glyphs are **deleted from the page's content stream** (the text layer, search and copy see the new text only), with the replacement embedded using the same font program (subset per font). Re-click an edit to keep changing it, or erase it to reveal the original.
+- Text boxes with font family/size/color, rectangles, ellipses, lines and arrows. Selecting any text activates the text tool, so its font, size and colour can be edited right away — the options always reflect and update the selected text.
+- **Edit existing text in place**: click any text and retype it — the original font, size, colour and position are matched and the original glyphs are **deleted from the page's content stream** (the text layer, search and copy see the new text only), with the replacement embedded using the same font program (subset per font). Re-click an edit to keep changing it, or erase it to reveal the original. A replacement that is selected can also be restyled with the text options.
 - Cover existing content with white boxes and type over it to "replace" text
 - Insert images (drag & drop or file picker) and signatures — draw them or **upload a photo/scan** (with automatic white-background removal)
 - Select, move, resize, rotate and delete annotations, multi-select with Shift
@@ -187,6 +187,7 @@ APP_URL=http://localhost:4173/ npm test
 - `scripts/e2e-ui.mjs` — theme toggle, homepage tool cards, signature image upload, Ko-fi button, language switch (persistence, translated strings, `<html lang>`/title)
 - `scripts/e2e-library.mjs` — save to the local library, rename, persistence across a reload, restore annotations, rebuild the PDF, delete
 - `scripts/e2e-textedit.mjs` — edit embedded-font and standard-font text, font/colour matching, hover highlight, wrapping, undo/redo, library round trip, exported font-program verification
+- `scripts/e2e-textselect.mjs` — selecting text activates the text tool, its options reflect and restyle the selected text, and the changes survive export
 
 All suites pass against the Vite dev server, the production build and the local
 Cloudflare Workers runtime (`npm run cf:dev`).

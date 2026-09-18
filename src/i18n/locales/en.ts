@@ -31,6 +31,7 @@ export const en = {
   },
   topbar: {
     openPdf: 'Open PDF',
+    homeTitle: 'Go to start screen',
     tools: 'Tools',
     toolsTitle: 'Merge, split and convert documents',
     library: 'Library',
