@@ -1,8 +1,10 @@
 import { Download, Loader2, X } from 'lucide-react'
 import { useStore } from '../store'
 import { runExport } from '../lib/exportController'
+import { useTranslation } from '../i18n'
 
 export function FormsBar() {
+  const { t } = useTranslation()
   const formLoading = useStore((state) => state.formLoading)
   const formWidgets = useStore((state) => state.formWidgets)
   const formValues = useStore((state) => state.formValues)
@@ -15,14 +17,14 @@ export function FormsBar() {
 
   return (
     <div className="options forms-bar">
-      <span className="options-title">Form filling</span>
+      <span className="options-title">{t('forms.title')}</span>
       {formLoading ? (
         <span className="options-hint">
-          <Loader2 size={14} className="spin" /> Reading fields…
+          <Loader2 size={14} className="spin" /> {t('forms.reading')}
         </span>
       ) : (
         <span className="options-hint">
-          {widgetCount} field{widgetCount === 1 ? '' : 's'} · {filledCount} edited
+          {t('forms.fields', { count: widgetCount, edited: filledCount })}
         </span>
       )}
       <label className="check">
@@ -31,14 +33,14 @@ export function FormsBar() {
           checked={flatten}
           onChange={(event) => setFormFlatten(event.target.checked)}
         />
-        Flatten fields into the page when saving
+        {t('forms.flatten')}
       </label>
       <div className="topbar-spacer" />
       <button type="button" className="button button-primary" onClick={() => void runExport()}>
-        <Download size={15} /> Save filled PDF
+        <Download size={15} /> {t('forms.save')}
       </button>
       <button type="button" className="button" onClick={exitFormMode}>
-        <X size={15} /> Exit
+        <X size={15} /> {t('forms.exit')}
       </button>
     </div>
   )

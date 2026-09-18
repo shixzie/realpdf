@@ -1,16 +1,17 @@
 import { useStore } from '../store'
+import { t } from '../i18n'
 import { loadPdfDocument } from './pdfjs'
 import { pdfHasFormFields } from './forms'
 
 async function loadIntoEditor(bytes: Uint8Array, fileName: string): Promise<void> {
   const loaded = await loadPdfDocument(bytes, (submit, wrong) => {
     const password = window.prompt(
-      wrong ? 'Incorrect password. Try again:' : 'This PDF is password protected. Enter the password:',
+      wrong ? t('toasts.incorrectPassword') : t('toasts.passwordProtected'),
     )
     submit(password ?? '')
   })
   useStore.getState().load({ bytes, fileName, pdf: loaded.pdf, pages: loaded.pages })
-  useStore.getState().toastMessage('success', `Loaded ${fileName}`)
+  useStore.getState().toastMessage('success', t('toasts.loaded', { fileName }))
 
   // Actions chosen on the home screen before a file existed.
   const pending = useStore.getState().pendingAction
@@ -23,7 +24,7 @@ async function loadIntoEditor(bytes: Uint8Array, fileName: string): Promise<void
       useStore.getState().setTool('select')
       await useStore.getState().enterFormMode()
     } else {
-      useStore.getState().toastMessage('info', 'This PDF has no fillable form fields.')
+      useStore.getState().toastMessage('info', t('toasts.noFormFields'))
     }
     return
   }
@@ -49,9 +50,11 @@ export async function openPdfFile(file: File): Promise<void> {
     await loadIntoEditor(bytes, file.name)
   } catch (error) {
     console.error(error)
-    const message = (error as Error)?.message || 'Could not open this PDF.'
-    useStore.getState().setError(message)
-    useStore.getState().toastMessage('error', `Could not open this PDF: ${message}`)
+    const message = (error as Error)?.message
+    useStore.getState().setError(message || t('toasts.openFailedGeneric'))
+    useStore
+      .getState()
+      .toastMessage('error', message ? t('toasts.openFailed', { message }) : t('toasts.openFailedGeneric'))
   } finally {
     useStore.getState().setLoading(false)
   }
@@ -66,8 +69,15 @@ export async function openPdfBytes(bytes: Uint8Array, fileName: string): Promise
     await loadIntoEditor(bytes, fileName)
   } catch (error) {
     console.error(error)
-    const message = (error as Error)?.message || 'Could not open the generated PDF.'
-    useStore.getState().toastMessage('error', `Could not open the generated PDF: ${message}`)
+    const message = (error as Error)?.message
+    useStore
+      .getState()
+      .toastMessage(
+        'error',
+        message
+          ? t('toasts.generatedOpenFailed', { message })
+          : t('toasts.generatedOpenFailedGeneric'),
+      )
     throw error
   } finally {
     useStore.getState().setLoading(false)

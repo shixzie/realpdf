@@ -18,30 +18,32 @@ import { useStore } from '../store'
 import type { Tool } from '../types'
 import { commitCanvas, getCanvas, insertImageObject } from '../lib/canvasRegistry'
 import { imageFileToDataUrl } from '../lib/assets'
+import { useTranslation } from '../i18n'
 
 interface ToolDef {
   id: Tool
-  label: string
+  labelKey: string
   shortcut: string
   icon: LucideIcon
 }
 
 export const TOOL_DEFS: ToolDef[] = [
-  { id: 'select', label: 'Select', shortcut: 'V', icon: MousePointer2 },
-  { id: 'text', label: 'Text', shortcut: 'T', icon: Type },
-  { id: 'pen', label: 'Draw', shortcut: 'P', icon: Pen },
-  { id: 'highlighter', label: 'Highlight', shortcut: 'H', icon: Highlighter },
-  { id: 'rect', label: 'Rectangle', shortcut: 'R', icon: Square },
-  { id: 'ellipse', label: 'Ellipse', shortcut: 'O', icon: Circle },
-  { id: 'line', label: 'Line', shortcut: 'L', icon: Minus },
-  { id: 'arrow', label: 'Arrow', shortcut: 'A', icon: AArrowUp },
-  { id: 'whiteout', label: 'Cover (white)', shortcut: 'W', icon: PaintBucket },
-  { id: 'image', label: 'Image', shortcut: 'I', icon: ImageIcon },
-  { id: 'signature', label: 'Signature', shortcut: 'S', icon: Signature },
-  { id: 'eraser', label: 'Erase annotation', shortcut: 'E', icon: Eraser },
+  { id: 'select', labelKey: 'tools.select', shortcut: 'V', icon: MousePointer2 },
+  { id: 'text', labelKey: 'tools.text', shortcut: 'T', icon: Type },
+  { id: 'pen', labelKey: 'tools.pen', shortcut: 'P', icon: Pen },
+  { id: 'highlighter', labelKey: 'tools.highlighter', shortcut: 'H', icon: Highlighter },
+  { id: 'rect', labelKey: 'tools.rect', shortcut: 'R', icon: Square },
+  { id: 'ellipse', labelKey: 'tools.ellipse', shortcut: 'O', icon: Circle },
+  { id: 'line', labelKey: 'tools.line', shortcut: 'L', icon: Minus },
+  { id: 'arrow', labelKey: 'tools.arrow', shortcut: 'A', icon: AArrowUp },
+  { id: 'whiteout', labelKey: 'tools.whiteout', shortcut: 'W', icon: PaintBucket },
+  { id: 'image', labelKey: 'tools.image', shortcut: 'I', icon: ImageIcon },
+  { id: 'signature', labelKey: 'tools.signature', shortcut: 'S', icon: Signature },
+  { id: 'eraser', labelKey: 'tools.eraser', shortcut: 'E', icon: Eraser },
 ]
 
 export function ToolRail() {
+  const { t } = useTranslation()
   const tool = useStore((state) => state.tool)
   const setTool = useStore((state) => state.setTool)
   const imagePickNonce = useStore((state) => state.imagePickNonce)
@@ -66,7 +68,7 @@ export function ToolRail() {
     const state = useStore.getState()
     const canvas = getCanvas(state.currentPageId)
     if (!canvas) {
-      state.toastMessage('error', 'Scroll to a page first, then add the image.')
+      state.toastMessage('error', t('toasts.scrollFirst'))
       return
     }
     try {
@@ -74,10 +76,10 @@ export function ToolRail() {
       state.beginChange()
       await insertImageObject(canvas, src)
       if (state.currentPageId) commitCanvas(state.currentPageId)
-      state.toastMessage('success', 'Image added — drag to position it.')
+      state.toastMessage('success', t('toasts.imageAdded'))
     } catch (error) {
       console.error(error)
-      state.toastMessage('error', 'Could not add that image.')
+      state.toastMessage('error', t('toasts.addImageFailed'))
     }
   }
 
@@ -86,13 +88,14 @@ export function ToolRail() {
       {TOOL_DEFS.map((definition) => {
         const Icon = definition.icon
         const active = tool === definition.id
+        const label = t(definition.labelKey)
         return (
           <button
             key={definition.id}
             type="button"
             className={`tool ${active ? 'is-active' : ''}`}
-            title={`${definition.label} (${definition.shortcut})`}
-            aria-label={definition.label}
+            title={`${label} (${definition.shortcut})`}
+            aria-label={label}
             onClick={() => {
               if (definition.id === 'image') {
                 setTool('image')

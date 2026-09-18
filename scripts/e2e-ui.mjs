@@ -135,6 +135,41 @@ try {
   const saveIndex = order.findIndex((label) => label.includes('Save PDF'))
   check(kofiIndex > -1 && saveIndex > -1 && kofiIndex < saveIndex, 'Ko-fi button sits beside (before) Save PDF')
 
+  // -------------------------------------------------------- localization
+  const languageSelect = page.locator('select.select-language')
+  check((await languageSelect.count()) === 1, 'language picker is available in the top bar')
+  await languageSelect.selectOption('es')
+  await page.waitForTimeout(250)
+  check((await page.locator('html').getAttribute('lang')) === 'es', 'html lang follows the selected locale')
+  check(
+    (await page.locator('button:has-text("Guardar PDF")').count()) === 1,
+    'UI strings switch to Spanish',
+  )
+  check(
+    (await page.locator('.tool[title^="Rectángulo"]').count()) === 1,
+    'tool labels and tooltips are translated',
+  )
+  check(
+    (await page.title()).includes('editor de PDF local'),
+    'document title follows the locale',
+  )
+
+  await page.reload({ waitUntil: 'domcontentloaded' })
+  await page.waitForSelector('.empty-card')
+  check((await page.locator('html').getAttribute('lang')) === 'es', 'locale persists across reloads')
+  check(
+    (await page.locator('button:has-text("Elegir un PDF")').count()) === 1,
+    'restored locale applies to the homepage',
+  )
+
+  await page.locator('select.select-language').selectOption('en')
+  await page.waitForTimeout(250)
+  check((await page.locator('html').getAttribute('lang')) === 'en', 'language can be switched back')
+  check(
+    (await page.locator('button:has-text("Choose a PDF")').count()) === 1,
+    'English strings return',
+  )
+
   check(pageErrors.length === 0, `no browser errors (${pageErrors.slice(0, 2).join(' | ')})`)
 } catch (error) {
   failures.push(`FAIL - ${error?.stack ?? error}`)
