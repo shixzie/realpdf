@@ -12,7 +12,7 @@ A real PDF editor that runs **entirely in your browser**. No uploads, no servers
 
 - Freehand pen, highlighter (multiplied blend, like a real marker) and eraser
 - Text boxes with font family/size/color, rectangles, ellipses, lines and arrows. Selecting any text activates the text tool, so its font, size and colour can be edited right away — the options always reflect and update the selected text.
-- **Edit existing text in place**: click any text and retype it — the original font, size, colour and position are matched, the run is covered with the colour sampled from the page behind it, and the replacement is embedded with the same font program (subset per font). Re-click an edit to keep changing it, or erase it to reveal the original. A replacement that is selected can also be restyled with the text options.
+- **Edit existing text in place**: click any text and retype it — the original font, size, colour and position are matched and the original glyphs are **deleted from the page's content stream** (the text layer, search and copy see the new text only), with the replacement embedded using the same font program (subset per font). Re-click an edit to keep changing it, or erase it to reveal the original. A replacement that is selected can also be restyled with the text options.
 - Cover existing content with white boxes and type over it to "replace" text
 - Insert images (drag & drop or file picker) and signatures — draw them or **upload a photo/scan** (with automatic white-background removal)
 - Select, move, resize, rotate and delete annotations, multi-select with Shift
@@ -87,7 +87,7 @@ npm run preview
 | --- | --- |
 | PDF rendering | [pdf.js](https://mozilla.github.io/pdf.js/) — Web Worker + **WebAssembly** decoders for JPEG 2000/ICC/JBIG2 (`wasm/`), plus CMaps and standard font data, all served from your own origin |
 | Editing surface | [fabric.js](https://fabricjs.com/) canvas overlays (one per visible page), coordinates stored in PDF points |
-| Saving | [pdf-lib](https://pdf-lib.js.org/) — annotations are re-drawn as native PDF operators, images embedded, new text mapped to Standard-14, edited text embedded with its original font (subset), highlights exported with a real Multiply blend mode |
+| Saving | [pdf-lib](https://pdf-lib.js.org/) — annotations are re-drawn as native PDF operators, images embedded, new text mapped to Standard-14, edited text embedded with its original font (subset) after rewriting the page's content streams to delete the original glyphs, highlights exported with a real Multiply blend mode |
 | State | [zustand](https://zustand.docs.pmnd.rs/) store with snapshot-based undo/redo |
 | ZIP export | dependency-free STORE-method zip writer (`src/lib/zip.ts`) |
 | Localization | dependency-free typed dictionaries (`src/i18n/`) with `Intl.PluralRules` plurals and locale-aware number/date formatting |
@@ -171,30 +171,34 @@ still happens in the browser. `www.realpdf.app` 301-redirects to
 
 ## Tests
 
-The repo ships headless-browser end-to-end tests (Playwright) that drive real pointer input and verify the exported PDFs by re-rendering and inspecting pixels and text.
+The suites run on [Vitest](https://vitest.dev/): headless-browser end-to-end
+tests (Playwright) drive real pointer input and verify the exported PDFs by
+re-rendering them, and unit tests exercise the content-stream rewriting without
+a browser. The global setup writes the shared fixtures and starts its own Vite
+server, so a single command is enough:
 
 ```bash
-npm run sample       # writes sample.pdf used by the tests
-npm run dev          # in one terminal
-npm test             # in another: editor + tools suites
-# or target the production build:
+npm test             # vitest run: unit + all end-to-end suites
+npm run test:watch   # the same, in watch mode
+npm test -- tests/e2e/text-edit.test.mjs   # one suite
+# or target a running server (for example the production build):
 APP_URL=http://localhost:4173/ npm test
 ```
 
-- `scripts/e2e.mjs` — load, annotate with every tool, eraser, undo/redo, virtualization, page ops, export → reopen verification, non-embedded standard font rendering
-- `scripts/e2e-tools.mjs` — merge, split range, PDF→PNG, PDF→text, images→PDF, text→PDF, form filling → exported value verification
-
-- `scripts/e2e-ui.mjs` — theme toggle, homepage tool cards, signature image upload, Ko-fi button, language switch (persistence, translated strings, `<html lang>`/title)
-- `scripts/e2e-library.mjs` — save to the local library, rename, persistence across a reload, restore annotations, rebuild the PDF, delete
-- `scripts/e2e-textedit.mjs` — edit embedded-font and standard-font text, font/colour matching, hover highlight, wrapping, undo/redo, library round trip, exported font-program verification
-- `scripts/e2e-textselect.mjs` — selecting text activates the text tool, its options reflect and restyle the selected text, and the changes survive export
+- `tests/unit/content-edit.test.mjs` — text-run matching and content-stream rewriting (form XObjects, rotated text, split `TJ` arrays)
+- `tests/e2e/editor.test.mjs` — load, annotate with every tool, eraser, undo/redo, virtualization, page ops, export → reopen verification, non-embedded standard font rendering
+- `tests/e2e/tools.test.mjs` — merge, split range, PDF→PNG, PDF→text, images→PDF, text→PDF, form filling → exported value verification
+- `tests/e2e/ui.test.mjs` — theme toggle, homepage tool cards, signature image upload, Ko-fi button, language switch (persistence, translated strings, `<html lang>`/title)
+- `tests/e2e/library.test.mjs` — save to the local library, rename, persistence across a reload, restore annotations, rebuild the PDF, delete
+- `tests/e2e/text-edit.test.mjs` — edit embedded-font and standard-font text: text layer deletion, exported font programs, coloured backgrounds
+- `tests/e2e/text-select.test.mjs` — selecting text activates the text tool, its options reflect and restyle the selected text, and the changes survive export
 
 All suites pass against the Vite dev server, the production build and the local
 Cloudflare Workers runtime (`npm run cf:dev`).
 
 ## Limitations (honest list)
 
-- **Existing text is replaced, not re-flowed.** Editing a run keeps the rest of the page exactly where it is: the original is covered with the page's own background colour and the replacement is drawn on top with the matched font, so surrounding lines never move. Reflowing paragraphs would require a real content-stream layout engine.
+- **Existing text is replaced, not re-flowed.** Editing a run deletes the matching text-showing operators from the page's content stream (including inside form XObjects) and draws the replacement at the original position, so surrounding lines never move. Reflowing paragraphs would require a real content-stream layout engine. When a run cannot be located with certainty (shared form XObjects drawn at different transforms, `TJ` arrays that pdf.js splits, encrypted streams), the exporter falls back to the older behaviour: the original is covered with the colour sampled from the page behind it.
 - The replacement font comes from the font program pdf.js rebuilds from the embedded font (the same outlines the viewer shows). Fonts pdf.js cannot hand over (Type 3, some non-embedded standard fonts) fall back to the closest Standard-14 family. Characters that are not part of a subsetted font are written as `?`.
 - **Office formats are not supported** (Word/Excel/PPT in or out) — they cannot be done faithfully client-side without heavy native engines.
 - Text you add is exported with the Standard-14 fonts (Helvetica/Times/Courier). Characters outside WinAnsi (CJK, emoji, …) are replaced with `?`. Existing text rendering supports embedded fonts and CJK via pdf.js CMaps.
@@ -214,11 +218,13 @@ src/
     pdfjs.ts      pdf.js setup + local wasm/font/cmap assets
     export.ts     fabric → pdf-lib annotation drawing
     textEdit.ts   existing-text hit-testing, font reuse, colour sampling
+    contentEdit.ts  content-stream walk that deletes edited text runs
     forms.ts      AcroForm discovery + value writing
     pdfOps.ts     merge, extract, image/text conversion
     currentDocument.ts  "bake" the edited document for tools/export
     serialize.ts  annotation JSON (assets kept out of undo snapshots)
     zip.ts        minimal ZIP writer
   store.ts        single zustand store (pages, history, tools, forms)
-scripts/          sample generator, e2e tests, screenshots
+scripts/          sample generator, screenshots, visual checks
+tests/            vitest suites: helpers, unit tests, browser end-to-end tests
 ```

@@ -530,6 +530,8 @@ export interface PdfTextData {
   kind: 'pdftext'
   originalText: string
   spawn: { left: number; top: number; width: number; angle: number }
+  /** Advance width of the original run, used to find it in the content stream. */
+  originalWidth: number
   font: { assetId?: string; family: FontFamily; bold: boolean; italic: boolean; spaceEm?: number }
   /** True once the colour, size or family was changed by hand. */
   styled?: boolean
@@ -548,6 +550,7 @@ export function createPdfTextEditObject(run: TextRun, colors: RunColors): Textbo
     kind: 'pdftext',
     originalText: run.str,
     spawn: { left, top, width, angle: run.angle },
+    originalWidth: run.width,
     font: { assetId: run.assetId, family: run.fallback, bold: run.bold, italic: run.italic, spaceEm: run.spaceEm },
   }
   return new Textbox(run.str, {
