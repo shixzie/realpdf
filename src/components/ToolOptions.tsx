@@ -1,9 +1,12 @@
+import { useMemo } from 'react'
 import { Trash2, X } from 'lucide-react'
+import type { FabricObject } from 'fabric'
 import { useStore } from '../store'
-import { activeCanvas, commitCanvas, deleteSelection, getCanvas } from '../lib/canvasRegistry'
+import { activeCanvas, activeTextSelection, commitCanvas, commitCanvasObject, deleteSelection, getCanvas } from '../lib/canvasRegistry'
+import { styleTextObject, textFontFamily, type TextStylePatch } from '../lib/textEdit'
 import { toHexColor } from '../lib/color'
 import { useTranslation } from '../i18n'
-import type { Tool } from '../types'
+import type { FontFamily, Tool } from '../types'
 
 const INK_COLORS = ['#111827', '#dc2626', '#ea580c', '#16a34a', '#2563eb', '#7c3aed', '#db2777', '#ffffff']
 const HIGHLIGHT_COLORS = ['#facc15', '#4ade80', '#60a5fa', '#f472b6', '#fb923c']
@@ -62,15 +65,42 @@ export function ToolOptions() {
   const tool = useStore((state) => state.tool)
   const settings = useStore((state) => state.settings)
   const updateSettings = useStore((state) => state.updateSettings)
+  const selectionNonce = useStore((state) => state.selectionNonce)
+
+  // Selecting any text activates the text tool; while a text object is
+  // selected its own font, size and colour are edited instead of the defaults.
+  // The edit-text tool also exposes them while a replacement is selected.
+  const selection = useMemo(
+    () => (tool === 'text' || tool === 'textedit' ? activeTextSelection() : undefined),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [tool, selectionNonce],
+  )
+  const styledText = Boolean(selection)
+  const showTextStyle = tool === 'text' || styledText
+  const textObject = selection?.object as (FabricObject & Record<string, any>) | undefined
+  const color = textObject ? toHexColor(String(textObject.fill ?? ''), settings.color) : settings.color
+  const fontFamily: FontFamily = textObject ? textFontFamily(textObject) : settings.fontFamily
+  const fontSize = textObject ? Math.round(Number(textObject.fontSize) || settings.fontSize) : settings.fontSize
+
+  const applyTextStyle = (patch: TextStylePatch) => {
+    if (selection) {
+      const state = useStore.getState()
+      state.beginChange()
+      styleTextObject(selection.object, patch)
+      commitCanvasObject(selection.canvas)
+      state.notifySelectionChange()
+    }
+    updateSettings(patch)
+  }
 
   return (
     <div className="options">
       <span className="options-title">{t(TOOL_LABEL_KEY[tool])}</span>
 
-      {COLOR_TOOLS.includes(tool) && (
+      {(COLOR_TOOLS.includes(tool) || styledText) && (
         <>
           <span className="options-label">{t('options.color')}</span>
-          <Swatches value={settings.color} colors={INK_COLORS} onChange={(color) => updateSettings({ color })} />
+          <Swatches value={color} colors={INK_COLORS} onChange={(value) => applyTextStyle({ color: value })} />
         </>
       )}
 
@@ -90,13 +120,13 @@ export function ToolOptions() {
         </>
       )}
 
-      {tool === 'text' && (
+      {showTextStyle && (
         <>
           <span className="options-label">{t('options.font')}</span>
           <select
             className="select"
-            value={settings.fontFamily}
-            onChange={(event) => updateSettings({ fontFamily: event.target.value as typeof settings.fontFamily })}
+            value={fontFamily}
+            onChange={(event) => applyTextStyle({ fontFamily: event.target.value as FontFamily })}
           >
             <option value="Helvetica">Helvetica</option>
             <option value="Times New Roman">Times New Roman</option>
@@ -108,10 +138,10 @@ export function ToolOptions() {
             min={8}
             max={72}
             step={1}
-            value={settings.fontSize}
-            onChange={(event) => updateSettings({ fontSize: Number(event.target.value) })}
+            value={fontSize}
+            onChange={(event) => applyTextStyle({ fontSize: Number(event.target.value) })}
           />
-          <span className="options-value">{settings.fontSize}pt</span>
+          <span className="options-value">{fontSize}pt</span>
         </>
       )}
 
@@ -171,7 +201,7 @@ export function ToolOptions() {
 
       {tool === 'whiteout' && <span className="options-hint">{t('options.whiteoutHint')}</span>}
 
-      {tool === 'textedit' && <span className="options-hint">{t('options.texteditHint')}</span>}
+      {tool === 'textedit' && !showTextStyle && <span className="options-hint">{t('options.texteditHint')}</span>}
 
       {tool === 'eraser' && <span className="options-hint">{t('options.eraserHint')}</span>}
 

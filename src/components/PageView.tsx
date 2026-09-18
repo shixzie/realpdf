@@ -15,6 +15,7 @@ import {
   eraseObjectAt,
   finalizeArrow,
   isShapeTool,
+  isTextObject,
   updateShape,
   type Vec,
 } from '../lib/tools'
@@ -66,6 +67,7 @@ export function PageView({ pageIndex }: PageViewProps) {
   const textRunsRef = useRef<TextRun[] | null>(null)
   const hoverRectRef = useRef<FabricObject | null>(null)
   const textEditTokenRef = useRef(0)
+  const downTextRef = useRef<{ hadActiveText: boolean; target: AnyObject | null } | null>(null)
 
   const latest = useRef({ tool, settings, pageId: page?.id ?? '' })
   latest.current = { tool, settings, pageId: page?.id ?? '' }
@@ -201,6 +203,23 @@ export function PageView({ pageIndex }: PageViewProps) {
       onChange()
     })
 
+    // Selecting a text object activates the text tool so its style options are
+    // shown and apply to the selection.
+    const onSelectionChange = () => {
+      const store = useStore.getState()
+      const selected = canvas.getActiveObjects()
+      if (selected.some((object) => isTextObject(object))) {
+        store.setTextSelectionPage(page.id)
+        if (latest.current.tool !== 'text') store.setTool('text')
+      } else if (!selected.length && store.textSelectionPage === page.id) {
+        store.setTextSelectionPage(null)
+      }
+      store.notifySelectionChange()
+    }
+    canvas.on('selection:created', onSelectionChange)
+    canvas.on('selection:updated', onSelectionChange)
+    canvas.on('selection:cleared', onSelectionChange)
+
     canvas.on('text:editing:exited', (event) => {
       const target = event.target as AnyObject | undefined
       if (!target) return
@@ -209,7 +228,9 @@ export function PageView({ pageIndex }: PageViewProps) {
         const spawn = target.data?.spawn as
           | { left: number; top: number; width: number; angle: number }
           | undefined
+        const styled = Boolean(target.data?.styled)
         const untouched =
+          !styled &&
           spawn != null &&
           value === target.data?.originalText &&
           Math.abs((target.left ?? 0) - spawn.left) < 0.75 &&
@@ -221,6 +242,10 @@ export function PageView({ pageIndex }: PageViewProps) {
           canvas.requestRenderAll()
           onChange()
         }
+        // Finishing a replacement leaves the edit-text tool active so the next
+        // run can be clicked without re-picking the tool.
+        const store = useStore.getState()
+        if (store.tool === 'text') store.setTool('textedit')
         return
       }
       if (target.data?.kind !== 'text') return
@@ -235,6 +260,17 @@ export function PageView({ pageIndex }: PageViewProps) {
       }
     })
 
+    // Snapshot the selection before fabric processes the click, so the text
+    // tool can tell a click on a text from a click that only deselects one.
+    canvas.on('mouse:down:before', (opt: TPointerEventInfo) => {
+      if (latest.current.tool !== 'text') return
+      const target = canvas.findTarget(opt.e).target as AnyObject | undefined
+      downTextRef.current = {
+        hadActiveText: isTextObject(canvas.getActiveObject()),
+        target: target && isTextObject(target) ? target : null,
+      }
+    })
+
     canvas.on('mouse:down', (opt: TPointerEventInfo) => {
       const { tool: activeTool, settings: activeSettings } = latest.current
       if (activeTool === 'textedit') {
@@ -242,14 +278,40 @@ export function PageView({ pageIndex }: PageViewProps) {
         return
       }
       if (activeTool === 'text') {
+        const down = downTextRef.current
+        downTextRef.current = null
+        const target = down?.target
+        if (target) {
+          // Clicking a PDF text replacement opens it for editing, like the
+          // edit-text tool. Plain text boxes are left to fabric: the first
+          // click selects them, clicking a selected one starts editing.
+          if (target.data?.kind === 'pdftext' && !target.isEditing && !target.getActiveControl?.()) {
+            canvas.setActiveObject(target)
+            target.enterEditing?.()
+            selectAllWhenEditing(target, canvas)
+            canvas.requestRenderAll()
+          }
+          return
+        }
+        // A click away from a selected text box only clears it; the next click
+        // creates a new one.
+        if (down?.hadActiveText) return
         useStore.getState().beginChange()
         const point = canvas.getScenePoint(opt.e)
         createTextObject(canvas, point, activeSettings)
-        useStore.getState().setTool('select')
         return
       }
       if (activeTool === 'eraser') {
         if (eraseObjectAt(canvas, opt.e)) commitCanvas(latest.current.pageId)
+        return
+      }
+      if (activeTool === 'select') {
+        // Clicking a text that is already selected fires no selection event,
+        // so pick the text tool here too.
+        const target = canvas.findTarget(opt.e).target as AnyObject | undefined
+        if (target && isTextObject(target) && canvas.getActiveObject() === target) {
+          useStore.getState().setTool('text')
+        }
         return
       }
       if (!isShapeTool(activeTool)) return
@@ -334,6 +396,7 @@ export function PageView({ pageIndex }: PageViewProps) {
       readyRef.current = false
       draftRef.current = null
       draftingRef.current = false
+      downTextRef.current = null
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [page?.id])

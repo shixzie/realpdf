@@ -20,14 +20,22 @@ export function isShapeTool(tool: Tool): boolean {
   return SHAPE_TOOLS.includes(tool)
 }
 
+/** True for text annotations and replacements of existing PDF text. */
+export function isTextObject(object: FabricObject | null | undefined): boolean {
+  const kind = (object as { data?: { kind?: string } } | null | undefined)?.data?.kind
+  return kind === 'text' || kind === 'pdftext'
+}
+
 export function applyToolToCanvas(canvas: Canvas, tool: Tool, settings: Settings): void {
   const drawing = tool === 'pen' || tool === 'highlighter'
   canvas.isDrawingMode = drawing
   canvas.selection = tool === 'select'
-  canvas.defaultCursor = tool === 'select' ? 'default' : tool === 'textedit' ? 'text' : 'crosshair'
+  canvas.defaultCursor = tool === 'select' ? 'default' : tool === 'textedit' || tool === 'text' ? 'text' : 'crosshair'
   // `textedit` keeps hit-testing on (to re-edit replacements) but nothing is
-  // selectable, so clicks are handled by the page itself.
-  canvas.skipTargetFind = drawing || (tool !== 'select' && tool !== 'eraser' && tool !== 'textedit')
+  // selectable, so clicks are handled by the page itself. The text tool also
+  // hit-tests, but only text objects stay interactive.
+  canvas.skipTargetFind =
+    drawing || (tool !== 'select' && tool !== 'eraser' && tool !== 'textedit' && tool !== 'text')
   if (drawing) {
     const brush = new PencilBrush(canvas)
     if (tool === 'pen') {
@@ -43,8 +51,11 @@ export function applyToolToCanvas(canvas: Canvas, tool: Tool, settings: Settings
   const evented = tool === 'select' || tool === 'eraser' || tool === 'textedit'
   canvas.forEachObject((obj) => {
     // `evented` must stay true for the eraser so hit-testing can find objects.
-    obj.set({ selectable, evented })
-    obj.set({ hoverCursor: tool === 'textedit' ? 'text' : undefined })
+    // The text tool keeps text objects clickable so they can be selected and
+    // restyled.
+    const text = tool === 'text' && isTextObject(obj)
+    obj.set({ selectable: selectable || text, evented: evented || text })
+    obj.set({ hoverCursor: tool === 'textedit' || text ? 'text' : undefined })
   })
   canvas.requestRenderAll()
 }
