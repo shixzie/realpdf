@@ -4,7 +4,7 @@ export const fr: Dictionary = {
   meta: {
     title: 'RealPDF — éditeur PDF local',
     description:
-      'RealPDF — un éditeur PDF entièrement local, dans le navigateur. Annotez, dessinez, ajoutez du texte et des images, remplissez des formulaires, fusionnez, divisez et convertissez des PDF, puis exportez. Vos fichiers ne quittent jamais votre appareil.',
+      'RealPDF — un éditeur PDF entièrement local, dans le navigateur. Annotez, dessinez, ajoutez du texte et des images, remplissez des formulaires, fusionnez, divisez et convertissez des PDF, ouvrez des fichiers Word/Excel/PowerPoint en PDF modifiables, puis exportez en PDF ou Office. Vos fichiers ne quittent jamais votre appareil.',
   },
   language: {
     label: 'Langue',
@@ -25,10 +25,10 @@ export const fr: Dictionary = {
     pages_other: '{count} pages',
   },
   topbar: {
-    openPdf: 'Ouvrir un PDF',
+    openPdf: 'Ouvrir un fichier',
     homeTitle: "Aller à l'écran d'accueil",
     tools: 'Outils',
-    toolsTitle: 'Fusionner, diviser et convertir des documents',
+    toolsTitle: 'Fusionner, diviser et convertir des PDF et fichiers Office',
     library: 'Bibliothèque',
     libraryTitle: 'Documents enregistrés dans ce navigateur',
     fillForms: 'Remplir des formulaires',
@@ -86,8 +86,8 @@ export const fr: Dictionary = {
     title: 'Modifiez des PDF sans les envoyer',
     subtitle:
       'RealPDF fonctionne entièrement dans votre navigateur. Votre document ne quitte jamais votre appareil : annotez-le, remplissez des formulaires, fusionnez, divisez et convertissez des fichiers, puis téléchargez le résultat.',
-    choose: 'Choisir un PDF',
-    dragHint: 'ou glissez-déposez un PDF n’importe où',
+    choose: 'Choisir un PDF ou un fichier Office',
+    dragHint: 'ou glissez-déposez un PDF, Word, Excel ou PowerPoint n’importe où',
     opening: 'Ouverture du document…',
     recent: 'Travaux récents',
     restore: 'Restaurer {title}',
@@ -97,6 +97,8 @@ export const fr: Dictionary = {
     splitText: 'Extrayez des plages de pages ou séparez chaque page.',
     convertTitle: 'Convertir',
     convertText: 'PDF en images ou en texte, images et texte en PDF.',
+    officeTitle: 'Office → PDF',
+    officeText: 'Ouvrez des fichiers Word, Excel ou PowerPoint et convertissez-les en PDF.',
     formsTitle: 'Remplir un formulaire',
     formsText: 'Saisissez du texte dans les champs interactifs et enregistrez-les.',
     annotateTitle: 'Annoter et signer',
@@ -196,8 +198,25 @@ export const fr: Dictionary = {
     pageImageSize: 'Page = taille de l’image',
     createOpen: 'Créer le PDF et l’ouvrir',
     pasteText: 'Collez le texte ici…',
-    convertNote:
-      'Tout est converti sur cet appareil. Les formats Office (Word/Excel/PPT) ne sont pas encore pris en charge.',
+    convertNote: 'Tout est converti sur cet appareil — vos fichiers ne le quittent jamais.',
+    tabOffice: 'Office',
+    officeToPdf: 'Office → PDF',
+    officeHint:
+      'Ouvrez des fichiers Word (.docx), Excel (.xlsx) ou PowerPoint (.pptx) et convertissez-les en PDF modifiables : texte, tableaux, images et mise en forme de base inclus.',
+    addOffice: 'Ajouter des fichiers Office',
+    officeNone: 'Aucun fichier Office pour l’instant.',
+    convertDownload: 'Convertir et télécharger',
+    convertOpen: 'Convertir et ouvrir',
+    officeConverted: 'Document Office converti en PDF.',
+    pdfToOffice: 'PDF → Office',
+    officeExportHint:
+      'Exportez le document actuel (avec vos modifications) en fichier Word, Excel ou PowerPoint modifiable.',
+    pdfToWord: 'Word (.docx)',
+    pdfToExcel: 'Excel (.xlsx)',
+    pdfToPowerpoint: 'PowerPoint (.pptx)',
+    officeExportDone: 'Fichier Office téléchargé.',
+    officeNote:
+      'La conversion Office est au niveau du contenu : texte, tableaux, images et mise en forme de base. Les mises en page complexes, graphiques, macros et polices exactes ne sont pas conservés.',
   },
   toasts: {
     loaded: '{fileName} chargé',
@@ -226,6 +245,11 @@ export const fr: Dictionary = {
     exported: 'Votre PDF modifié a été enregistré.',
     exportFailed: 'Échec de l’export : {message}',
     unknownError: 'erreur inconnue',
+    officeOpenFailed: 'Impossible d’ouvrir ce fichier Office : {message}',
+    officeOpenFailedGeneric: 'Impossible d’ouvrir ce fichier Office.',
+    officeExportFailed: 'Impossible de créer le fichier Office : {message}',
+    unsupportedFile:
+      'Fichier non pris en charge. Ouvrez un PDF, Word (.docx), Excel (.xlsx) ou PowerPoint (.pptx).',
   },
   errors: {
     noDocumentsToMerge: 'Aucun document à fusionner',
@@ -234,6 +258,8 @@ export const fr: Dictionary = {
     rangeUnparsed: 'Impossible de comprendre « {part} »',
     noImages: 'Ajoutez au moins une image',
     encodeFailed: 'Impossible d’encoder la page',
+    unsupportedOffice: 'Document Office non pris en charge',
+    noOfficeFiles: 'Ajoutez au moins un fichier Word, Excel ou PowerPoint',
   },
   canvas: {
     textPlaceholder: 'Saisissez le texte',

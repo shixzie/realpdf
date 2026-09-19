@@ -4,13 +4,14 @@ import {
   Combine,
   FileDown,
   FileText,
+  FileType2,
   FolderOpen,
   History,
   PenLine,
   Scissors,
 } from 'lucide-react'
 import { useStore, type PendingAction, type ToolsTab } from '../store'
-import { openPdfFile } from '../lib/openDocument'
+import { openDocumentFile } from '../lib/openDocument'
 import { useTranslation } from '../i18n'
 
 const TOOL_CARDS: Array<{
@@ -36,6 +37,12 @@ const TOOL_CARDS: Array<{
     icon: FileDown,
     titleKey: 'empty.convertTitle',
     textKey: 'empty.convertText',
+  },
+  {
+    action: { tab: 'office' },
+    icon: FileType2,
+    titleKey: 'empty.officeTitle',
+    textKey: 'empty.officeText',
   },
   {
     action: 'forms',
@@ -76,12 +83,12 @@ export function EmptyState() {
         <input
           ref={inputRef}
           type="file"
-          accept="application/pdf,.pdf"
+          accept="application/pdf,.pdf,.docx,.xlsx,.pptx"
           hidden
           onChange={(event) => {
             const file = event.target.files?.[0]
             event.target.value = ''
-            if (file) void openPdfFile(file)
+            if (file) void openDocumentFile(file)
             else useStore.getState().setPendingAction(null)
           }}
         />

@@ -41,7 +41,16 @@ describe('ui', () => {
     await page.waitForTimeout(200)
 
     // ------------------------------------------------- homepage tool cards
-    check((await page.locator('.home-tool').count()) === 5, 'homepage shows five tool cards')
+    check((await page.locator('.home-tool').count()) === 6, 'homepage shows six tool cards')
+    const officeCard = page.locator('.home-tool:has-text("Office → PDF")')
+    await officeCard.click()
+    await page.waitForSelector('.modal-wide')
+    check(
+      (await page.locator('.tab.is-active').innerText()).includes('Office'),
+      'Office card opens the tools modal on the Office tab',
+    )
+    await page.click('.modal-head .icon-button')
+    await page.waitForTimeout(200)
     const mergeCard = page.locator('.home-tool:has-text("Merge PDFs")')
     await mergeCard.click()
     await page.waitForSelector('.modal-wide')

@@ -49,6 +49,8 @@ A real PDF editor that runs **entirely in your browser**. No uploads, no servers
 - **PDF → Text** — download the text layer as `.txt`
 - **Images → PDF** — turn PNG/JPEG/WebP/GIF/BMP files into a PDF, fit to A4 or page-per-image
 - **Text → PDF** — render plain text into a paginated A4 PDF
+- **Office → PDF** — open Word (`.docx`), Excel (`.xlsx`) and PowerPoint (`.pptx`) files and convert them into editable PDFs: paragraphs, headings, lists, tables, merged cells, multiple sheets/slides and inline images are rebuilt with pdf-lib (no server, no native engine)
+- **PDF → Office** — export the current document (with your edits baked in) as an editable Word (`.docx`), Excel (`.xlsx`) or PowerPoint (`.pptx`) file: positioned text runs, page breaks, one sheet per page and one slide per page
 
 Everything the tools produce uses your **current edited state** (annotations, page order, filled forms), not just the original file.
 
@@ -89,7 +91,9 @@ npm run preview
 | Editing surface | [fabric.js](https://fabricjs.com/) canvas overlays (one per visible page), coordinates stored in PDF points |
 | Saving | [pdf-lib](https://pdf-lib.js.org/) — annotations are re-drawn as native PDF operators, images embedded, new text mapped to Standard-14, edited text embedded with its original font (subset) after rewriting the page's content streams to delete the original glyphs, highlights exported with a real Multiply blend mode. The same content-stream rewrite is applied to a scratch page and re-rendered with pdf.js while editing, so the on-screen preview matches the saved file |
 | State | [zustand](https://zustand.docs.pmnd.rs/) store with snapshot-based undo/redo |
-| ZIP export | dependency-free STORE-method zip writer (`src/lib/zip.ts`) |
+| ZIP export | dependency-free STORE-method zip writer (`src/lib/zip.ts`), with optional DEFLATE via pako for Office packages |
+| Office import | a dependency-free ZIP reader over pako (`src/lib/zipRead.ts`) + OOXML parsing with `DOMParser` (`ooxml.ts`, `docxToPdf.ts`, `xlsxToPdf.ts`, `pptxToPdf.ts`); shared text layout re-uses pdf-lib Standard-14 fonts (`pdfLayout.ts`) |
+| Office export | OOXML parts generated directly and packed with the zip writer (`pdfToOffice.ts`), using pdf.js text content with positions |
 | Localization | dependency-free typed dictionaries (`src/i18n/`) with `Intl.PluralRules` plurals and locale-aware number/date formatting |
 
 Export works by walking every stored annotation, inverting the pdf.js viewport transform to get PDF user-space coordinates, and drawing lines/rectangles/ellipses/text/images with pdf-lib. Rotation and non-standard page boxes are handled by the same inverse transform, so what you see is what gets written.
@@ -101,7 +105,7 @@ Export works by walking every stored annotation, inverting the pdf.js viewport t
 | `V` `T` `X` `P` `H` `R` `O` `L` `A` `W` `I` `S` `E` | select, text, edit text, draw, highlight, rectangle, ellipse, line, arrow, cover, image, signature, eraser |
 | `Ctrl/Cmd + Z` / `Ctrl/Cmd + Shift + Z` | undo / redo |
 | `Ctrl/Cmd + S` | save (download) the PDF |
-| `Ctrl/Cmd + O` | open a PDF |
+| `Ctrl/Cmd + O` | open a PDF or Office file |
 | `Ctrl/Cmd + scroll` | zoom |
 | `Delete` | delete selection |
 | `Esc` | deselect / back to select tool |
@@ -192,6 +196,8 @@ APP_URL=http://localhost:4173/ npm test
 - `tests/e2e/library.test.mjs` — save to the local library, rename, persistence across a reload, restore annotations, rebuild the PDF, delete
 - `tests/e2e/text-edit.test.mjs` — edit embedded-font and standard-font text: text layer deletion, exported font programs, coloured backgrounds
 - `tests/e2e/text-select.test.mjs` — selecting text activates the text tool, its options reflect and restyle the selected text, and the changes survive export
+- `tests/e2e/office.test.mjs` — Word/Excel/PowerPoint → PDF (text, tables, merged cells, embedded images) and PDF → Word/Excel/PowerPoint (OOXML parts, page breaks, one sheet/slide per page)
+- `tests/unit/zip.test.mjs` — ZIP round-trips for stored and deflated Office packages
 
 All suites pass against the Vite dev server, the production build and the local
 Cloudflare Workers runtime (`npm run cf:dev`).
@@ -200,7 +206,7 @@ Cloudflare Workers runtime (`npm run cf:dev`).
 
 - **Existing text is replaced, not re-flowed.** Editing a run deletes the matching text-showing operators from the page's content stream (including inside form XObjects) and draws the replacement at the original position, so surrounding lines never move. Reflowing paragraphs would require a real content-stream layout engine. When a run cannot be located with certainty (shared form XObjects drawn at different transforms, `TJ` arrays that pdf.js splits, encrypted streams), the exporter falls back to the older behaviour: the original is covered with the colour sampled from the page behind it.
 - The replacement font comes from the font program pdf.js rebuilds from the embedded font (the same outlines the viewer shows). Fonts pdf.js cannot hand over (Type 3, some non-embedded standard fonts) fall back to the closest Standard-14 family. Characters that are not part of a subsetted font are written as `?`.
-- **Office formats are not supported** (Word/Excel/PPT in or out) — they cannot be done faithfully client-side without heavy native engines.
+- **Office conversion is content-level, not pixel-faithful.** Word/Excel/PowerPoint files are parsed in the browser (ZIP + OOXML) and rebuilt with pdf-lib: text, tables, lists, inline images and basic paragraph/run styling (bold, italic, underline, colour, size, alignment) survive, while complex layouts, themes, charts/SmartArt, embedded objects, macros, headers/footers and exact fonts (they are matched to the Standard-14 substitutes) do not. Exporting a PDF back to Office preserves the text, its position, basic emphasis and the page/sheet/slide structure — not the original PDF's exact layout. Legacy `.doc/.xls/.ppt`, OpenDocument and macro-enabled variants are not supported.
 - Text you add is exported with the Standard-14 fonts (Helvetica/Times/Courier). Characters outside WinAnsi (CJK, emoji, …) are replaced with `?`. Existing text rendering supports embedded fonts and CJK via pdf.js CMaps.
 - Very large documents (hundreds of pages) work but page rendering is limited to a window around the viewport; extremely large images increase memory usage.
 - Filling forms flattens by default (recommended); unflattened export relies on pdf-lib copying widgets, which is best-effort.
@@ -223,7 +229,15 @@ src/
     pdfOps.ts     merge, extract, image/text conversion
     currentDocument.ts  "bake" the edited document for tools/export
     serialize.ts  annotation JSON (assets kept out of undo snapshots)
-    zip.ts        minimal ZIP writer
+    zip.ts        minimal ZIP writer (STORE, optional DEFLATE)
+    zipRead.ts    ZIP reader for Office packages
+    ooxml.ts      OOXML helpers: XML, relationships, units, WinAnsi text
+    pdfLayout.ts  shared wrapped-text layout over pdf-lib Standard-14 fonts
+    docxToPdf.ts  WordprocessingML → PDF (paragraphs, lists, tables, images)
+    xlsxToPdf.ts  SpreadsheetML → PDF (sheets, styles, merges, pagination)
+    pptxToPdf.ts  PresentationML → PDF (slides, placeholders, tables, images)
+    officeToPdf.ts  format detection + dispatcher
+    pdfToOffice.ts  PDF text extraction + Word/Excel/PowerPoint exporters
   store.ts        single zustand store (pages, history, tools, forms)
 scripts/          sample generator, screenshots, visual checks
 tests/            vitest suites: helpers, unit tests, browser end-to-end tests

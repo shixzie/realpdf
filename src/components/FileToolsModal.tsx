@@ -4,10 +4,13 @@ import {
   ArrowUp,
   Combine,
   FileDown,
+  FileSpreadsheet,
   FileText,
+  FileType2,
   FileUp,
   Image as ImageIcon,
   Loader2,
+  Presentation,
   Scissors,
   Trash2,
   X,
@@ -15,6 +18,8 @@ import {
 import { useStore, type ToolsTab } from '../store'
 import { openPdfBytes } from '../lib/openDocument'
 import { downloadBlob } from '../lib/exportController'
+import { officeToPdf } from '../lib/officeToPdf'
+import { pdfToDocx, pdfToPptx, pdfToXlsx } from '../lib/pdfToOffice'
 import {
   extractPages,
   imagesToPdf,
@@ -45,10 +50,24 @@ const TABS: Array<{ id: ToolsTab; labelKey: string; icon: typeof Combine }> = [
   { id: 'merge', labelKey: 'fileTools.tabMerge', icon: Combine },
   { id: 'split', labelKey: 'fileTools.tabSplit', icon: Scissors },
   { id: 'convert', labelKey: 'fileTools.tabConvert', icon: FileDown },
+  { id: 'office', labelKey: 'fileTools.tabOffice', icon: FileType2 },
 ]
+
+const OFFICE_ACCEPT =
+  '.docx,.xlsx,.pptx,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.openxmlformats-officedocument.presentationml.presentation'
+
+const OFFICE_MIME: Record<'docx' | 'xlsx' | 'pptx', string> = {
+  docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  pptx: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+}
 
 function baseName(name: string | null): string {
   return (name ?? 'document.pdf').replace(/\.pdf$/i, '')
+}
+
+function stripExtension(name: string): string {
+  return name.replace(/\.[^.]+$/, '')
 }
 
 async function readFiles(files: FileList | File[]): Promise<DraftSource[]> {
@@ -100,6 +119,7 @@ function Modal() {
           {tab === 'merge' && <MergeTab />}
           {tab === 'split' && <SplitTab />}
           {tab === 'convert' && <ConvertTab />}
+          {tab === 'office' && <OfficeTab />}
         </div>
       </div>
     </div>
@@ -624,6 +644,190 @@ function ConvertTab() {
       </section>
 
       <p className="tool-note">{t('fileTools.convertNote')}</p>
+    </div>
+  )
+}
+
+function OfficeTab() {
+  const { t } = useTranslation()
+  const fileName = useStore((state) => state.fileName)
+  const pdf = useStore((state) => state.pdf)
+  const { busy, run } = useBusy()
+  const inputRef = useRef<HTMLInputElement>(null)
+  const [sources, setSources] = useState<DraftSource[]>([])
+
+  const convertSources = async (): Promise<{ bytes: Uint8Array; name: string }> => {
+    const converted: MergeSource[] = []
+    for (const source of sources) {
+      if (!source.bytes) continue
+      converted.push({ name: source.name, bytes: await officeToPdf(source.bytes, source.name) })
+    }
+    if (!converted.length) throw new Error(t('errors.noOfficeFiles'))
+    if (converted.length === 1) {
+      return { bytes: converted[0].bytes, name: `${stripExtension(converted[0].name)}.pdf` }
+    }
+    return { bytes: await mergePdfs(converted), name: 'office-document.pdf' }
+  }
+
+  const exportOffice = async (kind: 'docx' | 'xlsx' | 'pptx') => {
+    try {
+      const scratch = await openPdfDocumentFromBytes(await bakedCurrentBytes())
+      try {
+        const bytes =
+          kind === 'docx'
+            ? await pdfToDocx(scratch)
+            : kind === 'xlsx'
+              ? await pdfToXlsx(scratch)
+              : await pdfToPptx(scratch)
+        downloadBlob(
+          new Blob([bytes as BlobPart], { type: OFFICE_MIME[kind] }),
+          `${stripExtension(fileName ?? 'document.pdf')}.${kind}`,
+        )
+        useStore.getState().toastMessage('success', t('fileTools.officeExportDone'))
+      } finally {
+        void scratch.loadingTask.destroy()
+      }
+    } catch (error) {
+      console.error(error)
+      const message = (error as Error)?.message ?? t('toasts.unknownError')
+      useStore.getState().toastMessage('error', t('toasts.officeExportFailed', { message }))
+    }
+  }
+
+  const failOfficeOpen = (error: unknown) => {
+    console.error(error)
+    const message = (error as Error)?.message
+    useStore
+      .getState()
+      .toastMessage(
+        'error',
+        message ? t('toasts.officeOpenFailed', { message }) : t('toasts.officeOpenFailedGeneric'),
+      )
+  }
+
+  return (
+    <div className="tool-section">
+      <section className="tool-block">
+        <h3>
+          <FileType2 size={15} /> {t('fileTools.officeToPdf')}
+        </h3>
+        <p className="tool-hint">{t('fileTools.officeHint')}</p>
+        <div className="tool-row">
+          <button type="button" className="button" onClick={() => inputRef.current?.click()}>
+            <FileUp size={15} /> {t('fileTools.addOffice')}
+          </button>
+          <input
+            ref={inputRef}
+            type="file"
+            accept={OFFICE_ACCEPT}
+            multiple
+            hidden
+            onChange={async (event) => {
+              const files = event.target.files ? Array.from(event.target.files) : []
+              event.target.value = ''
+              if (!files.length) return
+              const drafts = await readFiles(files)
+              setSources((current) => [...current, ...drafts])
+            }}
+          />
+        </div>
+        {sources.length === 0 && <p className="tool-empty">{t('fileTools.officeNone')}</p>}
+        <ul className="source-list">
+          {sources.map((source) => (
+            <li key={source.id} className="source-item">
+              <span className="source-name">{source.name}</span>
+              <span className="source-size">{source.bytes ? formatBytes(source.bytes.length) : ''}</span>
+              <button
+                type="button"
+                className="icon-button"
+                onClick={() => setSources((current) => current.filter((entry) => entry.id !== source.id))}
+              >
+                <Trash2 size={14} />
+              </button>
+            </li>
+          ))}
+        </ul>
+        <div className="tool-actions">
+          <button
+            type="button"
+            className="button"
+            disabled={Boolean(busy) || !sources.length}
+            onClick={() =>
+              void run('office-download', async () => {
+                try {
+                  const { bytes, name } = await convertSources()
+                  downloadBlob(new Blob([bytes as BlobPart], { type: 'application/pdf' }), name)
+                  useStore.getState().toastMessage('success', t('fileTools.officeConverted'))
+                } catch (error) {
+                  failOfficeOpen(error)
+                }
+              })
+            }
+          >
+            {busy === 'office-download' ? <Loader2 size={15} className="spin" /> : <FileDown size={15} />}{' '}
+            {t('fileTools.convertDownload')}
+          </button>
+          <button
+            type="button"
+            className="button button-primary"
+            disabled={Boolean(busy) || !sources.length}
+            onClick={() =>
+              void run('office-open', async () => {
+                if (!confirmReplace()) return
+                try {
+                  const { bytes, name } = await convertSources()
+                  await openPdfBytes(bytes, name)
+                  setSources([])
+                  useStore.getState().setToolsOpen(false)
+                } catch (error) {
+                  failOfficeOpen(error)
+                }
+              })
+            }
+          >
+            {busy === 'office-open' ? <Loader2 size={15} className="spin" /> : <Combine size={15} />}{' '}
+            {t('fileTools.convertOpen')}
+          </button>
+        </div>
+      </section>
+
+      <section className="tool-block">
+        <h3>
+          <FileDown size={15} /> {t('fileTools.pdfToOffice')}
+        </h3>
+        <p className="tool-hint">{t('fileTools.officeExportHint')}</p>
+        <div className="tool-row">
+          <button
+            type="button"
+            className="button"
+            disabled={Boolean(busy) || !pdf}
+            onClick={() => void run('office-docx', () => exportOffice('docx'))}
+          >
+            {busy === 'office-docx' ? <Loader2 size={15} className="spin" /> : <FileText size={15} />}{' '}
+            {t('fileTools.pdfToWord')}
+          </button>
+          <button
+            type="button"
+            className="button"
+            disabled={Boolean(busy) || !pdf}
+            onClick={() => void run('office-xlsx', () => exportOffice('xlsx'))}
+          >
+            {busy === 'office-xlsx' ? <Loader2 size={15} className="spin" /> : <FileSpreadsheet size={15} />}{' '}
+            {t('fileTools.pdfToExcel')}
+          </button>
+          <button
+            type="button"
+            className="button"
+            disabled={Boolean(busy) || !pdf}
+            onClick={() => void run('office-pptx', () => exportOffice('pptx'))}
+          >
+            {busy === 'office-pptx' ? <Loader2 size={15} className="spin" /> : <Presentation size={15} />}{' '}
+            {t('fileTools.pdfToPowerpoint')}
+          </button>
+        </div>
+      </section>
+
+      <p className="tool-note">{t('fileTools.officeNote')}</p>
     </div>
   )
 }
