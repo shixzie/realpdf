@@ -9,7 +9,7 @@ export const en = {
   meta: {
     title: 'RealPDF — local PDF editor',
     description:
-      'RealPDF — a fully local, in-browser PDF editor. Annotate, draw, add text and images, fill forms, merge, split and convert PDFs, then export. Your files never leave your device.',
+      'RealPDF — a fully local, in-browser PDF editor. Annotate, draw, add text and images, fill forms, merge, split and convert PDFs, open Word/Excel/PowerPoint files as editable PDFs, then export to PDF or Office. Your files never leave your device.',
   },
   language: {
     label: 'Language',
@@ -30,10 +30,10 @@ export const en = {
     pages_other: '{count} pages',
   },
   topbar: {
-    openPdf: 'Open PDF',
+    openPdf: 'Open file',
     homeTitle: 'Go to start screen',
     tools: 'Tools',
-    toolsTitle: 'Merge, split and convert documents',
+    toolsTitle: 'Merge, split and convert PDFs and Office files',
     library: 'Library',
     libraryTitle: 'Documents saved in this browser',
     fillForms: 'Fill forms',
@@ -90,8 +90,8 @@ export const en = {
     title: 'Edit PDFs without uploading them',
     subtitle:
       'RealPDF runs entirely in your browser. Your document never leaves your device — annotate it, fill forms, merge, split and convert files, then download the result.',
-    choose: 'Choose a PDF',
-    dragHint: 'or drag & drop a PDF anywhere',
+    choose: 'Choose a PDF or Office file',
+    dragHint: 'or drag & drop a PDF, Word, Excel or PowerPoint file',
     opening: 'Opening document…',
     recent: 'Recent work',
     restore: 'Restore {title}',
@@ -101,6 +101,8 @@ export const en = {
     splitText: 'Extract page ranges or split every page apart.',
     convertTitle: 'Convert',
     convertText: 'PDF to images or text, images and text to PDF.',
+    officeTitle: 'Office → PDF',
+    officeText: 'Open Word, Excel or PowerPoint files and convert them to PDF.',
     formsTitle: 'Fill a form',
     formsText: 'Type into interactive fields and save them in.',
     annotateTitle: 'Annotate & sign',
@@ -198,7 +200,25 @@ export const en = {
     pageImageSize: 'Page = image size',
     createOpen: 'Create PDF & open',
     pasteText: 'Paste text here…',
-    convertNote: 'Everything is converted on this device. Office formats (Word/Excel/PPT) are not supported yet.',
+    convertNote: 'Everything is converted on this device — your files never leave it.',
+    tabOffice: 'Office',
+    officeToPdf: 'Office → PDF',
+    officeHint:
+      'Open Word (.docx), Excel (.xlsx) or PowerPoint (.pptx) files and turn them into editable PDFs — text, tables, images and basic formatting included.',
+    addOffice: 'Add Office files',
+    officeNone: 'No Office files yet.',
+    convertDownload: 'Convert & download',
+    convertOpen: 'Convert & open',
+    officeConverted: 'Office document converted to PDF.',
+    pdfToOffice: 'PDF → Office',
+    officeExportHint:
+      'Export the current document (with your edits) as an editable Word, Excel or PowerPoint file.',
+    pdfToWord: 'Word (.docx)',
+    pdfToExcel: 'Excel (.xlsx)',
+    pdfToPowerpoint: 'PowerPoint (.pptx)',
+    officeExportDone: 'Office file downloaded.',
+    officeNote:
+      'Office conversion is content-level: text, tables, images and basic formatting. Complex layouts, charts, macros and exact fonts are not preserved.',
   },
   toasts: {
     loaded: 'Loaded {fileName}',
@@ -226,6 +246,10 @@ export const en = {
     exported: 'Saved your edited PDF.',
     exportFailed: 'Export failed: {message}',
     unknownError: 'unknown error',
+    officeOpenFailed: 'Could not open this Office file: {message}',
+    officeOpenFailedGeneric: 'Could not open this Office file.',
+    officeExportFailed: 'Could not create the Office file: {message}',
+    unsupportedFile: 'Unsupported file. Open a PDF, Word (.docx), Excel (.xlsx) or PowerPoint (.pptx) file.',
   },
   errors: {
     noDocumentsToMerge: 'No documents to merge',
@@ -234,6 +258,8 @@ export const en = {
     rangeUnparsed: 'Could not understand "{part}"',
     noImages: 'Add at least one image',
     encodeFailed: 'Could not encode the page',
+    unsupportedOffice: 'Unsupported Office document',
+    noOfficeFiles: 'Add at least one Word, Excel or PowerPoint file',
   },
   canvas: {
     textPlaceholder: 'Type here',

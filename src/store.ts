@@ -19,7 +19,7 @@ import {
 import { restoreAssets } from './lib/assets'
 import { t } from './i18n'
 
-export type ToolsTab = 'merge' | 'split' | 'convert'
+export type ToolsTab = 'merge' | 'split' | 'convert' | 'office'
 export type PendingAction = ToolsTab | 'forms'
 export type Theme = 'dark' | 'light'
 

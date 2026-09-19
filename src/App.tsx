@@ -11,7 +11,7 @@ import { LibraryModal } from './components/LibraryModal'
 import { FormsBar } from './components/FormsBar'
 import { EmptyState } from './components/EmptyState'
 import { ExportOverlay, Toast } from './components/Overlays'
-import { openPdfFile } from './lib/openDocument'
+import { isSupportedFileName, openDocumentFile } from './lib/openDocument'
 import { runExport } from './lib/exportController'
 import { activeCanvas, deleteSelection } from './lib/canvasRegistry'
 import type { Tool } from './types'
@@ -123,11 +123,11 @@ export default function App() {
     }
     const onDrop = (event: DragEvent) => {
       const files = Array.from(event.dataTransfer?.files ?? [])
-      const pdf = files.find((file) => file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf'))
-      if (!pdf) return
+      const document = files.find((file) => isSupportedFileName(file.name) || file.type === 'application/pdf')
+      if (!document) return
       if ((event.target as HTMLElement)?.closest('.page')) return
       event.preventDefault()
-      void openPdfFile(pdf)
+      void openDocumentFile(document)
     }
     window.addEventListener('dragover', onDragOver)
     window.addEventListener('drop', onDrop)

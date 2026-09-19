@@ -24,7 +24,7 @@ describe('document tools', () => {
 
     const openTools = async (tab) => {
       const already = await page.locator('.modal-wide').count()
-      if (!already) await page.click('button[title="Merge, split and convert documents"]')
+      if (!already) await page.click('button[title="Merge, split and convert PDFs and Office files"]')
       await page.click(`.tab:has-text("${tab}")`)
     }
 

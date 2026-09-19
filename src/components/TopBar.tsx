@@ -19,7 +19,7 @@ import {
   ZoomOut,
 } from 'lucide-react'
 import { useStore } from '../store'
-import { openPdfFile } from '../lib/openDocument'
+import { openDocumentFile } from '../lib/openDocument'
 import { runExport } from '../lib/exportController'
 import { getCanvas } from '../lib/canvasRegistry'
 import { useTranslation } from '../i18n'
@@ -79,12 +79,12 @@ export function TopBar() {
           id="open-pdf-input"
           ref={fileInputRef}
           type="file"
-          accept="application/pdf,.pdf"
+          accept="application/pdf,.pdf,.docx,.xlsx,.pptx"
           hidden
           onChange={(event) => {
             const file = event.target.files?.[0]
             event.target.value = ''
-            if (file) void openPdfFile(file)
+            if (file) void openDocumentFile(file)
           }}
         />
         {fileName && <span className="file-name" title={fileName}>{fileName}</span>}
