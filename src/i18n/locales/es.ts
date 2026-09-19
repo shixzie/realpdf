@@ -76,7 +76,7 @@ export const es: Dictionary = {
     selectHint: 'Haz clic para seleccionar · Mayús+clic para varios · arrastra los tiradores para redimensionar',
     whiteoutHint: 'Arrastra sobre el contenido existente para cubrirlo y añade texto encima.',
     texteditHint:
-      'Haz clic en el texto existente del PDF para editarlo. La fuente, el tamaño y el color originales se ajustan, y el texto original se elimina del archivo al guardar.',
+      'Haz clic en el texto existente del PDF para editarlo. Se ajustan la fuente (incluidas negrita y cursiva), el tamaño y el color originales, el reemplazo crece al escribir en lugar de partirse en líneas, y el texto original se elimina del archivo al guardar.',
     eraserHint: 'Haz clic en cualquier anotación para eliminarla.',
     imageHint: 'Elige un archivo de imagen para colocarlo en la página actual.',
     signatureHint: 'Dibuja tu firma en el cuadro de diálogo.',

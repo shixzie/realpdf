@@ -113,6 +113,21 @@ export async function buildEmbeddedFontPdf(file = path.join(OUT_DIR, 'textedit-e
   return file
 }
 
+/** A page whose text is drawn with embedded bold and italic programs. */
+export async function buildStyledFontPdf(file = path.join(OUT_DIR, 'textedit-styled.pdf')) {
+  const doc = await PDFDocument.create()
+  doc.registerFontkit(fontkit)
+  const dir = path.dirname(LIBERATION)
+  const bold = await doc.embedFont(fs.readFileSync(path.join(dir, 'LiberationSans-Bold.ttf')), { subset: false })
+  const italic = await doc.embedFont(fs.readFileSync(path.join(dir, 'LiberationSans-Italic.ttf')), { subset: false })
+  const page = doc.addPage([500, 300])
+  page.drawText('Embedded bold run', { x: 40, y: 240, size: 20, font: bold, color: rgb(0, 0, 0) })
+  page.drawText('Embedded italic run', { x: 40, y: 180, size: 20, font: italic, color: rgb(0, 0, 0) })
+  ensureOutDir()
+  fs.writeFileSync(file, await doc.save())
+  return file
+}
+
 /** Small page whose text uses the non-embedded base-14 Helvetica. */
 export function standardFontPdfBytes() {
   const stream = 'BT /F1 28 Tf 40 100 Td (Standard font test) Tj ET'

@@ -81,7 +81,7 @@ export const en = {
     selectHint: 'Click to select · Shift-click for multiple · drag handles to resize',
     whiteoutHint: 'Drag over existing content to cover it, then add text on top.',
     texteditHint:
-      'Click existing PDF text to edit it. The original font, size and colour are matched, and the original text is deleted from the file when you save.',
+      'Click existing PDF text to edit it. The original font (bold/italic included), size and colour are matched, the replacement grows as you type instead of wrapping, and the original text is deleted from the file when you save.',
     eraserHint: 'Click any annotation to remove it.',
     imageHint: 'Pick an image file to place it on the current page.',
     signatureHint: 'Draw your signature in the dialog.',

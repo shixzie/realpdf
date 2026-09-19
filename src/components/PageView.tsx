@@ -21,6 +21,7 @@ import {
 } from '../lib/tools'
 import {
   createPdfTextEditObject,
+  fitPdfTextEditWidth,
   loadPageTextRuns,
   registerCanvasFonts,
   runAtPoint,
@@ -166,6 +167,8 @@ export function PageView({ pageIndex }: PageViewProps) {
     if (token !== textEditTokenRef.current || canvasRef.current !== canvas) return
     useStore.getState().beginChange()
     const object = createPdfTextEditObject(run, colors)
+    // Measured with the loaded face, so the run never wraps even before typing.
+    fitPdfTextEditWidth(object)
     canvas.add(object)
     // Publish the edit right away so the final-result preview starts building.
     commitCanvas(latest.current.pageId)
@@ -214,7 +217,13 @@ export function PageView({ pageIndex }: PageViewProps) {
     canvas.on('object:added', onChange)
     canvas.on('object:removed', onChange)
     canvas.on('object:modified', onChange)
-    canvas.on('text:changed', onChange)
+    canvas.on('text:changed', (event) => {
+      const target = event.target as AnyObject | undefined
+      // A replacement extends along the baseline as it is typed, like the run
+      // it replaces, instead of wrapping inside the original run's width.
+      if (target?.data?.kind === 'pdftext') fitPdfTextEditWidth(target)
+      onChange()
+    })
 
     canvas.on('path:created', (event) => {
       const path = (event as unknown as { path: AnyObject }).path
@@ -253,13 +262,14 @@ export function PageView({ pageIndex }: PageViewProps) {
           | { left: number; top: number; width: number; angle: number }
           | undefined
         const styled = Boolean(target.data?.styled)
+        // Width is managed by the auto-fit (the box grows with the text), so
+        // only the text, place and style decide whether anything changed.
         const untouched =
           !styled &&
           spawn != null &&
           value === target.data?.originalText &&
           Math.abs((target.left ?? 0) - spawn.left) < 0.75 &&
           Math.abs((target.top ?? 0) - spawn.top) < 0.75 &&
-          Math.abs((target.width ?? 0) - spawn.width) < 0.75 &&
           Math.abs((target.angle ?? 0) - spawn.angle) < 0.5
         if (!value.trim() || untouched) {
           canvas.remove(target)
