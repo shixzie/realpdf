@@ -78,7 +78,7 @@ export const de: Dictionary = {
     whiteoutHint:
       'Ziehen Sie über vorhandene Inhalte, um sie abzudecken, und fügen Sie dann Text darüber ein.',
     texteditHint:
-      'Klicken Sie auf vorhandenen PDF-Text, um ihn zu bearbeiten. Schriftart, Größe und Farbe werden übernommen, und der Originaltext wird beim Speichern aus der Datei entfernt.',
+      'Klicken Sie auf vorhandenen PDF-Text, um ihn zu bearbeiten. Schriftart (inkl. Fett/Kursiv), Größe und Farbe werden übernommen, der Ersatztext wächst beim Tippen, statt umzubrechen, und der Originaltext wird beim Speichern aus der Datei entfernt.',
     eraserHint: 'Klicken Sie auf eine Anmerkung, um sie zu entfernen.',
     imageHint: 'Wählen Sie eine Bilddatei, um sie auf der aktuellen Seite zu platzieren.',
     signatureHint: 'Zeichnen Sie Ihre Unterschrift im Dialog.',

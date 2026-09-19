@@ -121,18 +121,39 @@ export function familyForAsset(assetId: string): string {
   return `"${fontFamilyName(assetId)}"`
 }
 
+export interface FontAssetStyle {
+  bold?: boolean
+  italic?: boolean
+}
+
+function fontFaceKey(assetId: string, style: FontAssetStyle): string {
+  return `${assetId}:${style.bold ? 'b' : '-'}${style.italic ? 'i' : '-'}`
+}
+
 const fontFaceTasks = new Map<string, Promise<boolean>>()
 
-/** Loads a stored font asset as a FontFace so canvas can render with it. */
-export function registerFontAsset(assetId: string): Promise<boolean> {
-  const existing = fontFaceTasks.get(assetId)
+/**
+ * Loads a stored font asset as a FontFace so canvas can render with it.
+ *
+ * The rebuilt program already is the face the run used, so it is registered
+ * with the run's weight/style: leaving them at `normal` makes the browser
+ * synthesise bold/oblique on top of the real face, and the on-screen
+ * replacement ends up heavier and more slanted than the original (and than the
+ * exported file, which embeds the raw program without synthesis).
+ */
+export function registerFontAsset(assetId: string, style: FontAssetStyle = {}): Promise<boolean> {
+  const key = fontFaceKey(assetId, style)
+  const existing = fontFaceTasks.get(key)
   if (existing) return existing
   const task = (async () => {
     if (typeof FontFace === 'undefined' || typeof document === 'undefined') return false
     const src = getAsset(assetId)
     if (!src) return false
     try {
-      const face = new FontFace(fontFamilyName(assetId), dataUrlBytes(src).buffer as ArrayBuffer)
+      const face = new FontFace(fontFamilyName(assetId), dataUrlBytes(src).buffer as ArrayBuffer, {
+        weight: style.bold ? '700' : '400',
+        style: style.italic ? 'italic' : 'normal',
+      })
       await face.load()
       document.fonts.add(face)
       return true
@@ -141,20 +162,23 @@ export function registerFontAsset(assetId: string): Promise<boolean> {
       return false
     }
   })()
-  fontFaceTasks.set(assetId, task)
+  fontFaceTasks.set(key, task)
   return task
 }
 
 /** Registers the fonts referenced by `pdftext` annotations and re-measures them. */
 export async function registerCanvasFonts(canvas: Canvas): Promise<void> {
   const objects = canvas.getObjects().filter((object) => (object as AnyObject).data?.kind === 'pdftext') as AnyObject[]
-  const ids = new Set<string>()
+  const tasks = new Map<string, Promise<boolean>>()
   for (const object of objects) {
-    const assetId = object.data?.font?.assetId
-    if (typeof assetId === 'string') ids.add(assetId)
+    const font = (object.data?.font ?? {}) as { assetId?: string; bold?: boolean; italic?: boolean }
+    if (typeof font.assetId !== 'string') continue
+    const style: FontAssetStyle = { bold: Boolean(font.bold), italic: Boolean(font.italic) }
+    const key = fontFaceKey(font.assetId, style)
+    if (!tasks.has(key)) tasks.set(key, registerFontAsset(font.assetId, style))
   }
-  if (!ids.size) return
-  const loaded = await Promise.all(Array.from(ids).map((id) => registerFontAsset(id)))
+  if (!tasks.size) return
+  const loaded = await Promise.all(tasks.values())
   if (!loaded.some(Boolean)) return
   for (const object of objects) {
     if (object.canvas !== canvas) continue
@@ -283,7 +307,7 @@ async function resolveFont(page: PDFPageProxy, fontKey: string): Promise<FontInf
     try {
       const bytes = face.data instanceof Uint8Array ? face.data : new Uint8Array(face.data)
       const assetId = addFontAsset(bytes, face.mimetype)
-      await registerFontAsset(assetId)
+      await registerFontAsset(assetId, { bold, italic })
       return {
         family: familyForAsset(assetId),
         fallback: normalizeFamily(name || face.fallbackName),
@@ -618,6 +642,40 @@ export function createPdfTextEditObject(run: TextRun, colors: RunColors): Textbo
   })
 }
 
+/** Width the box is measured at so its content lays out on one unwrapped line. */
+const UNWRAPPED_WIDTH = 1e6
+
+/**
+ * Fits a replacement's box to its content so a retyped run extends along the
+ * baseline instead of wrapping inside the original run's width. The box never
+ * shrinks below the original run's box.
+ */
+export function fitPdfTextEditWidth(object: FabricObject): void {
+  const target = object as AnyObject
+  if (target.data?.kind !== 'pdftext') return
+  const textbox = target as unknown as { initDimensions?: () => void; calcTextWidth?: () => number }
+  if (typeof textbox.initDimensions !== 'function' || typeof textbox.calcTextWidth !== 'function') return
+  const spawn = target.data?.spawn as { width?: number } | undefined
+  const fontSize = Math.max(1, Number(target.fontSize) || 16)
+  const minWidth = Math.max(fontSize, Number(spawn?.width) || 0)
+  const current = Number(target.width) || minWidth
+  let natural = 0
+  try {
+    // Measure with a box wide enough that every explicit line stays unwrapped.
+    target.set({ width: UNWRAPPED_WIDTH })
+    textbox.initDimensions()
+    natural = Math.max(0, Number(textbox.calcTextWidth()) || 0)
+  } catch {
+    natural = 0
+  }
+  const wanted = Math.max(minWidth, natural + Math.max(2, natural * 0.02))
+  target.set({ width: wanted })
+  textbox.initDimensions()
+  if (Math.abs(wanted - current) > 0.01) target.setCoords()
+  target.dirty = true
+  target.canvas?.requestRenderAll()
+}
+
 export interface TextStylePatch {
   color?: string
   fontSize?: number
@@ -650,6 +708,10 @@ export function styleTextObject(object: FabricObject, patch: TextStylePatch): vo
       font.spaceEm = undefined
     }
     target.set({ data: { ...target.data, font, styled: true } })
+  }
+  if (patch.fontSize !== undefined || patch.fontFamily !== undefined) {
+    // A larger size or a wider family can outgrow the box; keep it from wrapping.
+    fitPdfTextEditWidth(target)
   }
   target.setCoords()
   target.dirty = true

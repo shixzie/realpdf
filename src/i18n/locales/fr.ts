@@ -77,7 +77,7 @@ export const fr: Dictionary = {
       'Cliquez pour sélectionner · Maj+clic pour plusieurs · faites glisser les poignées pour redimensionner',
     whiteoutHint: 'Faites glisser sur le contenu existant pour le masquer, puis ajoutez du texte par-dessus.',
     texteditHint:
-      'Cliquez sur le texte existant du PDF pour le modifier. La police, la taille et la couleur d’origine sont reproduites, et le texte d’origine est supprimé du fichier à l’enregistrement.',
+      'Cliquez sur le texte existant du PDF pour le modifier. La police (gras/italique inclus), la taille et la couleur d’origine sont reproduites, le remplacement s’allonge à la saisie au lieu de passer à la ligne, et le texte d’origine est supprimé du fichier à l’enregistrement.',
     eraserHint: 'Cliquez sur une annotation pour la supprimer.',
     imageHint: 'Choisissez un fichier image à placer sur la page actuelle.',
     signatureHint: 'Dessinez votre signature dans la boîte de dialogue.',
