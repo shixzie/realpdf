@@ -1,6 +1,6 @@
 import { useTranslation } from '../i18n'
 
-const GITHUB_URL = 'https://github.com/shixzie'
+const GITHUB_URL = 'https://github.com/shixzie/realpdf'
 const X_URL = 'https://x.com/shixzie'
 
 function GitHubMark() {
