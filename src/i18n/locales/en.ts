@@ -64,7 +64,7 @@ export const en = {
     ellipse: 'Ellipse',
     line: 'Line',
     arrow: 'Arrow',
-    whiteout: 'Cover (white)',
+    whiteout: 'Cover',
     whiteoutShort: 'Cover',
     image: 'Image',
     signature: 'Signature',

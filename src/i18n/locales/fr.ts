@@ -59,7 +59,7 @@ export const fr: Dictionary = {
     ellipse: 'Ellipse',
     line: 'Ligne',
     arrow: 'Flèche',
-    whiteout: 'Masquer (blanc)',
+    whiteout: 'Masquer',
     whiteoutShort: 'Masquer',
     image: 'Image',
     signature: 'Signature',

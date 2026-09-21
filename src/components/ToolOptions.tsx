@@ -10,6 +10,7 @@ import type { FontFamily, Tool } from '../types'
 
 const INK_COLORS = ['#111827', '#dc2626', '#ea580c', '#16a34a', '#2563eb', '#7c3aed', '#db2777', '#ffffff']
 const HIGHLIGHT_COLORS = ['#facc15', '#4ade80', '#60a5fa', '#f472b6', '#fb923c']
+const WHITEOUT_COLORS = ['#ffffff', '#000000', '#111827', '#dc2626', '#ea580c', '#16a34a', '#2563eb', '#7c3aed', '#db2777']
 
 const TOOL_LABEL_KEY: Record<Tool, string> = {
   select: 'tools.select',
@@ -199,7 +200,17 @@ export function ToolOptions() {
         </>
       )}
 
-      {tool === 'whiteout' && <span className="options-hint">{t('options.whiteoutHint')}</span>}
+      {tool === 'whiteout' && (
+        <>
+          <span className="options-label">{t('options.color')}</span>
+          <Swatches
+            value={settings.whiteoutColor}
+            colors={WHITEOUT_COLORS}
+            onChange={(whiteoutColor) => updateSettings({ whiteoutColor })}
+          />
+          <span className="options-hint">{t('options.whiteoutHint')}</span>
+        </>
+      )}
 
       {tool === 'textedit' && !showTextStyle && <span className="options-hint">{t('options.texteditHint')}</span>}
 

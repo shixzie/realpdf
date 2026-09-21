@@ -154,6 +154,7 @@ const DEFAULT_SETTINGS: Settings = {
   fontFamily: 'Helvetica',
   highlightColor: '#facc15',
   highlightWidth: 14,
+  whiteoutColor: '#ffffff',
 }
 
 function makePage(info: PageSourceInfo): PageState {
