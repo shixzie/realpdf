@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
-import { GripVertical, Plus, Trash2 } from 'lucide-react'
+import { Download, GripVertical, Loader2, Plus, Trash2 } from 'lucide-react'
 import { useStore } from '../store'
 import { useTranslation } from '../i18n'
+import { quickExport } from '../lib/quickExport'
 import type { PageState } from '../types'
 
 function Thumbnail({ page }: { page: PageState }) {
@@ -68,6 +69,13 @@ export function PageSidebar() {
   const currentPageId = useStore((state) => state.currentPageId)
   const [dragIndex, setDragIndex] = useState<number | null>(null)
   const [overIndex, setOverIndex] = useState<number | null>(null)
+  const [downloadingId, setDownloadingId] = useState<string | null>(null)
+
+  const downloadPage = (pageId: string) => {
+    if (downloadingId) return
+    setDownloadingId(pageId)
+    void quickExport('png', { pageId }).finally(() => setDownloadingId(null))
+  }
 
   return (
     <aside className="sidebar">
@@ -138,6 +146,22 @@ export function PageSidebar() {
                 }}
               >
                 <Trash2 size={13} />
+              </button>
+              <button
+                type="button"
+                className="thumb-download"
+                title={t('sidebar.downloadPage')}
+                disabled={downloadingId !== null}
+                onClick={(event) => {
+                  event.stopPropagation()
+                  downloadPage(page.id)
+                }}
+              >
+                {downloadingId === page.id ? (
+                  <Loader2 size={13} className="spin" />
+                ) : (
+                  <Download size={13} />
+                )}
               </button>
             </div>
           )
