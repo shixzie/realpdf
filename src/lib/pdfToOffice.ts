@@ -455,6 +455,12 @@ const SLIDE_LAYOUT_XML =
   `<p:clrMapOvr><a:masterClrMapping/></p:clrMapOvr>` +
   `</p:sldLayout>`
 
+const SLIDE_RELS =
+  `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>` +
+  `<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">` +
+  `<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/slideLayout" Target="../slideLayouts/slideLayout1.xml"/>` +
+  `</Relationships>`
+
 function textBoxXml(line: PdfTextLine, id: number): string {
   const size = line.size > 0 ? line.size : 12
   const top = Math.max(0, line.y - size * 0.82)
@@ -572,6 +578,7 @@ export async function pdfToPptx(pdf: PDFDocumentProxy): Promise<Uint8Array> {
     },
     { name: 'ppt/theme/theme1.xml', data: THEME_XML },
     ...slideParts.map((data, index) => ({ name: `ppt/slides/slide${index + 1}.xml`, data })),
+    ...slideParts.map((_, index) => ({ name: `ppt/slides/_rels/slide${index + 1}.xml.rels`, data: SLIDE_RELS })),
   ]
 
   return packOffice(entries)

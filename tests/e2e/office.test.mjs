@@ -148,6 +148,10 @@ describe('office formats', () => {
       [...pptxArchive.keys()].filter((name) => /^ppt\/slides\/slide\d+\.xml$/.test(name)).length === 3,
       'PDF → PowerPoint creates one slide per page',
     )
+    check(
+      (zipText(pptxArchive, 'ppt/slides/_rels/slide1.xml.rels') ?? '').includes('slideLayout'),
+      'PDF → PowerPoint links every slide to the slide layout',
+    )
 
     check(pageErrors.length === 0, `no browser errors (${pageErrors.slice(0, 3).join(' | ')})`)
   })
