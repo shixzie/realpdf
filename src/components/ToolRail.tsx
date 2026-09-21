@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react'
 import {
-  AArrowUp,
+  ArrowUpRight,
   Circle,
   Eraser,
   Highlighter,
@@ -37,7 +37,7 @@ export const TOOL_DEFS: ToolDef[] = [
   { id: 'rect', labelKey: 'tools.rect', shortcut: 'R', icon: Square },
   { id: 'ellipse', labelKey: 'tools.ellipse', shortcut: 'O', icon: Circle },
   { id: 'line', labelKey: 'tools.line', shortcut: 'L', icon: Minus },
-  { id: 'arrow', labelKey: 'tools.arrow', shortcut: 'A', icon: AArrowUp },
+  { id: 'arrow', labelKey: 'tools.arrow', shortcut: 'A', icon: ArrowUpRight },
   { id: 'whiteout', labelKey: 'tools.whiteout', shortcut: 'W', icon: PaintBucket },
   { id: 'image', labelKey: 'tools.image', shortcut: 'I', icon: ImageIcon },
   { id: 'signature', labelKey: 'tools.signature', shortcut: 'S', icon: Signature },
