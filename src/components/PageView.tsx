@@ -237,15 +237,17 @@ export function PageView({ pageIndex }: PageViewProps) {
     })
 
     // Selecting a text object activates the text tool so its style options are
-    // shown and apply to the selection.
+    // shown and apply to the selection. Selections of other annotations are
+    // tracked too, so the options bar can follow them while the select tool
+    // keeps their move/resize handles.
     const onSelectionChange = () => {
       const store = useStore.getState()
       const selected = canvas.getActiveObjects()
-      if (selected.some((object) => isTextObject(object))) {
-        store.setTextSelectionPage(page.id)
-        if (latest.current.tool !== 'text') store.setTool('text')
-      } else if (!selected.length && store.textSelectionPage === page.id) {
-        store.setTextSelectionPage(null)
+      if (selected.length) {
+        store.setSelectionPage(page.id)
+        if (selected.some((object) => isTextObject(object)) && latest.current.tool !== 'text') store.setTool('text')
+      } else if (store.selectionPage === page.id) {
+        store.setSelectionPage(null)
       }
       store.notifySelectionChange()
     }

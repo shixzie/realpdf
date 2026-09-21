@@ -98,6 +98,7 @@ export const fr: Dictionary = {
     clearPage: 'Effacer la page',
     selectHint:
       'Cliquez pour sélectionner · Maj+clic pour plusieurs · faites glisser les poignées pour redimensionner',
+    selectionHint: 'Faites glisser pour déplacer · poignées pour redimensionner ou pivoter · Suppr pour supprimer',
     whiteoutHint: 'Faites glisser sur le contenu existant pour le masquer, puis ajoutez du texte par-dessus.',
     texteditHint:
       'Cliquez sur le texte existant du PDF pour le modifier. La police (gras/italique inclus), la taille et la couleur d’origine sont reproduites, le remplacement s’allonge à la saisie au lieu de passer à la ligne, et le texte d’origine est supprimé du fichier à l’enregistrement.',

@@ -11,7 +11,8 @@ A real PDF editor that runs **entirely in your browser**. No uploads, no servers
 **Edit & annotate**
 
 - Freehand pen, highlighter (multiplied blend, like a real marker) and eraser
-- Text boxes with font family/size/color, rectangles, ellipses, lines and arrows. Selecting any text activates the text tool, so its font, size and colour can be edited right away — the options always reflect and update the selected text.
+- Text boxes with font family/size/color, rectangles, ellipses, lines and arrows
+- **Edit any drawn result, not just text**: selecting an annotation shows the options of the tool that produced it, pre-filled with that object's own values, and changing them restyles the selection in place — a cover's fill, a rectangle/ellipse/line/arrow's colour and width (the arrow head follows its line), a pen stroke or highlight, and text (selecting text activates the text tool so its font, size and colour can be edited right away). Multi-selections, undo/redo and export all keep up; see [docs/selection-options.md](docs/selection-options.md).
 - **Edit existing text in place**: click any text and retype it — the original font (bold/italic included), size, colour and position are matched, and the box grows along the baseline as you type so the replacement never wraps. The original glyphs are **deleted from the page's content stream** (the text layer, search and copy see the new text only), with the replacement embedded using the same font program (subset per font). The canvas **previews the final page automatically**: the original glyphs disappear from the rendered page as you edit (no fake background box, so text over artwork/stripes previews correctly), and undo brings them back. Re-click an edit to keep changing it, or erase it to reveal the original. A replacement that is selected can also be restyled with the text options.
 - Cover existing content with white boxes and type over it to "replace" text
 - Insert images (drag & drop or file picker) and signatures — draw them or **upload a photo/scan** (with automatic white-background removal)
@@ -196,6 +197,7 @@ APP_URL=http://localhost:4173/ npm test
 - `tests/e2e/library.test.mjs` — save to the local library, rename, persistence across a reload, restore annotations, rebuild the PDF, delete
 - `tests/e2e/text-edit.test.mjs` — edit embedded-font and standard-font text: text layer deletion, exported font programs, coloured backgrounds
 - `tests/e2e/text-select.test.mjs` — selecting text activates the text tool, its options reflect and restyle the selected text, and the changes survive export
+- `tests/e2e/selection-options.test.mjs` — selecting covers, shapes, arrows, highlights and drawings shows their tool options, restyles the selection (arrow head included), survives undo/redo and export
 - `tests/e2e/office.test.mjs` — Word/Excel/PowerPoint → PDF (text, tables, merged cells, embedded images) and PDF → Word/Excel/PowerPoint (OOXML parts, page breaks, one sheet/slide per page)
 - `tests/unit/zip.test.mjs` — ZIP round-trips for stored and deflated Office packages
 
@@ -224,6 +226,7 @@ src/
     pdfjs.ts      pdf.js setup + local wasm/font/cmap assets
     export.ts     fabric → pdf-lib annotation drawing
     textEdit.ts   existing-text hit-testing, font reuse, colour sampling
+    annotationStyle.ts  selected-result kind, style read/apply (covers, shapes, paths)
     contentEdit.ts  content-stream walk that deletes edited text runs
     forms.ts      AcroForm discovery + value writing
     pdfOps.ts     merge, extract, image/text conversion

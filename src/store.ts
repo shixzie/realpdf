@@ -65,8 +65,8 @@ interface AppState {
   fitNonce: number
   /** Bumped whenever the canvas selection changes, so panels re-read it. */
   selectionNonce: number
-  /** Page whose text object was selected last, used to disambiguate pages. */
-  textSelectionPage: string | null
+  /** Page whose objects were selected last, used to disambiguate pages. */
+  selectionPage: string | null
   scrollRequest: { pageId: string; nonce: number } | null
   imagePickNonce: number
   flushFns: Set<() => void>
@@ -94,7 +94,7 @@ interface AppState {
   setTool: (tool: Tool) => void
   updateSettings: (patch: Partial<Settings>) => void
   notifySelectionChange: () => void
-  setTextSelectionPage: (pageId: string | null) => void
+  setSelectionPage: (pageId: string | null) => void
   setCurrentPage: (pageId: string) => void
   requestScrollTo: (pageId: string) => void
   requestImagePick: () => void
@@ -203,7 +203,7 @@ export const useStore = create<AppState>()((set, get) => ({
   lastChangeAt: 0,
   fitNonce: 0,
   selectionNonce: 0,
-  textSelectionPage: null,
+  selectionPage: null,
   scrollRequest: null,
   imagePickNonce: 0,
   flushFns: new Set(),
@@ -238,7 +238,7 @@ export const useStore = create<AppState>()((set, get) => ({
       scrollRequest: null,
       error: null,
       fitNonce: get().fitNonce + 1,
-      textSelectionPage: null,
+      selectionPage: null,
       formMode: false,
       formWidgets: {},
       formValues: {},
@@ -263,7 +263,7 @@ export const useStore = create<AppState>()((set, get) => ({
       hasForms: false,
       toolsOpen: false,
       projectId: null,
-      textSelectionPage: null,
+      selectionPage: null,
     }),
 
   setZoom: (zoom) => set({ zoom: Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, zoom)) }),
@@ -272,8 +272,8 @@ export const useStore = create<AppState>()((set, get) => ({
   setTool: (tool) => set({ tool }),
   updateSettings: (patch) => set({ settings: { ...get().settings, ...patch } }),
   notifySelectionChange: () => set({ selectionNonce: get().selectionNonce + 1 }),
-  setTextSelectionPage: (pageId) => {
-    if (get().textSelectionPage !== pageId) set({ textSelectionPage: pageId })
+  setSelectionPage: (pageId) => {
+    if (get().selectionPage !== pageId) set({ selectionPage: pageId })
   },
   setCurrentPage: (pageId) => {
     if (get().currentPageId !== pageId) set({ currentPageId: pageId })
@@ -459,7 +459,7 @@ export const useStore = create<AppState>()((set, get) => ({
         scrollRequest: null,
         error: null,
         fitNonce: get().fitNonce + 1,
-        textSelectionPage: null,
+        selectionPage: null,
         formValues: entry.formValues ?? {},
         formFlatten: entry.formFlatten ?? true,
         hasForms: entry.hasForms ?? false,

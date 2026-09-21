@@ -97,6 +97,7 @@ export const es: Dictionary = {
     deleteSelected: 'Eliminar selección',
     clearPage: 'Borrar página',
     selectHint: 'Haz clic para seleccionar · Mayús+clic para varios · arrastra los tiradores para redimensionar',
+    selectionHint: 'Arrastra para mover · usa los tiradores para redimensionar o girar · Supr para eliminar',
     whiteoutHint: 'Arrastra sobre el contenido existente para cubrirlo y añade texto encima.',
     texteditHint:
       'Haz clic en el texto existente del PDF para editarlo. Se ajustan la fuente (incluidas negrita y cursiva), el tamaño y el color originales, el reemplazo crece al escribir en lugar de partirse en líneas, y el texto original se elimina del archivo al guardar.',

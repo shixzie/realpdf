@@ -2,11 +2,26 @@ import { useMemo } from 'react'
 import { Trash2, X } from 'lucide-react'
 import type { FabricObject } from 'fabric'
 import { useStore } from '../store'
-import { activeCanvas, activeTextSelection, commitCanvas, commitCanvasObject, deleteSelection, getCanvas } from '../lib/canvasRegistry'
+import {
+  activeCanvas,
+  activeSelection,
+  commitCanvas,
+  commitCanvasObject,
+  deleteSelection,
+  getCanvas,
+} from '../lib/canvasRegistry'
 import { styleTextObject, textFontFamily, type TextStylePatch } from '../lib/textEdit'
+import {
+  annotationToolOf,
+  readAnnotationStyle,
+  styleAnnotationObjects,
+  type AnnotationStyle,
+  type AnnotationStylePatch,
+} from '../lib/annotationStyle'
+import { isTextObject } from '../lib/tools'
 import { toHexColor } from '../lib/color'
 import { useTranslation } from '../i18n'
-import type { FontFamily, Tool } from '../types'
+import type { FontFamily, Settings, Tool } from '../types'
 
 const INK_COLORS = ['#111827', '#dc2626', '#ea580c', '#16a34a', '#2563eb', '#7c3aed', '#db2777', '#ffffff']
 const HIGHLIGHT_COLORS = ['#facc15', '#4ade80', '#60a5fa', '#f472b6', '#fb923c']
@@ -68,44 +83,96 @@ export function ToolOptions() {
   const updateSettings = useStore((state) => state.updateSettings)
   const selectionNonce = useStore((state) => state.selectionNonce)
 
-  // Selecting any text activates the text tool; while a text object is
-  // selected its own font, size and colour are edited instead of the defaults.
-  // The edit-text tool also exposes them while a replacement is selected.
+  // Selecting any result shows the options of the tool that produced it and
+  // edits the selection in place — covers, shapes, arrows, drawings and text
+  // alike. The select tool stays active so the object keeps its move/resize
+  // handles.
   const selection = useMemo(
-    () => (tool === 'text' || tool === 'textedit' ? activeTextSelection() : undefined),
+    () => activeSelection(),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [tool, selectionNonce],
   )
-  const styledText = Boolean(selection)
-  const showTextStyle = tool === 'text' || styledText
-  const textObject = selection?.object as (FabricObject & Record<string, any>) | undefined
-  const color = textObject ? toHexColor(String(textObject.fill ?? ''), settings.color) : settings.color
+  const selectedObjects = selection?.objects ?? []
+  const textObjects = useMemo(
+    () => selectedObjects.filter(isTextObject),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [selection, selectionNonce],
+  )
+  const styledText = textObjects.length > 0
+  const selectionTool = useMemo<Tool | null>(() => {
+    for (const object of selectedObjects) {
+      const mapped = annotationToolOf(object)
+      if (mapped) return mapped
+    }
+    return null
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selection, selectionNonce])
+
+  const panelTool: Tool = tool === 'select' ? (styledText ? 'text' : selectionTool ?? 'select') : tool
+  const showTextStyle = panelTool === 'text' || panelTool === 'textedit'
+  // Restyling the selection only happens with the select tool; with a drawing
+  // tool active the same controls edit the defaults for the next result.
+  const editingSelection = Boolean(tool === 'select' && selection && !showTextStyle)
+  const stylingSelection = editingSelection || (showTextStyle && styledText)
+  const style: AnnotationStyle = editingSelection ? readAnnotationStyle(selectedObjects) : {}
+
+  const textObject = styledText ? (textObjects[0] as FabricObject & Record<string, any>) : undefined
+  const color = textObject ? toHexColor(String(textObject.fill ?? ''), settings.color) : style.color ?? settings.color
   const fontFamily: FontFamily = textObject ? textFontFamily(textObject) : settings.fontFamily
   const fontSize = textObject ? Math.round(Number(textObject.fontSize) || settings.fontSize) : settings.fontSize
+  const highlightColor = style.color ?? settings.highlightColor
+  const highlightWidth = style.width ?? settings.highlightWidth
+  const whiteoutColor = style.color ?? settings.whiteoutColor
 
   const applyTextStyle = (patch: TextStylePatch) => {
-    if (selection) {
+    if (showTextStyle && textObjects.length) {
       const state = useStore.getState()
       state.beginChange()
-      styleTextObject(selection.object, patch)
-      commitCanvasObject(selection.canvas)
+      for (const object of textObjects) styleTextObject(object, patch)
+      if (selection) commitCanvasObject(selection.canvas)
       state.notifySelectionChange()
     }
     updateSettings(patch)
   }
 
+  const applyAnnotationStyle = (patch: AnnotationStylePatch) => {
+    if (editingSelection && selection) {
+      const state = useStore.getState()
+      state.beginChange()
+      styleAnnotationObjects(selection.canvas, selectedObjects, patch)
+      commitCanvasObject(selection.canvas)
+      state.notifySelectionChange()
+    }
+    const settingsPatch: Partial<Settings> = {}
+    if (panelTool === 'highlighter') {
+      if (patch.color !== undefined) settingsPatch.highlightColor = patch.color
+      if (patch.width !== undefined) settingsPatch.highlightWidth = patch.width
+    } else if (panelTool === 'whiteout') {
+      if (patch.color !== undefined) settingsPatch.whiteoutColor = patch.color
+    } else {
+      if (patch.color !== undefined) settingsPatch.color = patch.color
+      if (patch.width !== undefined) settingsPatch.strokeWidth = patch.width
+    }
+    updateSettings(settingsPatch)
+  }
+
+  const applyColor = (value: string) => {
+    if (showTextStyle) applyTextStyle({ color: value })
+    else applyAnnotationStyle({ color: value })
+  }
+
   return (
     <div className="options">
-      <span className="options-title">{t(TOOL_LABEL_KEY[tool])}</span>
+      <span className="options-title">{t(TOOL_LABEL_KEY[panelTool])}</span>
 
-      {(COLOR_TOOLS.includes(tool) || styledText) && (
+      {(COLOR_TOOLS.includes(panelTool) || showTextStyle) && (
         <>
           <span className="options-label">{t('options.color')}</span>
-          <Swatches value={color} colors={INK_COLORS} onChange={(value) => applyTextStyle({ color: value })} />
+          <Swatches value={color} colors={INK_COLORS} onChange={applyColor} />
         </>
       )}
 
-      {WIDTH_TOOLS.includes(tool) && (
+      {WIDTH_TOOLS.includes(panelTool) && (
         <>
           <span className="options-label">{t('options.width')}</span>
           <input
@@ -114,10 +181,10 @@ export function ToolOptions() {
             min={1}
             max={24}
             step={0.5}
-            value={settings.strokeWidth}
-            onChange={(event) => updateSettings({ strokeWidth: Number(event.target.value) })}
+            value={style.width ?? settings.strokeWidth}
+            onChange={(event) => applyAnnotationStyle({ width: Number(event.target.value) })}
           />
-          <span className="options-value">{settings.strokeWidth}pt</span>
+          <span className="options-value">{style.width ?? settings.strokeWidth}pt</span>
         </>
       )}
 
@@ -146,13 +213,13 @@ export function ToolOptions() {
         </>
       )}
 
-      {tool === 'highlighter' && (
+      {panelTool === 'highlighter' && (
         <>
           <span className="options-label">{t('options.color')}</span>
           <Swatches
-            value={settings.highlightColor}
+            value={highlightColor}
             colors={HIGHLIGHT_COLORS}
-            onChange={(highlightColor) => updateSettings({ highlightColor })}
+            onChange={(color) => applyAnnotationStyle({ color })}
           />
           <span className="options-label">{t('options.width')}</span>
           <input
@@ -161,14 +228,14 @@ export function ToolOptions() {
             min={6}
             max={40}
             step={1}
-            value={settings.highlightWidth}
-            onChange={(event) => updateSettings({ highlightWidth: Number(event.target.value) })}
+            value={highlightWidth}
+            onChange={(event) => applyAnnotationStyle({ width: Number(event.target.value) })}
           />
-          <span className="options-value">{settings.highlightWidth}pt</span>
+          <span className="options-value">{highlightWidth}pt</span>
         </>
       )}
 
-      {tool === 'select' && (
+      {panelTool === 'select' && (
         <>
           <button
             type="button"
@@ -200,25 +267,43 @@ export function ToolOptions() {
         </>
       )}
 
-      {tool === 'whiteout' && (
+      {stylingSelection && panelTool !== 'select' && (
+        <button
+          type="button"
+          className="button button-ghost"
+          onClick={() => {
+            if (selection) deleteSelection(selection.canvas)
+          }}
+        >
+          <Trash2 size={15} /> {t('options.deleteSelected')}
+        </button>
+      )}
+
+      {panelTool === 'whiteout' && (
         <>
           <span className="options-label">{t('options.color')}</span>
           <Swatches
-            value={settings.whiteoutColor}
+            value={whiteoutColor}
             colors={WHITEOUT_COLORS}
-            onChange={(whiteoutColor) => updateSettings({ whiteoutColor })}
+            onChange={(color) => applyAnnotationStyle({ color })}
           />
-          <span className="options-hint">{t('options.whiteoutHint')}</span>
+          <span className="options-hint">
+            {editingSelection ? t('options.selectionHint') : t('options.whiteoutHint')}
+          </span>
         </>
       )}
 
-      {tool === 'textedit' && !showTextStyle && <span className="options-hint">{t('options.texteditHint')}</span>}
+      {panelTool === 'textedit' && !showTextStyle && <span className="options-hint">{t('options.texteditHint')}</span>}
 
-      {tool === 'eraser' && <span className="options-hint">{t('options.eraserHint')}</span>}
+      {panelTool === 'eraser' && <span className="options-hint">{t('options.eraserHint')}</span>}
 
-      {tool === 'image' && <span className="options-hint">{t('options.imageHint')}</span>}
+      {panelTool === 'image' && (
+        <span className="options-hint">
+          {editingSelection ? t('options.selectionHint') : t('options.imageHint')}
+        </span>
+      )}
 
-      {tool === 'signature' && <span className="options-hint">{t('options.signatureHint')}</span>}
+      {panelTool === 'signature' && <span className="options-hint">{t('options.signatureHint')}</span>}
     </div>
   )
 }
