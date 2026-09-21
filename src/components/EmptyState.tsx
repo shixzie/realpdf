@@ -13,6 +13,7 @@ import {
 import { useStore, type PendingAction, type ToolsTab } from '../store'
 import { openDocumentFile } from '../lib/openDocument'
 import { useTranslation } from '../i18n'
+import { SocialLinks } from './SocialLinks'
 
 const TOOL_CARDS: Array<{
   action: PendingAction | { tab: ToolsTab }
@@ -152,6 +153,8 @@ export function EmptyState() {
             <span>{t('empty.annotateText')}</span>
           </button>
         </div>
+
+        <SocialLinks />
       </div>
     </div>
   )

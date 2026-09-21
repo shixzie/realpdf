@@ -267,6 +267,11 @@ export const en = {
   kofi: {
     text: 'Support me',
   },
+  social: {
+    label: 'Find me on',
+    github: 'GitHub',
+    twitter: 'X (Twitter)',
+  },
 }
 
 export type Dictionary = typeof en

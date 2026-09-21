@@ -267,4 +267,9 @@ export const fr: Dictionary = {
   kofi: {
     text: 'Soutenez-moi',
   },
+  social: {
+    label: 'Retrouvez-moi sur',
+    github: 'GitHub',
+    twitter: 'X (Twitter)',
+  },
 }
