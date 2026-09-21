@@ -98,6 +98,7 @@ export const de: Dictionary = {
     clearPage: 'Seite leeren',
     selectHint:
       'Klicken zum Auswählen · Umschalt+Klick für mehrere · Griffe zum Größe ändern ziehen',
+    selectionHint: 'Ziehen zum Verschieben · Griffe zum Größe ändern oder Drehen · Entf zum Löschen',
     whiteoutHint:
       'Ziehen Sie über vorhandene Inhalte, um sie abzudecken, und fügen Sie dann Text darüber ein.',
     texteditHint:

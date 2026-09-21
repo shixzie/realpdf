@@ -102,6 +102,7 @@ export const en = {
     deleteSelected: 'Delete selected',
     clearPage: 'Clear page',
     selectHint: 'Click to select · Shift-click for multiple · drag handles to resize',
+    selectionHint: 'Drag to move · use the handles to resize or rotate · Delete removes it',
     whiteoutHint: 'Drag over existing content to cover it, then add text on top.',
     texteditHint:
       'Click existing PDF text to edit it. The original font (bold/italic included), size and colour are matched, the replacement grows as you type instead of wrapping, and the original text is deleted from the file when you save.',
