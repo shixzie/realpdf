@@ -4,7 +4,6 @@ import {
   ChevronRight,
   BookOpen,
   ClipboardList,
-  Download,
   FileText,
   FolderOpen,
   Heart,
@@ -20,10 +19,10 @@ import {
 } from 'lucide-react'
 import { useStore } from '../store'
 import { openDocumentFile } from '../lib/openDocument'
-import { runExport } from '../lib/exportController'
 import { getCanvas } from '../lib/canvasRegistry'
 import { useTranslation } from '../i18n'
 import { LanguagePicker } from './LanguagePicker'
+import { ExportControl } from './ExportControl'
 
 export function TopBar() {
   const { t } = useTranslation()
@@ -32,7 +31,6 @@ export function TopBar() {
   const currentPageId = useStore((state) => state.currentPageId)
   const zoom = useStore((state) => state.zoom)
   const loading = useStore((state) => state.loading)
-  const exporting = useStore((state) => state.exporting)
   const hasForms = useStore((state) => state.hasForms)
   const theme = useStore((state) => state.theme)
   const formMode = useStore((state) => state.formMode)
@@ -221,16 +219,7 @@ export function TopBar() {
         <Heart size={15} /> {t('topbar.support')}
       </a>
 
-      {pages.length > 0 && (
-        <button
-          type="button"
-          className="button button-primary"
-          onClick={() => void runExport()}
-          disabled={exporting}
-        >
-          {exporting ? <Loader2 size={16} className="spin" /> : <Download size={16} />} {t('topbar.savePdf')}
-        </button>
-      )}
+      {pages.length > 0 && <ExportControl />}
     </header>
   )
 }

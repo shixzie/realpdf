@@ -7,6 +7,7 @@ import path from 'node:path'
 import { afterAll, beforeAll, describe, it } from 'vitest'
 import {
   check,
+  clickSavePdf,
   dragOnPage,
   gotoHome,
   isDark,
@@ -191,7 +192,7 @@ describe('editor', () => {
     // --------------------------------------------------------------- export
     const [download] = await Promise.all([
       page.waitForEvent('download', { timeout: 30000 }),
-      page.click('button:has-text("Save PDF")'),
+      clickSavePdf(page),
     ])
     const exportedPath = path.join(OUT_DIR, 'realpdf-exported.pdf')
     await download.saveAs(exportedPath)

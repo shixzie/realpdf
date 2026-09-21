@@ -159,7 +159,9 @@ await page.click('.modal-head .icon-button')
 await wait(500)
 
 // ---------------------------------------------------------------- save pdf
-await page.click('button:has-text("Save PDF")')
+await page.click('.export-trigger')
+await page.waitForSelector('.export-menu-item-pdf')
+await page.click('.export-menu-item-pdf')
 await wait(2600)
 
 // -------------------------------------------------------------------- done

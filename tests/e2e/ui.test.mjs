@@ -117,7 +117,7 @@ describe('ui', () => {
 
     // ------------------------------------------------------ kofi button
     const kofi = page.locator('a.button-kofi')
-    check((await kofi.count()) === 1, 'Ko-fi support button is present next to Save PDF')
+    check((await kofi.count()) === 1, 'Ko-fi support button is present next to Export')
     check(
       (await kofi.getAttribute('href')) === 'https://ko-fi.com/shixzie',
       'Ko-fi button links to the support page',
@@ -128,8 +128,8 @@ describe('ui', () => {
       return labels
     })
     const kofiIndex = order.findIndex((label) => label.includes('Support'))
-    const saveIndex = order.findIndex((label) => label.includes('Save PDF'))
-    check(kofiIndex > -1 && saveIndex > -1 && kofiIndex < saveIndex, 'Ko-fi button sits beside (before) Save PDF')
+    const saveIndex = order.findIndex((label) => label.includes('Export'))
+    check(kofiIndex > -1 && saveIndex > -1 && kofiIndex < saveIndex, 'Ko-fi button sits beside (before) Export')
 
     // -------------------------------------------------------- localization
     const languageSelect = page.locator('select.select-language')
@@ -138,7 +138,7 @@ describe('ui', () => {
     await page.waitForTimeout(250)
     check((await page.locator('html').getAttribute('lang')) === 'es', 'html lang follows the selected locale')
     check(
-      (await page.locator('button:has-text("Guardar PDF")').count()) === 1,
+      (await page.locator('button:has-text("Exportar")').count()) === 1,
       'UI strings switch to Spanish',
     )
     check(

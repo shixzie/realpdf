@@ -5,7 +5,7 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import { afterAll, beforeAll, describe, it } from 'vitest'
-import { check, gotoHome, launchApp, openPdf } from '../helpers/app.mjs'
+import { check, clickSavePdf, gotoHome, launchApp, openPdf } from '../helpers/app.mjs'
 import { OUT_DIR, SAMPLE_PDF } from '../helpers/fixtures.mjs'
 
 describe('local library', () => {
@@ -37,7 +37,7 @@ describe('local library', () => {
     // ------------------------------------------------------------ save it
     const [download] = await Promise.all([
       page.waitForEvent('download', { timeout: 30000 }),
-      page.click('button:has-text("Save PDF")'),
+      clickSavePdf(page),
     ])
     await download.saveAs(path.join(OUT_DIR, 'library-export.pdf'))
     await page.waitForSelector('.toast:has-text("Saved your edited PDF")', { timeout: 30000 })

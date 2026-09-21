@@ -72,11 +72,20 @@ export async function dragOnPage(page, from, to, index = 0) {
   await page.waitForTimeout(220)
 }
 
-/** Clicks Save PDF and stores the download. */
+/** Opens the export menu and starts the PDF download. */
+export function clickSavePdf(page) {
+  return (async () => {
+    await page.click('.export-trigger')
+    await page.waitForSelector('.export-menu-item-pdf')
+    await page.click('.export-menu-item-pdf')
+  })()
+}
+
+/** Saves the document as PDF and stores the download. */
 export async function savePdf(page, filePath) {
   const [download] = await Promise.all([
     page.waitForEvent('download', { timeout: 30000 }),
-    page.click('button:has-text("Save PDF")'),
+    clickSavePdf(page),
   ])
   await download.saveAs(filePath)
   return filePath

@@ -112,7 +112,11 @@ await page.locator('.page').first().screenshot({ path: editorShot })
 
 const [download] = await Promise.all([
   page.waitForEvent('download', { timeout: 30000 }),
-  page.click('button:has-text("Save PDF")'),
+  (async () => {
+    await page.click('.export-trigger')
+    await page.waitForSelector('.export-menu-item-pdf')
+    await page.click('.export-menu-item-pdf')
+  })(),
 ])
 const exported = path.join(OUT, 'visual-exported.pdf')
 await download.saveAs(exported)
