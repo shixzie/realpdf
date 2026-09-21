@@ -744,10 +744,10 @@ button {
   padding: 0 4px;
 }
 
-.thumb-delete {
+.thumb-delete,
+.thumb-download {
   position: absolute;
   bottom: 7px;
-  left: 7px;
   width: 22px;
   height: 22px;
   border-radius: 6px;
@@ -760,12 +760,29 @@ button {
   cursor: pointer;
 }
 
-.thumb:hover .thumb-delete {
+.thumb-delete {
+  left: 7px;
+}
+
+.thumb-download {
+  left: 33px;
+}
+
+.thumb:hover .thumb-delete,
+.thumb:hover .thumb-download {
   display: flex;
 }
 
 .thumb-delete:hover {
   background: #b91c1c;
+}
+
+.thumb-download:hover:not(:disabled) {
+  background: var(--accent-strong);
+}
+
+.thumb-download:disabled {
+  cursor: default;
 }
 
 /* ---------- Empty state ---------- */

@@ -21,6 +21,8 @@ export interface QuickExportOptions {
   scope?: ExportScope
   /** Images only: render scale (1 = 72 dpi, 2 = 144 dpi, 3 = 216 dpi). */
   scale?: number
+  /** Images only: download this page instead of the visible one. */
+  pageId?: string
 }
 
 function stripExtension(name: string): string {
@@ -31,13 +33,12 @@ async function exportImages(
   format: ImageFormat,
   scope: ExportScope,
   scale: number,
+  pageId?: string,
 ): Promise<void> {
   const state = useStore.getState()
   const base = stripExtension(state.fileName ?? 'document.pdf')
-  const currentIndex = Math.max(
-    0,
-    state.pages.findIndex((page) => page.id === state.currentPageId),
-  )
+  const index = state.pages.findIndex((page) => page.id === (pageId ?? state.currentPageId))
+  const currentIndex = index < 0 ? 0 : index
   const scratch = await openPdfDocumentFromBytes(await bakedCurrentBytes())
   try {
     if (scope === 'all') {
@@ -94,7 +95,7 @@ export async function quickExport(
         void scratch.loadingTask.destroy()
       }
     } else {
-      await exportImages(format === 'jpg' ? 'jpeg' : 'png', scope, scale)
+      await exportImages(format === 'jpg' ? 'jpeg' : 'png', scope, scale, options.pageId)
     }
     useStore.getState().toastMessage('success', t('export.downloaded'))
   } catch (error) {

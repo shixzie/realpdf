@@ -29,7 +29,7 @@ A real PDF editor that runs **entirely in your browser**. No uploads, no servers
 
 **Pages**
 
-- Reorder pages by dragging thumbnails, delete pages, insert blank pages
+- Reorder pages by dragging thumbnails, delete pages, insert blank pages, or download one page as a PNG image
 - Annotations are kept per page and survive reordering and scrolling (the viewer virtualizes pages)
 
 **Forms**

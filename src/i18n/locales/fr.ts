@@ -136,6 +136,7 @@ export const fr: Dictionary = {
     blank: 'Vierge',
     addBlank: 'Ajouter une page vierge après la page actuelle',
     deletePage: 'Supprimer la page',
+    downloadPage: 'Télécharger la page en image',
   },
   library: {
     title: 'Votre bibliothèque',

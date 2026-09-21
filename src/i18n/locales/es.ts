@@ -135,6 +135,7 @@ export const es: Dictionary = {
     blank: 'En blanco',
     addBlank: 'Añadir una página en blanco después de la actual',
     deletePage: 'Eliminar página',
+    downloadPage: 'Descargar la página como imagen',
   },
   library: {
     title: 'Tu biblioteca',

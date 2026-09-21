@@ -140,6 +140,7 @@ export const en = {
     blank: 'Blank',
     addBlank: 'Add a blank page after the current page',
     deletePage: 'Delete page',
+    downloadPage: 'Download page as image',
   },
   library: {
     title: 'Your library',

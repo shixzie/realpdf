@@ -137,6 +137,7 @@ export const de: Dictionary = {
     blank: 'Leer',
     addBlank: 'Nach der aktuellen Seite eine leere Seite einfügen',
     deletePage: 'Seite löschen',
+    downloadPage: 'Seite als Bild herunterladen',
   },
   library: {
     title: 'Ihre Bibliothek',
