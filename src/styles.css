@@ -271,6 +271,123 @@ button {
   cursor: default;
 }
 
+/* ---------- Save / export control ---------- */
+
+.export-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.export-trigger svg:last-child {
+  opacity: 0.75;
+  margin-left: 1px;
+}
+
+.export-menu {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 45;
+  width: 292px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 6px;
+  background: var(--bg-panel);
+  border: 1px solid var(--border-strong);
+  border-radius: 12px;
+  box-shadow: var(--shadow);
+}
+
+.export-menu-section {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.export-menu-heading {
+  padding: 7px 10px 3px;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+}
+
+.export-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 8px 10px;
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+}
+
+.export-menu-item:hover:not(:disabled) {
+  background: var(--bg-hover);
+}
+
+.export-menu-item:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.export-menu-item-pdf {
+  background: var(--accent-soft);
+}
+
+.export-menu-item-pdf:hover:not(:disabled) {
+  background: var(--accent-soft);
+  box-shadow: inset 0 0 0 1px var(--accent);
+}
+
+.export-menu-icon {
+  display: flex;
+  flex: none;
+  color: var(--text-muted);
+}
+
+.export-menu-item-pdf .export-menu-icon {
+  color: var(--accent-ink);
+}
+
+.export-menu-text {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.export-menu-label {
+  font-size: 13px;
+  font-weight: 550;
+}
+
+.export-menu-hint {
+  font-size: 11.5px;
+  color: var(--text-dim);
+}
+
+.export-menu-separator {
+  height: 1px;
+  margin: 5px 6px;
+  background: var(--border);
+}
+
+.export-menu-tools {
+  color: var(--text-muted);
+}
+
+.export-menu-tools .export-menu-icon {
+  color: inherit;
+}
+
 /* ---------- Workspace ---------- */
 
 .workspace {

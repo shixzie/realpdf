@@ -54,7 +54,14 @@ await page.waitForTimeout(500)
 await page.screenshot({ path: 'docs/editor-light.png' })
 
 // save once so the library has an entry with a thumbnail
-await Promise.all([page.waitForEvent('download'), page.click('button:has-text("Save PDF")')])
+await Promise.all([
+  page.waitForEvent('download'),
+  (async () => {
+    await page.click('.export-trigger')
+    await page.waitForSelector('.export-menu-item-pdf')
+    await page.click('.export-menu-item-pdf')
+  })(),
+])
 await page.waitForSelector('.toast:has-text("Saved your edited PDF")', { timeout: 30000 })
 await page.waitForTimeout(600)
 await page.click('button:has-text("Library")')

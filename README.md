@@ -22,7 +22,7 @@ A real PDF editor that runs **entirely in your browser**. No uploads, no servers
 
 ![Your library](docs/library.png)
 
-- Every Save PDF is also recorded in this browser (IndexedDB): title, page count, size, thumbnail and timestamp
+- Every Save as PDF is also recorded in this browser (IndexedDB): title, page count, size, thumbnail and timestamp
 - Documents keep their **editable state** — annotations, page order and form values — so **Open** resumes exactly where you left off
 - Rename, rebuild/download the PDF, delete single entries or clear everything; storage usage is shown
 - Recent work appears on the homepage for one-click resume
