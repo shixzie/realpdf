@@ -12,9 +12,19 @@ import {
 } from 'fabric'
 import type { Settings, Tool } from '../types'
 import { useStore } from '../store'
+import { parseColor } from './color'
 import { t } from '../i18n'
 
 const SHAPE_TOOLS: Tool[] = ['rect', 'ellipse', 'line', 'arrow', 'whiteout']
+
+/** Committed highlight strokes render at this opacity so the page shows through. */
+export const HIGHLIGHT_OPACITY = 0.35
+
+/** Live brush color: the highlighter previews at the opacity it will render at. */
+function highlightBrushColor(color: string): string {
+  const { r, g, b, a } = parseColor(color)
+  return `rgba(${r}, ${g}, ${b}, ${a * HIGHLIGHT_OPACITY})`
+}
 
 export function isShapeTool(tool: Tool): boolean {
   return SHAPE_TOOLS.includes(tool)
@@ -42,7 +52,9 @@ export function applyToolToCanvas(canvas: Canvas, tool: Tool, settings: Settings
       brush.color = settings.color
       brush.width = settings.strokeWidth
     } else {
-      brush.color = settings.highlightColor
+      // The preview must match the committed annotation, or positioning the
+      // stroke precisely is guesswork.
+      brush.color = highlightBrushColor(settings.highlightColor)
       brush.width = settings.highlightWidth
     }
     canvas.freeDrawingBrush = brush

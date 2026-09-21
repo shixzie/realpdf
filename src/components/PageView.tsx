@@ -14,6 +14,7 @@ import {
   createTextObject,
   eraseObjectAt,
   finalizeArrow,
+  HIGHLIGHT_OPACITY,
   isShapeTool,
   isTextObject,
   updateShape,
@@ -231,7 +232,13 @@ export function PageView({ pageIndex }: PageViewProps) {
       const kind = latest.current.tool === 'highlighter' ? 'highlight' : 'draw'
       path.set({ data: { kind } })
       if (kind === 'highlight') {
-        path.set({ opacity: 0.35, globalCompositeOperation: 'multiply' })
+        // The brush previews translucently; the committed path stores the
+        // opaque color and leans on opacity/blend (also read by the exporter).
+        path.set({
+          stroke: latest.current.settings.highlightColor,
+          opacity: HIGHLIGHT_OPACITY,
+          globalCompositeOperation: 'multiply',
+        })
       }
       onChange()
     })
