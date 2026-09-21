@@ -79,7 +79,7 @@ export function createShape(kind: Tool, a: Vec, b: Vec, settings: Settings): Fab
         top: y,
         width,
         height,
-        fill: '#ffffff',
+        fill: settings.whiteoutColor,
         stroke: undefined,
         data: { kind: 'whiteout' },
       })

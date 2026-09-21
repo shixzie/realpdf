@@ -22,6 +22,7 @@ export interface Settings {
   fontFamily: FontFamily
   highlightColor: string
   highlightWidth: number
+  whiteoutColor: string
 }
 
 export interface AnnotationsJSON {
