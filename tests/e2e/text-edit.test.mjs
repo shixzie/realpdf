@@ -48,9 +48,16 @@ describe('text editing', () => {
 
     await page.click('.tool[title^="Edit text"]')
     const first = await pageBox(page)
-    await page.mouse.move(first.x + 150, first.y + 134)
-    await page.waitForTimeout(350)
-    const hover = await pixelStats(page, { x: 148, y: 128, w: 4, h: 4 })
+    // The page's text runs load in the background after the tool is picked, and
+    // a pointer move that lands before they arrive draws nothing; nudge the
+    // pointer until the highlight appears.
+    let hover = null
+    for (let attempt = 0; attempt < 20; attempt += 1) {
+      await page.mouse.move(first.x + 150 + (attempt % 2), first.y + 134)
+      await page.waitForTimeout(250)
+      hover = await pixelStats(page, { x: 148, y: 128, w: 4, h: 4 })
+      if (hover.alpha > 20) break
+    }
     check(hover.alpha > 20, `hovering existing text shows a highlight (alpha ${hover.alpha})`)
     // Untouched text is the reference for the preview's font fidelity.
     const secondLineRegion = { x: 56, y: 156, w: 110, h: 20 }
