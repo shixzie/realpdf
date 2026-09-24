@@ -1,0 +1,33 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [master]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+      - run: npm run build
+      - run: npm test
+      - name: Upload exported test PDFs
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: realpdf-tests
+          path: /tmp/realpdf-tests
+          if-no-files-found: ignore
