@@ -23,10 +23,12 @@ import {
   type PDFPage,
 } from 'pdf-lib'
 import fontkit from '@pdf-lib/fontkit'
-import { Point, util, type FabricObject } from 'fabric'
+import { Point, Textbox, util, type FabricObject } from 'fabric'
 import { parseColor, toPdfRgb } from './color'
 import { dataUrlBytes, dataUrlMime, flipDataUrl, getAsset } from './assets'
 import { removeTextRuns, type TextRemovalTarget } from './contentEdit'
+import type { FallbackFonts } from './fonts/fallback'
+import { graphemes } from './fonts/graphemes'
 import type { FontFamily } from '../types'
 
 /** fabric's line-box and baseline fractions (see lib/textEdit.ts). */
@@ -151,15 +153,33 @@ export function normalizeFamily(family: unknown): FontFamily {
   return 'Helvetica'
 }
 
-const encodingCache = new WeakMap<PDFFont, Map<string, string>>()
+const encodingCache = new WeakMap<PDFFont, Map<string, boolean>>()
 
-/** Standard fonts use WinAnsi; replace anything they cannot encode. */
-function sanitizeText(text: string, font: PDFFont): string {
+/** Whether a standard (WinAnsi) font can encode every character of `text`. */
+function canEncode(text: string, font: PDFFont): boolean {
   let cache = encodingCache.get(font)
   if (!cache) {
     cache = new Map()
     encodingCache.set(font, cache)
   }
+  for (const ch of text) {
+    let ok = cache.get(ch)
+    if (ok === undefined) {
+      ok = true
+      try {
+        font.encodeText(ch)
+      } catch {
+        ok = false
+      }
+      cache.set(ch, ok)
+    }
+    if (!ok) return false
+  }
+  return true
+}
+
+/** Standard fonts use WinAnsi; replace anything they cannot encode. */
+function sanitizeText(text: string, font: PDFFont): string {
   let out = ''
   for (const ch of text) {
     if (ch === '\t') {
@@ -167,20 +187,100 @@ function sanitizeText(text: string, font: PDFFont): string {
       continue
     }
     const code = ch.codePointAt(0) ?? 0
-    if (code < 32) continue
-    let mapped = cache.get(ch)
-    if (mapped === undefined) {
-      mapped = ch
-      try {
-        font.encodeText(ch)
-      } catch {
-        mapped = '?'
-      }
-      cache.set(ch, mapped)
-    }
-    out += mapped
+    if (code < 32 && ch !== '\n') continue
+    out += ch === '\n' || canEncode(ch, font) ? ch : '?'
   }
   return out
+}
+
+/** One stretch of a line drawn with a single font. */
+interface TextRun {
+  font: PDFFont
+  text: string
+}
+
+/**
+ * Glyphs the standard font cannot encode, mapped to an embedded fallback font
+ * (see lib/fonts/fallback.ts). Keys are grapheme clusters of the sanitized text.
+ */
+interface FallbackPlan {
+  primary: PDFFont
+  clusters: Map<string, TextRun>
+}
+
+/**
+ * Resolves every cluster the standard font cannot encode against the bundled
+ * fallback fonts. Returns null (the plain standard-font path) when the text
+ * needs no fallback, so nothing is downloaded or embedded for WinAnsi text.
+ */
+async function planFallback(
+  text: string,
+  primary: PDFFont,
+  bold: boolean,
+  ctx: DrawContext,
+): Promise<{ text: string; plan: FallbackPlan } | null> {
+  const needsFallback = Array.from(text).some((ch) => (ch.codePointAt(0) ?? 0) >= 32 && !canEncode(ch, primary))
+  if (!needsFallback) return null
+  const fonts = await ctx.getFallback()
+  if (!fonts) return null
+  const clusters = new Map<string, TextRun>()
+  let out = ''
+  for (const cluster of graphemes(text.normalize('NFC'))) {
+    if (cluster === '\t') {
+      out += '    '
+      continue
+    }
+    const visible = Array.from(cluster).filter((ch) => (ch.codePointAt(0) ?? 0) >= 32).join('')
+    if (!visible) {
+      if (cluster.includes('\n')) out += '\n'
+      continue
+    }
+    if (canEncode(visible, primary)) {
+      out += visible
+      continue
+    }
+    const resolved = clusters.get(visible) ?? (await fonts.resolve(visible, bold))
+    if (resolved) {
+      clusters.set(visible, resolved)
+      out += visible
+      continue
+    }
+    // No single font draws the whole cluster: keep its base character.
+    const base = Array.from(visible)[0]
+    if (canEncode(base, primary)) {
+      out += base
+      continue
+    }
+    const single = clusters.get(base) ?? (await fonts.resolve(base, bold))
+    if (single) {
+      clusters.set(base, single)
+      out += base
+    } else {
+      out += '?'
+    }
+  }
+  return { text: out, plan: { primary, clusters } }
+}
+
+/** Splits a line into runs that share a font. */
+function textRuns(line: string, plan: FallbackPlan): TextRun[] {
+  const runs: TextRun[] = []
+  for (const cluster of graphemes(line)) {
+    const mapped = plan.clusters.get(cluster)
+    const run = mapped ?? { font: plan.primary, text: canEncode(cluster, plan.primary) ? cluster : '?' }
+    const last = runs[runs.length - 1]
+    if (last && last.font === run.font) last.text += run.text
+    else runs.push({ ...run })
+  }
+  return runs
+}
+
+function runWidth(run: TextRun, size: number): number {
+  try {
+    return run.font.widthOfTextAtSize(run.text, size)
+  } catch {
+    return Array.from(run.text).length * size * 0.5
+  }
 }
 
 function wrapText(text: string, maxWidth: number, measure: (value: string) => number): string[] {
@@ -203,7 +303,7 @@ function wrapText(text: string, maxWidth: number, measure: (value: string) => nu
         if (candidateWidth > maxWidth && !current) {
           // Single word too long: hard-break it.
           let chunk = ''
-          for (const ch of word) {
+          for (const ch of graphemes(word)) {
             const next = chunk + ch
             if (measure(next) > maxWidth && chunk) {
               lines.push(chunk)
@@ -360,6 +460,18 @@ export async function buildPdf(
     }
   }
 
+  // Loaded only when some text needs glyphs the standard fonts lack.
+  let fallback: Promise<FallbackFonts | null> | null = null
+  const getFallback = (): Promise<FallbackFonts | null> => {
+    fallback ??= import('./fonts/fallback')
+      .then(({ createFallbackFonts }) => createFallbackFonts(out))
+      .catch((error) => {
+        console.warn('Could not load the fallback fonts', error)
+        return null
+      })
+    return fallback
+  }
+
   const images = new Map<string, PDFImage>()
   const getImage = async (src: string): Promise<PDFImage> => {
     const hit = images.get(src)
@@ -405,7 +517,7 @@ export async function buildPdf(
       }
     }
     for (const obj of objects) {
-      await drawObject(obj as AnyObject, page, inv, { getFont, getImage, getCustomFontInfo, realEdits })
+      await drawObject(obj as AnyObject, page, inv, { getFont, getImage, getCustomFontInfo, getFallback, realEdits })
     }
     options.onProgress?.(index + 1, total)
   }
@@ -435,6 +547,8 @@ interface DrawContext {
   getFont: (family: FontFamily, bold: boolean, italic: boolean) => Promise<PDFFont>
   getImage: (src: string) => Promise<PDFImage>
   getCustomFontInfo: (assetId: string) => Promise<CustomFontInfo | null>
+  /** Fallback fonts for characters outside WinAnsi, loaded on first use. */
+  getFallback: () => Promise<FallbackFonts | null>
   /** Edited runs whose original glyphs were deleted from the content stream. */
   realEdits: WeakSet<FabricObject>
 }
@@ -715,6 +829,7 @@ async function drawTextObject(obj: AnyObject, page: PDFPage, inv: Inverted, ctx:
   const fontSize = Number(obj.fontSize) || 16
   let font: PDFFont
   let custom: CustomFontInfo | null = null
+  let bold = false
   if (editing && typeof data.font?.assetId === 'string') {
     custom = await ctx.getCustomFontInfo(data.font.assetId)
   }
@@ -722,7 +837,7 @@ async function drawTextObject(obj: AnyObject, page: PDFPage, inv: Inverted, ctx:
     font = custom.font
   } else {
     const family = editing && data.font?.family ? data.font.family : normalizeFamily(obj.fontFamily)
-    const bold = editing
+    bold = editing
       ? Boolean(data.font?.bold)
       : String(obj.fontWeight ?? '').toLowerCase() === 'bold' || Number(obj.fontWeight) >= 600
     const italic = editing
@@ -730,9 +845,11 @@ async function drawTextObject(obj: AnyObject, page: PDFPage, inv: Inverted, ctx:
       : String(obj.fontStyle ?? '').toLowerCase() === 'italic'
     font = await ctx.getFont(family, bold, italic)
   }
+  const fallback = custom ? null : await planFallback(text, font, bold, ctx)
+  const plan = fallback?.plan ?? null
   const sanitized = custom
     ? sanitizeCustomText(text, custom.metrics)
-    : sanitizeText(text, font)
+    : fallback?.text ?? sanitizeText(text, font)
   const lineHeight = Number(obj.lineHeight) || 1.16
   const heightImpl = fontSize * FONT_SIZE_MULT
   const lineAdvance = editing ? heightImpl * lineHeight : fontSize * (Number(obj.lineHeightFactor) || 1.16)
@@ -745,13 +862,16 @@ async function drawTextObject(obj: AnyObject, page: PDFPage, inv: Inverted, ctx:
   const spaceEm = custom ? clampSpaceEm(data.font?.spaceEm ?? custom.metrics?.spaceEm) : 0
   const measure = (value: string): number => {
     if (custom) return measureCustomText(custom, value, fontSize, spaceEm)
+    if (plan) return textRuns(value, plan).reduce((sum, run) => sum + runWidth(run, fontSize), 0)
     try {
       return font.widthOfTextAtSize(value, fontSize)
     } catch {
       return value.length * fontSize * 0.5
     }
   }
-  const lines = wrapText(sanitized, boxWidth, measure)
+  // Text-tool objects are IText: their lines are exactly their newlines, so
+  // only Textbox runs (edited PDF text) wrap to the box width.
+  const lines = wrapText(sanitized, obj instanceof Textbox ? boxWidth : 0, measure)
   const angle = dirAngle(obj, inv)
   if (editing) {
     // When the original run was deleted from the content stream there is
@@ -796,17 +916,22 @@ async function drawTextObject(obj: AnyObject, page: PDFPage, inv: Inverted, ctx:
     else if (align === 'right' || align === 'justify' || align === 'justify-center' || align === 'justify-right') {
       lx = boxWidth - lineWidth
     }
-    const scene = localToScene(obj, lx, baseline + i * lineAdvance)
-    const point = inv.point(scene.x, scene.y)
-    page.drawText(line, {
-      x: point.x,
-      y: point.y,
-      size: fontSize,
-      font,
-      color: toPdfRgb(paint),
-      opacity,
-      rotate: degrees(angle),
-    })
+    const runs = plan ? textRuns(line, plan) : [{ font, text: line }]
+    let offset = 0
+    for (const run of runs) {
+      const scene = localToScene(obj, lx + offset, baseline + i * lineAdvance)
+      const point = inv.point(scene.x, scene.y)
+      page.drawText(run.text, {
+        x: point.x,
+        y: point.y,
+        size: fontSize,
+        font: run.font,
+        color: toPdfRgb(paint),
+        opacity,
+        rotate: degrees(angle),
+      })
+      if (runs.length > 1) offset += runWidth(run, fontSize)
+    }
   }
 }
 
