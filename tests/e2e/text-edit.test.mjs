@@ -23,6 +23,7 @@ import {
   buildStandardFontPdf,
   buildStripedPdf,
   buildStyledFontPdf,
+  buildSubsetFontPdf,
 } from '../helpers/fixtures.mjs'
 
 describe('text editing', () => {
@@ -367,5 +368,56 @@ describe('text editing', () => {
     )
 
     check(pageErrors.length === 0, `no browser page errors during the whole run (${pageErrors.join(' | ')})`)
+  })
+
+  it('draws characters a subsetted font lacks with a fallback font', async () => {
+    const { page, context, pageErrors } = app
+    const errorsBefore = pageErrors.length
+    // The original subset only has the glyphs of "Hello world". The retyped
+    // text adds Latin letters it lacks (drawn with Helvetica) and Greek and
+    // Cyrillic ones no Standard-14 font can encode (drawn with Noto Sans).
+    const subset = await buildSubsetFontPdf()
+    await gotoHome(page)
+    await openPdf(page, subset)
+    await page.click('.tool[title^="Edit text"]')
+    const box = await pageBox(page)
+    await page.mouse.click(box.x + 80, box.y + 54)
+    await page.waitForTimeout(700)
+    await page.keyboard.press('Control+a')
+    await page.keyboard.type('Hello Jazz Ωμέγα Жук')
+    await page.keyboard.press('Escape')
+    await page.waitForTimeout(400)
+    await page.mouse.click(box.x + 300, box.y + 270)
+    await page.waitForTimeout(300)
+
+    const exported = path.join(OUT_DIR, 'textedit-subset-exported.pdf')
+    await savePdf(page, exported)
+    const layer = await pdfText(exported)
+    check(!layer.includes('world'), `the subsetted original is deleted (${layer})`)
+    check(!layer.includes('?'), `no character is replaced with a question mark (${layer})`)
+    check(
+      layer.replace(/\s+/g, '').includes('HelloJazzΩμέγαЖук'),
+      `every retyped character is real text in the layer (${layer})`,
+    )
+
+    const fonts = [...new Map((await pageFonts(exported)).map((font) => [font.ref, font])).values()]
+    const bases = fonts.map((font) => font.base).join(', ')
+    check(fonts.some((font) => /liberation/i.test(font.base)), `the original subset still draws what it can (${bases})`)
+    check(fonts.some((font) => /helvetica/i.test(font.base)), `missing Latin letters use the Standard-14 family (${bases})`)
+    check(
+      fonts.some((font) => /notosans/i.test(font.base) && font.embedded),
+      `missing Greek and Cyrillic letters use the embedded Unicode fallback (${bases})`,
+    )
+
+    // Every part of the line renders: no glyph is dropped or drawn as .notdef.
+    const latin = await exportedPixelStats(context, exported, { x: 40, y: 40, w: 92, h: 28 })
+    const greek = await exportedPixelStats(context, exported, { x: 140, y: 40, w: 52, h: 28 })
+    const cyrillic = await exportedPixelStats(context, exported, { x: 202, y: 40, w: 34, h: 28 })
+    check(latin.dark > 20, `the Latin part renders (${latin.dark} dark pixels)`)
+    check(greek.dark > 20, `the Greek part renders (${greek.dark} dark pixels)`)
+    check(cyrillic.dark > 20, `the Cyrillic part renders (${cyrillic.dark} dark pixels)`)
+
+    const errors = pageErrors.slice(errorsBefore)
+    check(errors.length === 0, `no browser page errors while editing the subset (${errors.join(' | ')})`)
   })
 })

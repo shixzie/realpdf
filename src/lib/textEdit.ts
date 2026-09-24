@@ -308,9 +308,12 @@ async function resolveFont(page: PDFPageProxy, fontKey: string): Promise<FontInf
       const bytes = face.data instanceof Uint8Array ? face.data : new Uint8Array(face.data)
       const assetId = addFontAsset(bytes, face.mimetype)
       await registerFontAsset(assetId, { bold, italic })
+      const fallback = normalizeFamily(name || face.fallbackName)
       return {
-        family: familyForAsset(assetId),
-        fallback: normalizeFamily(name || face.fallbackName),
+        // Subsets only carry the glyphs the document used; the browser draws
+        // retyped characters they lack with the fallback, like the exporter.
+        family: `${familyForAsset(assetId)}, ${cssFamily('', fallback)}`,
+        fallback,
         assetId,
         spaceEm: fontSpaceEm(assetId),
         bold,
