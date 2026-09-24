@@ -128,6 +128,18 @@ export async function buildStyledFontPdf(file = path.join(OUT_DIR, 'textedit-sty
   return file
 }
 
+/** A page whose text uses a subset: only the glyphs of "Hello world" are embedded. */
+export async function buildSubsetFontPdf(file = path.join(OUT_DIR, 'textedit-subset.pdf')) {
+  const doc = await PDFDocument.create()
+  doc.registerFontkit(fontkit)
+  const font = await doc.embedFont(fs.readFileSync(LIBERATION), { subset: true })
+  const page = doc.addPage([500, 300])
+  page.drawText('Hello world', { x: 40, y: 240, size: 20, font, color: rgb(0, 0, 0) })
+  ensureOutDir()
+  fs.writeFileSync(file, await doc.save())
+  return file
+}
+
 /** Small page whose text uses the non-embedded base-14 Helvetica. */
 export function standardFontPdfBytes() {
   const stream = 'BT /F1 28 Tf 40 100 Td (Standard font test) Tj ET'
