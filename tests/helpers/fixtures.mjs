@@ -113,18 +113,6 @@ export async function buildEmbeddedFontPdf(file = path.join(OUT_DIR, 'textedit-e
   return file
 }
 
-/** A page whose text uses a subset font that only has the glyphs it draws. */
-export async function buildSubsetFontPdf(file = path.join(OUT_DIR, 'textedit-subset.pdf')) {
-  const doc = await PDFDocument.create()
-  doc.registerFontkit(fontkit)
-  const font = await doc.embedFont(fs.readFileSync(LIBERATION), { subset: true })
-  const page = doc.addPage([595, 842])
-  page.drawText('Hello world', { x: 56, y: 700, size: 18, font, color: rgb(0, 0, 0) })
-  ensureOutDir()
-  fs.writeFileSync(file, await doc.save())
-  return file
-}
-
 /** A page whose text is drawn with embedded bold and italic programs. */
 export async function buildStyledFontPdf(file = path.join(OUT_DIR, 'textedit-styled.pdf')) {
   const doc = await PDFDocument.create()
