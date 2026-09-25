@@ -90,7 +90,7 @@ npm run preview
 | --- | --- |
 | PDF rendering | [pdf.js](https://mozilla.github.io/pdf.js/) — Web Worker + **WebAssembly** decoders for JPEG 2000/ICC/JBIG2 (`wasm/`), plus CMaps and standard font data, all served from your own origin |
 | Editing surface | [fabric.js](https://fabricjs.com/) canvas overlays (one per visible page), coordinates stored in PDF points |
-| Saving | [pdf-lib](https://pdf-lib.js.org/) — annotations are re-drawn as native PDF operators, images embedded, new text mapped to Standard-14, edited text embedded with its original font (subset) after rewriting the page's content streams to delete the original glyphs, highlights exported with a real Multiply blend mode. The same content-stream rewrite is applied to a scratch page and re-rendered with pdf.js while editing, so the on-screen preview matches the saved file |
+| Saving | [pdf-lib](https://pdf-lib.js.org/) — annotations are re-drawn as native PDF operators, images embedded, new text mapped to Standard-14 with Noto fallback subsets for other scripts and emoji, edited text embedded with its original font (subset) after rewriting the page's content streams to delete the original glyphs, highlights exported with a real Multiply blend mode. The same content-stream rewrite is applied to a scratch page and re-rendered with pdf.js while editing, so the on-screen preview matches the saved file |
 | State | [zustand](https://zustand.docs.pmnd.rs/) store with snapshot-based undo/redo |
 | ZIP export | dependency-free STORE-method zip writer (`src/lib/zip.ts`), with optional DEFLATE via pako for Office packages |
 | Office import | a dependency-free ZIP reader over pako (`src/lib/zipRead.ts`) + OOXML parsing with `DOMParser` (`ooxml.ts`, `docxToPdf.ts`, `xlsxToPdf.ts`, `pptxToPdf.ts`); shared text layout re-uses pdf-lib Standard-14 fonts (`pdfLayout.ts`) |
@@ -114,7 +114,8 @@ Export works by walking every stored annotation, inverting the pdf.js viewport t
 ## Deploying to Cloudflare Workers
 
 The whole app is static, so it deploys as a Workers static-assets project — no
-origin server, and the pdf.js WebAssembly decoders, fonts and CMaps are served
+origin server, and the pdf.js WebAssembly decoders, fonts and CMaps (plus the
+Noto fallback font slices, emitted as hashed assets) are served
 from your own domain (there is no CDN call to a third party). A small Worker
 (`worker/index.ts`) sits in front of the assets to log/trace requests and to
 redirect `www` to the apex domain.
@@ -195,6 +196,7 @@ APP_URL=http://localhost:4173/ npm test
 - `tests/e2e/tools.test.mjs` — merge, split range, PDF→PNG, PDF→text, images→PDF, text→PDF, form filling → exported value verification
 - `tests/e2e/ui.test.mjs` — theme toggle, homepage tool cards, signature image upload, Ko-fi button, language switch (persistence, translated strings, `<html lang>`/title)
 - `tests/e2e/library.test.mjs` — save to the local library, rename, persistence across a reload, restore annotations, rebuild the PDF, delete
+- `tests/e2e/unicode-text.test.mjs` — added text outside WinAnsi (extended Latin, Greek, Cyrillic, CJK, Hangul, emoji) exports with embedded Noto subsets, WinAnsi-only text embeds nothing extra, typed line breaks survive
 - `tests/e2e/text-edit.test.mjs` — edit embedded-font and standard-font text: text layer deletion, exported font programs, coloured backgrounds
 - `tests/e2e/text-select.test.mjs` — selecting text activates the text tool, its options reflect and restyle the selected text, and the changes survive export
 - `tests/e2e/selection-options.test.mjs` — selecting covers, shapes, arrows, highlights and drawings shows their tool options, restyles the selection (arrow head included), survives undo/redo and export
@@ -209,7 +211,7 @@ Cloudflare Workers runtime (`npm run cf:dev`).
 - **Existing text is replaced, not re-flowed.** Editing a run deletes the matching text-showing operators from the page's content stream (including inside form XObjects) and draws the replacement at the original position, so surrounding lines never move. Reflowing paragraphs would require a real content-stream layout engine. When a run cannot be located with certainty (shared form XObjects drawn at different transforms, `TJ` arrays that pdf.js splits, encrypted streams), the exporter falls back to the older behaviour: the original is covered with the colour sampled from the page behind it.
 - The replacement font comes from the font program pdf.js rebuilds from the embedded font (the same outlines the viewer shows). Fonts pdf.js cannot hand over (Type 3, some non-embedded standard fonts) fall back to the closest Standard-14 family. Characters a subsetted font does not contain are drawn with the run's Standard-14 family (same weight and slant), or with the bundled Noto Sans (Latin, Greek, Cyrillic) when WinAnsi cannot encode them; only characters neither covers (CJK, emoji, …) are written as `?`.
 - **Office conversion is content-level, not pixel-faithful.** Word/Excel/PowerPoint files are parsed in the browser (ZIP + OOXML) and rebuilt with pdf-lib: text, tables, lists, inline images and basic paragraph/run styling (bold, italic, underline, colour, size, alignment) survive, while complex layouts, themes, charts/SmartArt, embedded objects, macros, headers/footers and exact fonts (they are matched to the Standard-14 substitutes) do not. Exporting a PDF back to Office preserves the text, its position, basic emphasis and the page/sheet/slide structure — not the original PDF's exact layout. Legacy `.doc/.xls/.ppt`, OpenDocument and macro-enabled variants are not supported.
-- Text you add is exported with the Standard-14 fonts (Helvetica/Times/Courier). Characters outside WinAnsi (CJK, emoji, …) are replaced with `?`. Existing text rendering supports embedded fonts and CJK via pdf.js CMaps.
+- Text you add is exported with the Standard-14 fonts (Helvetica/Times/Courier). Characters outside WinAnsi fall back to bundled Noto fonts, embedded as glyph subsets only when the text needs them: Noto Sans (extended Latin, Greek, Cyrillic, Vietnamese), Noto Sans SC (Chinese, Japanese kana), Noto Sans KR (Hangul) and Noto Emoji (emoji, drawn as monochrome outlines since PDF fonts cannot carry colour glyphs). The fallback glyphs are always upright sans-serif (Noto Sans in regular only, the CJK and emoji fonts in regular or bold), so they do not follow Times/Courier or italic, and Han characters use Simplified Chinese glyph shapes. Scripts outside those fonts (Arabic, Hebrew, Indic, Thai, …) and right-to-left layout are not supported and still export as `?`. Existing text rendering supports embedded fonts and CJK via pdf.js CMaps.
 - Very large documents (hundreds of pages) work but page rendering is limited to a window around the viewport; extremely large images increase memory usage.
 - Filling forms flattens by default (recommended); unflattened export relies on pdf-lib copying widgets, which is best-effort.
 - Password-protected PDFs are supported for viewing/editing when you know the password.
@@ -225,6 +227,7 @@ src/
   lib/
     pdfjs.ts      pdf.js setup + local wasm/font/cmap assets
     export.ts     fabric → pdf-lib annotation drawing
+    fonts/        Noto fallback fonts for characters the Standard-14 fonts lack (loaded on demand)
     textEdit.ts   existing-text hit-testing, font reuse, colour sampling
     annotationStyle.ts  selected-result kind, style read/apply (covers, shapes, paths)
     contentEdit.ts  content-stream walk that deletes edited text runs
