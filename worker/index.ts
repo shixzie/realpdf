@@ -1,4 +1,11 @@
 import { tracing } from 'cloudflare:workers'
+import { handleApi, type ApiDeps } from './api'
+import { loadCertificateAuthority, type CertificateAuthority } from './certificateAuthority'
+import { purgeExpiredSignRequests } from './signRequests'
+import { purgeExpiredChallenges } from './signingIdentity'
+
+/** Secrets set with `wrangler secret put`; optional (see wrangler.jsonc). */
+type WorkerEnv = Env & { SIGNING_CA_KEY?: string; SIGNING_CA_CERT?: string }
 
 // These mirror public/_headers. With assets.run_worker_first enabled the
 // assets layer no longer applies _headers to responses, so the Worker does.
@@ -26,12 +33,45 @@ function applyAssetHeaders(response: Response, pathname: string): Response {
   })
 }
 
+let caPromise: Promise<CertificateAuthority | null> | null = null
+
+function certificateAuthority(env: WorkerEnv): Promise<CertificateAuthority | null> {
+  if (!caPromise) {
+    caPromise =
+      env.SIGNING_CA_KEY && env.SIGNING_CA_CERT
+        ? loadCertificateAuthority(env.SIGNING_CA_KEY, env.SIGNING_CA_CERT).catch((error) => {
+            caPromise = null
+            logEvent('ca_error', { message: error instanceof Error ? error.message : String(error) })
+            return null
+          })
+        : Promise.resolve(null)
+  }
+  return caPromise
+}
+
+function apiDeps(env: WorkerEnv): ApiDeps {
+  return {
+    store: env.SIGN_STORE,
+    certificateAuthority: () => certificateAuthority(env),
+    sendEmail: env.EMAIL
+      ? async ({ to, subject, text }) => {
+          await env.EMAIL.send({ from: { name: 'RealPDF', email: env.SIGNING_EMAIL_FROM }, to, subject, text })
+        }
+      : null,
+    allow: async (bucket, key) => {
+      const limiter = bucket === 'email' ? env.EMAIL_LIMIT : env.WRITE_LIMIT
+      if (!limiter) return true
+      return (await limiter.limit({ key })).success
+    },
+  }
+}
+
 function logEvent(event: string, fields: Record<string, string | number | boolean | undefined>) {
   console.log(JSON.stringify({ event, ...fields }))
 }
 
 export default {
-  async fetch(request: Request, env: Env): Promise<Response> {
+  async fetch(request: Request, env: WorkerEnv): Promise<Response> {
     const url = new URL(request.url)
     const host = (request.headers.get('host') ?? url.hostname).split(':')[0].toLowerCase()
     const startedAt = performance.now()
@@ -59,8 +99,9 @@ export default {
       }
 
       try {
-        const assetResponse = await env.ASSETS.fetch(request)
-        const response = applyAssetHeaders(assetResponse, url.pathname)
+        const response = url.pathname.startsWith('/api/')
+          ? applyAssetHeaders(await handleApi(request, apiDeps(env)), url.pathname)
+          : applyAssetHeaders(await env.ASSETS.fetch(request), url.pathname)
         const durationMs = Math.round(performance.now() - startedAt)
         const contentLength = response.headers.get('content-length')
 
@@ -90,5 +131,11 @@ export default {
         })
       }
     })
+  },
+
+  async scheduled(_controller: ScheduledController, env: WorkerEnv): Promise<void> {
+    const requests = await purgeExpiredSignRequests(env.SIGN_STORE)
+    const challenges = await purgeExpiredChallenges(env.SIGN_STORE)
+    logEvent('purge', { requests, challenges })
   },
 }

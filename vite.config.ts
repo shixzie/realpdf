@@ -2,6 +2,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { defineConfig, type Plugin } from 'vite'
 import react from '@vitejs/plugin-react'
+import { signingApiMiddleware } from './worker/devServer'
 
 const PDFJS_DIRS = ['wasm', 'standard_fonts', 'cmaps', 'iccs'] as const
 
@@ -51,10 +52,23 @@ function pdfjsAssets(): Plugin {
   }
 }
 
+/** Serves the Worker's /api/ routes from the dev and preview servers. */
+function signingApi(): Plugin {
+  return {
+    name: 'realpdf:signing-api',
+    configureServer(server) {
+      server.middlewares.use(signingApiMiddleware())
+    },
+    configurePreviewServer(server) {
+      server.middlewares.use(signingApiMiddleware())
+    },
+  }
+}
+
 export default defineConfig({
   // Deployed at the domain root (https://realpdf.app), so assets use absolute paths.
   base: '/',
-  plugins: [react(), pdfjsAssets()],
+  plugins: [react(), pdfjsAssets(), signingApi()],
   build: {
     target: 'es2022',
     chunkSizeWarningLimit: 1500,
