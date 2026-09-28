@@ -1,8 +1,8 @@
 import { useStore, type ActiveSignRequest } from '../store'
 import { t } from '../i18n'
 import { bakedCurrentBytes } from './currentDocument'
-import { openPdfBytes } from './openDocument'
-import { documentIsUnchanged } from './signController'
+import { openPdfBytes, replaceDocumentBytes } from './openDocument'
+import { documentIsUnchanged, loadSigning, userSpaceRect } from './signController'
 import {
   addSignedVersion,
   createRequest,
@@ -46,8 +46,10 @@ export async function openRequestFromLink(id: string, key: string): Promise<void
 }
 
 /**
- * Encrypts the current document and uploads it as a new request. An
- * unchanged file is sent as-is so any signatures it already has stay valid.
+ * Encrypts the current document, with an empty signature field for every
+ * placed "sign here" spot, and uploads it as a new request. An unchanged file
+ * is sent as-is (the fields are an incremental update) so any signatures it
+ * already has stay valid.
  */
 export async function createRequestForCurrentDocument(args: {
   from: string
@@ -55,9 +57,41 @@ export async function createRequestForCurrentDocument(args: {
 }): Promise<MyRequest & { link: string }> {
   const state = useStore.getState()
   await state.flushAll()
-  const bytes = documentIsUnchanged() && state.bytes ? state.bytes : await bakedCurrentBytes()
+  let bytes = documentIsUnchanged() && state.bytes ? state.bytes : await bakedCurrentBytes()
+  const { signSpots, requestDraft } = useStore.getState()
+  if (signSpots.length) {
+    const { addSignatureFields } = await loadSigning()
+    const names = new Map(requestDraft.signers.map((signer) => [signer.id, signer.name.trim()]))
+    bytes = await addSignatureFields(
+      bytes,
+      signSpots.map((spot) => ({
+        pageIndex: spot.pageIndex,
+        rect: userSpaceRect(spot.pageIndex, spot),
+        label: (spot.signer && names.get(spot.signer)) || undefined,
+      })),
+    )
+  }
   const fileName = state.fileName ?? 'document.pdf'
   return createRequest({ bytes, fileName, from: args.from, message: args.message })
+}
+
+/** Creates the request from the Sign flow and shows its link. */
+export async function sendForSignatures(): Promise<void> {
+  const state = useStore.getState()
+  if (!state.bytes) return
+  const { from, message } = state.requestDraft
+  state.setExporting(true, 0.3)
+  try {
+    const created = await createRequestForCurrentDocument({ from: from.trim(), message: message.trim() })
+    const current = useStore.getState()
+    current.updateRequestDraft({ created })
+    current.setSignStep('sent')
+  } catch (error) {
+    console.error(error)
+    useStore.getState().toastMessage('error', requestErrorMessage(error))
+  } finally {
+    useStore.getState().setExporting(false)
+  }
 }
 
 /**
@@ -67,17 +101,13 @@ export async function createRequestForCurrentDocument(args: {
 export async function returnSignedCopy(request: ActiveSignRequest, signed: Uint8Array, signer: string): Promise<boolean> {
   try {
     const { header, status } = await addSignedVersion(request, signed, signer)
-    await openPdfBytes(new Uint8Array(signed), header.fileName)
+    await replaceDocumentBytes(new Uint8Array(signed), header.fileName)
     useStore.getState().setSignRequest({
       ...request,
       header,
       versions: status.versions.length,
       signedHere: true,
     })
-    const recipient = request.owner ? null : request.header.from
-    useStore
-      .getState()
-      .toastMessage('success', recipient ? t('signRequest.sentBackTo', { name: recipient }) : t('signRequest.sentBack'))
     return true
   } catch (error) {
     console.error(error)

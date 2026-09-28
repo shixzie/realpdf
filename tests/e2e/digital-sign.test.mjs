@@ -1,15 +1,16 @@
 /**
- * Certificate signing suite: unlock a PKCS#12 file, draw the signature box on
- * a page, download the signed PDF and verify it independently (Node crypto for
- * the CMS signature, pdf.js for the signature field). Then open the signed
- * file and countersign it, which must keep the first signature valid, and
- * remember a certificate on the device, reuse it after a reload and forget it.
+ * Signing yourself through the top bar's Sign button: adopt a drawn
+ * signature backed by a PKCS#12 file, place it on a page, review, download
+ * and verify the file independently (Node crypto for the CMS signature,
+ * pdf.js for the signature field). Then countersign the signed file with a
+ * typed signature, which must keep the first signature valid, and check that
+ * the device remembers the signer (key non-exportable) until it is forgotten.
  */
 import fs from 'node:fs'
 import path from 'node:path'
 import { afterAll, beforeAll, describe, it } from 'vitest'
 import * as pdfjs from 'pdfjs-dist/legacy/build/pdf.mjs'
-import { check, dragOnPage, exportedPixelStats, gotoHome, launchApp, openPdf } from '../helpers/app.mjs'
+import { check, dragOnPage, exportedPixelStats, gotoHome, launchApp, openPdf, pageBox } from '../helpers/app.mjs'
 import { OUT_DIR, SAMPLE_PDF } from '../helpers/fixtures.mjs'
 import { makeRsaPkcs12, verifyPdfSignatures } from '../helpers/signing.mjs'
 
@@ -27,18 +28,41 @@ async function signatureWidgets(filePath) {
   return widgets
 }
 
-async function openSignDialog(page) {
-  await page.click('.export-trigger')
-  await page.waitForSelector('.export-menu-item-sign')
-  await page.click('.export-menu-item-sign')
-  await page.waitForSelector('.digital-sign')
+/** Top bar Sign → Sign yourself. */
+async function startSelfSign(page) {
+  await page.click('.sign-trigger')
+  await page.waitForSelector('.sign-menu-self')
+  await page.click('.sign-menu-self')
 }
 
-async function unlock(page, p12Path, password) {
-  await page.setInputFiles('.digital-sign-file-input', p12Path)
-  await page.waitForSelector('input[name="certificate-password"]')
-  await page.fill('input[name="certificate-password"]', password)
-  await page.click('.digital-sign-unlock button[type="submit"]')
+/** Draws a squiggle on the adopt dialog's signature pad. */
+async function drawSignature(page) {
+  await page.click('.adopt-style-draw')
+  const pad = await page.locator('.adopt-pad').boundingBox()
+  await page.mouse.move(pad.x + 60, pad.y + 120)
+  await page.mouse.down()
+  for (let i = 1; i <= 24; i += 1) {
+    await page.mouse.move(pad.x + 60 + i * 18, pad.y + 100 + Math.sin(i / 2) * 40)
+  }
+  await page.mouse.up()
+}
+
+async function clickOnPage(page, point, index = 0) {
+  const box = await pageBox(page, index)
+  await page.mouse.click(box.x + point.x, box.y + point.y)
+  await page.waitForTimeout(150)
+}
+
+async function reviewAndSign(page, filePath) {
+  await page.click('.sign-finish')
+  await page.waitForSelector('.sign-review')
+  await page.click('.sign-submit')
+  await page.waitForSelector('.sign-done', { timeout: 30000 })
+  const [download] = await Promise.all([page.waitForEvent('download', { timeout: 30000 }), page.click('.sign-download')])
+  await download.saveAs(filePath)
+  await page.click('.sign-done-close')
+  await page.waitForSelector('.sign-done', { state: 'detached' })
+  return download
 }
 
 describe('digital signatures', () => {
@@ -58,38 +82,55 @@ describe('digital signatures', () => {
     await app?.browser.close()
   })
 
-  it('signs with a certificate and a visible signature placed on the page', async () => {
+  it('adopts a drawn signature, places it and signs with a certificate file', async () => {
     const { page, context, pageErrors } = app
     await gotoHome(page)
     await openPdf(page, SAMPLE_PDF)
-    await openSignDialog(page)
+    check((await page.locator('.export-trigger').count()) === 1, 'export stays separate from signing')
+    await startSelfSign(page)
+    await page.waitForSelector('.adopt-signature')
+    check((await page.locator('.adopt-signature h2').innerText()) === 'Create your signature', 'first-time signers adopt a signature')
 
-    // A wrong password is reported and nothing is unlocked.
-    await unlock(page, p12Path, 'not-the-password')
-    await page.waitForSelector('.cert-error')
-    check((await page.locator('.cert-error').innerText()).includes('Wrong password'), 'wrong password is reported')
-    check(await page.locator('.digital-sign-submit').isDisabled(), 'signing stays disabled until unlocked')
+    // A certificate file instead of an email; a wrong password is reported.
+    await page.setInputFiles('.adopt-file-input', p12Path)
+    await page.waitForSelector('input[name="certificate-password"]')
+    await drawSignature(page)
+    await page.fill('input[name="certificate-password"]', 'not-the-password')
+    await page.click('.adopt-submit')
+    await page.waitForSelector('.adopt-signature .cert-error')
+    check((await page.locator('.adopt-signature .cert-error').innerText()).includes('Wrong password'), 'wrong password is reported')
 
     await page.fill('input[name="certificate-password"]', p12.password)
-    await page.click('.digital-sign-unlock button[type="submit"]')
-    await page.waitForSelector('.cert-summary')
-    check((await page.locator('.cert-name').innerText()) === 'Ada Lovelace', 'certificate owner is shown')
-    check((await page.locator('.cert-summary').innerText()).includes('RealPDF Test CA'), 'issuer is shown')
+    await page.click('.adopt-submit')
+    await page.waitForSelector('.sign-bar')
+    check((await page.locator('.adopt-signature').count()) === 0, 'the dialog makes way for placing')
+    check((await page.locator('.sign-as').innerText()).includes('Ada Lovelace'), 'the bar says who is signing')
+    check(await page.locator('.sign-finish').isDisabled(), 'finishing needs a placed signature')
 
+    // Drag a box, then remove and re-add it to exercise the controls.
+    await dragOnPage(page, { x: 330, y: 640 }, { x: 540, y: 720 })
+    check((await page.locator('.sign-spot').count()) === 1, 'a signature is placed')
+    check((await page.locator('.sign-spot img').count()) === 1, 'the placed signature shows the drawn image')
+    await page.click('.sign-spot-remove')
+    check((await page.locator('.sign-spot').count()) === 0, 'a placed signature can be removed')
+    await dragOnPage(page, { x: 330, y: 640 }, { x: 540, y: 720 })
+
+    await page.click('.sign-finish')
+    await page.waitForSelector('.sign-review')
+    const review = await page.locator('.sign-review-card').innerText()
+    check(review.includes('Ada Lovelace') && review.includes('page 1'), `review shows signer and page (${review})`)
+    await page.click('.sign-more summary')
     await page.fill('input[name="signature-reason"]', 'I approve this document')
     await page.fill('input[name="signature-location"]', 'London')
-    await page.click('.digital-sign-submit')
-    await page.waitForSelector('.sign-banner')
-    check((await page.locator('.digital-sign').count()) === 0, 'dialog makes way for placing the box')
+    await page.click('.sign-submit')
+    await page.waitForSelector('.sign-done', { timeout: 30000 })
+    check((await page.locator('.sign-done').innerText()).includes('Signed by Ada Lovelace'), 'done step names the signer')
 
     const signedPath = path.join(OUT_DIR, 'digitally-signed.pdf')
-    const [download] = await Promise.all([
-      page.waitForEvent('download', { timeout: 30000 }),
-      dragOnPage(page, { x: 330, y: 640 }, { x: 540, y: 720 }),
-    ])
+    const [download] = await Promise.all([page.waitForEvent('download', { timeout: 30000 }), page.click('.sign-download')])
     check(download.suggestedFilename().endsWith('-signed.pdf'), `signed file name (${download.suggestedFilename()})`)
     await download.saveAs(signedPath)
-    await page.waitForSelector('.digital-sign', { state: 'detached' })
+    await page.click('.sign-done-close')
 
     const signed = fs.readFileSync(signedPath)
     const original = fs.readFileSync(SAMPLE_PDF)
@@ -99,8 +140,10 @@ describe('digital signatures', () => {
     check(result?.coversFile === true, 'signature covers the whole file')
     check(result?.hasSigningCertificateV2 === true, 'PAdES signing-certificate-v2 attribute is present')
     check(result?.certificates?.[0]?.equals(p12.certificateDer), 'signer certificate is embedded')
-    const text = signed.toString('latin1')
-    check(text.includes('/SubFilter /ETSI.CAdES.detached'), 'PAdES sub-filter')
+    const update = signed.subarray(original.length).toString('latin1')
+    check(update.includes('/SubFilter /ETSI.CAdES.detached'), 'PAdES sub-filter')
+    check(update.includes('/Subtype /Image'), 'the handwritten signature is embedded in the appearance')
+    check(update.includes('/Reason'), 'the reason is recorded')
 
     const [widget] = await signatureWidgets(signedPath)
     check(widget?.pageNumber === 1, 'signature field is on the first page')
@@ -118,45 +161,49 @@ describe('digital signatures', () => {
     check(pageErrors.length === 0, `no browser errors: ${pageErrors.join(' | ')}`)
   })
 
-  it('countersigns an already signed PDF without breaking the first signature', async () => {
+  it('countersigns with a typed signature without breaking the first one', async () => {
     const { page, pageErrors } = app
     const firstPath = path.join(OUT_DIR, 'digitally-signed.pdf')
     await gotoHome(page)
     await openPdf(page, firstPath)
-    await openSignDialog(page)
-    await unlock(page, secondPath, second.password)
-    await page.waitForSelector('.cert-summary')
+    // The remembered signer goes straight to placing; switch to another one.
+    await startSelfSign(page)
+    await page.waitForSelector('.sign-bar')
+    check((await page.locator('.sign-as').innerText()).includes('Ada Lovelace'), 'the remembered signature is used')
+    await page.click('.sign-change')
+    await page.waitForSelector('.adopt-identity')
+    await page.click('.adopt-switch')
+    await page.waitForSelector('.saved-cert')
+    await page.setInputFiles('.adopt-file-input', secondPath)
+    await page.fill('input[name="signer-name"]', 'Charles Babbage')
+    await page.fill('input[name="certificate-password"]', second.password)
+    await page.click('.adopt-font:nth-child(2)')
+    await page.click('.adopt-submit')
+    await page.waitForSelector('.adopt-signature', { state: 'detached' })
+    check((await page.locator('.sign-as').innerText()).includes('Charles Babbage'), 'the new signer is used')
+
+    await clickOnPage(page, { x: 150, y: 700 })
+    check((await page.locator('.sign-spot').count()) === 1, 'a click places a default-size signature')
+    await page.click('.sign-finish')
+    await page.waitForSelector('.sign-review')
+    await page.click('.sign-more summary')
     check(await page.locator('input[name="signature-certify"]').isDisabled(), 'certifying is unavailable once signed')
-    await page.selectOption('select[name="signature-placement"]', 'invisible')
+    await page.click('.sign-review-back')
 
     const countersignedPath = path.join(OUT_DIR, 'digitally-countersigned.pdf')
-    const [download] = await Promise.all([
-      page.waitForEvent('download', { timeout: 30000 }),
-      page.click('.digital-sign-submit'),
-    ])
-    await download.saveAs(countersignedPath)
+    await reviewAndSign(page, countersignedPath)
 
     const results = verifyPdfSignatures(fs.readFileSync(countersignedPath))
     check(results.length === 2, `two signatures (${results.length})`)
     check(results.every((result) => result.valid), 'both signatures verify')
     check(results[1]?.coversFile === true && results[0]?.coversFile === false, 'the new signature covers the whole file')
     check(String(results[1]?.signer).includes('Charles Babbage'), 'the second signer is recorded')
+    check((await signatureWidgets(countersignedPath)).length === 2, 'two visible signatures')
     check(pageErrors.length === 0, `no browser errors: ${pageErrors.join(' | ')}`)
   })
 
-  it('remembers a certificate on this device as a non-exportable key', async () => {
+  it('remembers signers on this device with non-exportable keys until forgotten', async () => {
     const { page, pageErrors } = app
-    await gotoHome(page)
-    await openPdf(page, SAMPLE_PDF)
-    await openSignDialog(page)
-    await page.setInputFiles('.digital-sign-file-input', secondPath)
-    await page.check('input[name="certificate-remember"]')
-    await page.fill('input[name="certificate-password"]', second.password)
-    await page.click('.digital-sign-unlock button[type="submit"]')
-    await page.waitForSelector('.cert-remembered')
-    await page.click('.modal-head .icon-button')
-
-    // The stored key is the CryptoKey itself and cannot be exported.
     const stored = await page.evaluate(
       () =>
         new Promise((resolve) => {
@@ -164,56 +211,49 @@ describe('digital signatures', () => {
           request.onsuccess = () => {
             const read = request.result.transaction('identities').objectStore('identities').getAll()
             read.onsuccess = async () => {
-              const [entry] = read.result
-              let exported = true
-              try {
-                await crypto.subtle.exportKey('pkcs8', entry.key)
-              } catch {
-                exported = false
+              const entries = []
+              for (const entry of read.result) {
+                let exported = true
+                try {
+                  await crypto.subtle.exportKey('pkcs8', entry.key)
+                } catch {
+                  exported = false
+                }
+                entries.push({ name: entry.info.name, extractable: entry.key.extractable, exported })
               }
-              resolve({ count: read.result.length, extractable: entry.key.extractable, exported, name: entry.info.name })
+              resolve(entries)
             }
           }
           request.onerror = () => resolve(null)
         }),
     )
-    check(stored?.count === 1 && stored?.name === 'Charles Babbage', `one identity is remembered (${JSON.stringify(stored)})`)
-    check(stored?.extractable === false && stored?.exported === false, 'the remembered key cannot be exported')
+    check(stored?.length === 2, `both signers are remembered (${JSON.stringify(stored)})`)
+    check(stored?.every((entry) => entry.extractable === false && entry.exported === false), 'remembered keys cannot be exported')
 
-    // After a reload the certificate is selected without the file or password.
+    // After a reload, Sign goes straight to placing with the latest signer.
     await page.reload()
     await page.waitForSelector('.empty-card')
     await openPdf(page, SAMPLE_PDF)
-    await openSignDialog(page)
-    await page.waitForSelector('.cert-summary')
-    check((await page.locator('.cert-name').innerText()) === 'Charles Babbage', 'saved certificate is selected')
-    check((await page.locator('.cert-remembered').count()) === 1, 'it is marked as remembered')
-    await page.selectOption('select[name="signature-placement"]', 'invisible')
-    const savedPath = path.join(OUT_DIR, 'digitally-signed-saved.pdf')
-    const [download] = await Promise.all([
-      page.waitForEvent('download', { timeout: 30000 }),
-      page.click('.digital-sign-submit'),
-    ])
-    await download.saveAs(savedPath)
-    const [result] = verifyPdfSignatures(fs.readFileSync(savedPath))
-    check(result?.valid === true && String(result?.signer).includes('Charles Babbage'), 'signs with the remembered key')
+    await startSelfSign(page)
+    await page.waitForSelector('.sign-bar')
+    check((await page.locator('.sign-as').innerText()).includes('Charles Babbage'), 'the latest signer is picked')
 
-    // Switching lists the saved certificates; forgetting removes it.
-    await openSignDialog(page)
-    await page.waitForSelector('.cert-summary')
-    await page.click('.cert-switch')
+    // Forget both from the adopt dialog.
+    await page.click('.sign-change')
+    await page.waitForSelector('.adopt-forget')
+    await page.click('.adopt-forget')
     await page.waitForSelector('.saved-cert')
-    check((await page.locator('.saved-cert').innerText()).includes('Charles Babbage'), 'saved certificate is listed')
+    check((await page.locator('.saved-cert').innerText()).includes('Ada Lovelace'), 'the other saved signer is listed')
     await page.click('.saved-cert-forget')
     await page.waitForSelector('.saved-cert', { state: 'detached' })
-    await page.waitForSelector('.signing-id')
     await page.reload()
     await page.waitForSelector('.empty-card')
     await openPdf(page, SAMPLE_PDF)
-    await openSignDialog(page)
-    await page.waitForSelector('.signing-id')
+    await startSelfSign(page)
+    await page.waitForSelector('.adopt-signature')
     await page.waitForTimeout(500)
-    check((await page.locator('.cert-summary').count()) === 0, 'forgotten certificate is gone after a reload')
+    check((await page.locator('.adopt-identity, .saved-cert').count()) === 0, 'forgotten signers are gone after a reload')
+    check((await page.locator('input[name="signer-email"]').count()) === 1, 'a new signer starts with name and email')
     check(pageErrors.length === 0, `no browser errors: ${pageErrors.join(' | ')}`)
   })
 })

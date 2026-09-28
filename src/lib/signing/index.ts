@@ -1,7 +1,14 @@
 export { CertificateError, loadSigningIdentity } from './identity'
 export type { CertificateInfo, SigningIdentity } from './identity'
-export { readSignatureSummary, SignError, signPdf } from './pdfSign'
-export type { SignatureFieldInfo, SignatureLine, SignaturePlacement, SignatureSummary, SignOptions } from './pdfSign'
+export { addSignatureFields, readSignatureSummary, SignError, signPdf } from './pdfSign'
+export type {
+  NewSignatureField,
+  SignatureFieldInfo,
+  SignatureLine,
+  SignaturePlacement,
+  SignatureSummary,
+  SignOptions,
+} from './pdfSign'
 export { forgetIdentity, getSavedIdentity, listSavedIdentities, rememberIdentity } from './keystore'
 export type { SavedIdentityMeta } from './keystore'
 export { completeEnrollment, EnrollError, startEnrollment } from './enroll'

@@ -23,6 +23,7 @@ import { getCanvas } from '../lib/canvasRegistry'
 import { useTranslation } from '../i18n'
 import { LanguagePicker } from './LanguagePicker'
 import { ExportControl } from './ExportControl'
+import { SignControl } from './SignControl'
 
 export function TopBar() {
   const { t } = useTranslation()
@@ -70,8 +71,15 @@ export function TopBar() {
       </button>
 
       <div className="topbar-group">
-        <button type="button" className="button" onClick={() => fileInputRef.current?.click()} disabled={loading}>
-          {loading ? <Loader2 size={16} className="spin" /> : <FolderOpen size={16} />} {t('topbar.openPdf')}
+        <button
+          type="button"
+          className="button"
+          title={t('topbar.openPdf')}
+          onClick={() => fileInputRef.current?.click()}
+          disabled={loading}
+        >
+          {loading ? <Loader2 size={16} className="spin" /> : <FolderOpen size={16} />}{' '}
+          <span className="topbar-label topbar-label-low">{t('topbar.openPdf')}</span>
         </button>
         <input
           id="open-pdf-input"
@@ -92,7 +100,7 @@ export function TopBar() {
           title={t('topbar.toolsTitle')}
           onClick={() => useStore.getState().setToolsOpen(true)}
         >
-          <Wrench size={15} /> {t('topbar.tools')}
+          <Wrench size={15} /> <span className="topbar-label">{t('topbar.tools')}</span>
         </button>
         <button
           type="button"
@@ -100,7 +108,7 @@ export function TopBar() {
           title={t('topbar.libraryTitle')}
           onClick={() => void useStore.getState().openLibrary()}
         >
-          <BookOpen size={15} /> {t('topbar.library')}
+          <BookOpen size={15} /> <span className="topbar-label">{t('topbar.library')}</span>
         </button>
         {(hasForms || formMode) && (
           <button
@@ -116,7 +124,8 @@ export function TopBar() {
               }
             }}
           >
-            <ClipboardList size={15} /> {formMode ? t('topbar.fillingForms') : t('topbar.fillForms')}
+            <ClipboardList size={15} />{' '}
+            <span className="topbar-label topbar-label-low">{formMode ? t('topbar.fillingForms') : t('topbar.fillForms')}</span>
           </button>
         )}
       </div>
@@ -216,9 +225,10 @@ export function TopBar() {
         rel="noreferrer noopener"
         title={t('topbar.supportTitle')}
       >
-        <Heart size={15} /> {t('topbar.support')}
+        <Heart size={15} /> <span className="topbar-label">{t('topbar.support')}</span>
       </a>
 
+      {pages.length > 0 && <SignControl />}
       {pages.length > 0 && <ExportControl />}
     </header>
   )

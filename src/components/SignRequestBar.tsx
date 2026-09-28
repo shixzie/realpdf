@@ -2,6 +2,7 @@ import { CheckCircle2, Copy, Download, PenLine, Send } from 'lucide-react'
 import { useStore } from '../store'
 import { useTranslation } from '../i18n'
 import { downloadBlob } from '../lib/exportController'
+import { signedFileName, startSigning } from '../lib/signController'
 import { requestLink } from '../lib/signRequests'
 
 /**
@@ -11,7 +12,8 @@ import { requestLink } from '../lib/signRequests'
 export function SignRequestBar() {
   const { t } = useTranslation()
   const request = useStore((state) => state.signRequest)
-  if (!request) return null
+  const placing = useStore((state) => state.signFlow?.step === 'place')
+  if (!request || placing) return null
   const { header } = request
 
   const signers = header.signers.length
@@ -21,8 +23,7 @@ export function SignRequestBar() {
   const download = () => {
     const state = useStore.getState()
     if (!state.bytes) return
-    const base = header.fileName.replace(/\.pdf$/i, '')
-    downloadBlob(new Blob([new Uint8Array(state.bytes)], { type: 'application/pdf' }), `${base}-signed.pdf`)
+    downloadBlob(new Blob([new Uint8Array(state.bytes)], { type: 'application/pdf' }), signedFileName(header.fileName))
   }
 
   let lead: string
@@ -69,9 +70,9 @@ export function SignRequestBar() {
         <button
           type="button"
           className={`button ${request.owner ? '' : 'button-primary'} sign-request-sign`}
-          onClick={() => useStore.getState().setDigitalSign('form')}
+          onClick={() => void startSigning('self')}
         >
-          <PenLine size={14} /> {t('signRequest.sign')}
+          <PenLine size={14} /> {request.owner ? t('signRequest.sign') : t('signRequest.startSigning')}
         </button>
       )}
     </div>

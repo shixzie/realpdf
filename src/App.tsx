@@ -6,7 +6,8 @@ import { ToolOptions } from './components/ToolOptions'
 import { Viewer } from './components/Viewer'
 import { PageSidebar } from './components/PageSidebar'
 import { SignatureModal } from './components/SignatureModal'
-import { DigitalSignatureModal } from './components/DigitalSignatureModal'
+import { SignFlowModals } from './components/SignFlowModals'
+import { SignBar } from './components/SignBar'
 import { RequestSignaturesModal } from './components/RequestSignaturesModal'
 import { SignRequestBar } from './components/SignRequestBar'
 import { FileToolsModal } from './components/FileToolsModal'
@@ -165,6 +166,7 @@ export default function App() {
           <div className="main">
             {formMode ? <FormsBar /> : <ToolOptions />}
             <SignRequestBar />
+            <SignBar />
             <Viewer />
           </div>
           <PageSidebar />
@@ -173,7 +175,7 @@ export default function App() {
         <EmptyState />
       )}
       <SignatureModal />
-      <DigitalSignatureModal />
+      <SignFlowModals />
       <RequestSignaturesModal />
       <FileToolsModal />
       <LibraryModal />
