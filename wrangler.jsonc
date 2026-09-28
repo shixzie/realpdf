@@ -39,9 +39,9 @@
   // challenges. `wrangler deploy` creates the bucket if it does not exist.
   "r2_buckets": [{ "binding": "SIGN_STORE", "bucket_name": "realpdf-signing" }],
   // Sends the verification codes for email-verified signing certificates.
-  // Needs Email Sending enabled for realpdf.app in the Cloudflare dashboard.
-  "send_email": [{ "name": "EMAIL", "allowed_sender_addresses": ["sign@realpdf.app"] }],
-  "vars": { "SIGNING_EMAIL_FROM": "sign@realpdf.app" },
+  // Needs Email Sending enabled for m.realpdf.app in the Cloudflare dashboard.
+  "send_email": [{ "name": "EMAIL", "allowed_sender_addresses": ["sign@m.realpdf.app"] }],
+  "vars": { "SIGNING_EMAIL_FROM": "sign@m.realpdf.app" },
   // Per-IP limits for uploads and certificate requests, and per-IP and
   // per-address limits for verification emails.
   "ratelimits": [

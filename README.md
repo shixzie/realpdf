@@ -185,8 +185,8 @@ does not:
 1. **R2 bucket** `realpdf-signing` (binding `SIGN_STORE`). `wrangler deploy`
    creates it if it does not exist. A daily cron (`17 3 * * *`) deletes expired
    requests and verification codes.
-2. **Email Sending** for `realpdf.app`, so the `EMAIL` binding can send the
-   codes from `sign@realpdf.app` (Cloudflare dashboard → Email → Email Sending,
+2. **Email Sending** for the `m.realpdf.app` subdomain, so the `EMAIL` binding can send the
+   codes from `sign@m.realpdf.app` (Cloudflare dashboard → Email → Email Sending,
    add the domain and its DNS records).
 3. **The CA** that issues the certificates, as two Worker secrets:
 
