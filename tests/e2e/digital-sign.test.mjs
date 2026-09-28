@@ -246,6 +246,18 @@ describe('digital signatures', () => {
     check((await page.locator('.saved-cert').innerText()).includes('Ada Lovelace'), 'the other saved signer is listed')
     await page.click('.saved-cert-forget')
     await page.waitForSelector('.saved-cert', { state: 'detached' })
+    // The list updates at once; wait for the keys to leave IndexedDB before reloading.
+    await page.waitForFunction(
+      () =>
+        new Promise((resolve) => {
+          const request = indexedDB.open('realpdf-signing')
+          request.onsuccess = () => {
+            const count = request.result.transaction('identities').objectStore('identities').count()
+            count.onsuccess = () => resolve(count.result === 0)
+          }
+          request.onerror = () => resolve(false)
+        }),
+    )
     await page.reload()
     await page.waitForSelector('.empty-card')
     await openPdf(page, SAMPLE_PDF)
