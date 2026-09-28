@@ -1,7 +1,7 @@
-import { verifyPdf, VerifyError, type VerificationReport, type VerifiedSignature } from '../../../src/lib/signing/verify'
-import { pdfInputProperties, readPdfArgument } from '../pdfInput'
-import { ToolError, type Tool } from '../protocol'
-import { trustAnchors, type McpContext } from '../context'
+import { verifyPdf, VerifyError, type VerificationReport, type VerifiedSignature } from '../../../src/lib/signing/verify.ts'
+import { pdfInputProperties, readPdfArgument } from '../pdfInput.ts'
+import { ToolError, type Tool } from '../protocol.ts'
+import { trustAnchors, type McpContext } from '../context.ts'
 
 function describeSignature(signature: VerifiedSignature, index: number): string {
   const who = signature.signer ? `${signature.signer.name}${signature.signer.email ? ` <${signature.signer.email}>` : ''}` : 'unknown signer'

@@ -6,9 +6,9 @@ import {
   requestLink,
   sealVersion,
   type RequestHeader,
-} from '../../../src/lib/signing/requestEnvelope'
-import { verifyPdf, type VerificationReport } from '../../../src/lib/signing/verify'
-import { randomId } from '../../encoding'
+} from '../../../src/lib/signing/requestEnvelope.ts'
+import { verifyPdf, type VerificationReport } from '../../../src/lib/signing/verify.ts'
+import { randomId } from '../../encoding.ts'
 import {
   createSignRequest,
   deleteSignRequest,
@@ -16,12 +16,12 @@ import {
   readSignRequestVersion,
   SignRequestError,
   type SignRequestStatus,
-} from '../../signRequests'
-import { trustAnchors, type McpContext } from '../context'
-import { encodeBase64, pdfInputProperties, readPdfArgument } from '../pdfInput'
-import { ToolError, type Tool, type ToolResult } from '../protocol'
-import { addSignatureFields, parseSignatureFields, signatureFieldsSchema } from '../signatureFields'
-import { summarize } from './verify'
+} from '../../signRequests.ts'
+import { trustAnchors, type McpContext } from '../context.ts'
+import { encodeBase64, pdfInputProperties, readPdfArgument } from '../pdfInput.ts'
+import { ToolError, type Tool, type ToolResult } from '../protocol.ts'
+import { addSignatureFields, parseSignatureFields, signatureFieldsSchema } from '../signatureFields.ts'
+import { summarize } from './verify.ts'
 
 const ERROR_TEXT: Record<string, string> = {
   invalidId: 'That is not a RealPDF signing link.',

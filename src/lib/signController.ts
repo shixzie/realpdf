@@ -3,6 +3,7 @@ import { t } from '../i18n'
 import { bakedCurrentBytes } from './currentDocument'
 import { downloadBlob } from './exportController'
 import { makeInverse } from './export'
+import { returnSignedCopy } from './signRequestController'
 import type { SigningIdentity } from './signing/identity'
 import type { SignatureLine, SignaturePlacement, SignatureSummary } from './signing/pdfSign'
 
@@ -123,6 +124,13 @@ export async function signCurrentDocument(request: SignRequest): Promise<void> {
     })
     const base = (useStore.getState().fileName ?? 'document.pdf').replace(/\.pdf$/i, '')
     downloadBlob(new Blob([new Uint8Array(signed)], { type: 'application/pdf' }), `${base}-signed.pdf`)
+    const active = useStore.getState().signRequest
+    if (active) {
+      useStore.getState().setExporting(true, 0.9)
+      await returnSignedCopy(active, signed, request.identity.info.name)
+      useStore.getState().setExporting(false)
+      return
+    }
     useStore.getState().setExporting(false)
     useStore.getState().toastMessage('success', t('digitalSign.signed', { name: request.identity.info.name }))
   } catch (error) {

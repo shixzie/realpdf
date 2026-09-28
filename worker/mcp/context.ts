@@ -1,5 +1,5 @@
-import type { CertificateAuthority } from '../certificateAuthority'
-import type { BlobStore } from '../store'
+import type { CertificateAuthority } from '../certificateAuthority.ts'
+import type { BlobStore } from '../store.ts'
 
 /**
  * What the MCP tools need from the Worker. It is a subset of the /api/ deps

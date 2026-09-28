@@ -1,10 +1,10 @@
 import crypto from 'node:crypto'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import forge from 'node-forge'
-import { handleApi } from './api'
-import { loadCertificateAuthority, type CertificateAuthority } from './certificateAuthority'
-import { memoryStore } from './store'
-import type { EmailMessage } from './signingIdentity'
+import { handleApi } from './api.ts'
+import { loadCertificateAuthority, type CertificateAuthority } from './certificateAuthority.ts'
+import { memoryStore } from './store.ts'
+import type { EmailMessage } from './signingIdentity.ts'
 
 /**
  * The /api/ routes for `npm run dev`, `npm run preview` and the test suite,

@@ -2,7 +2,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { defineConfig, type Plugin } from 'vite'
 import react from '@vitejs/plugin-react'
-import { signingApiMiddleware } from './worker/devServer'
+import { signingApiMiddleware } from './worker/devServer.ts'
 
 const PDFJS_DIRS = ['wasm', 'standard_fonts', 'cmaps', 'iccs'] as const
 

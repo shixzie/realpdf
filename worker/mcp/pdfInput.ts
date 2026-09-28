@@ -1,4 +1,4 @@
-import { ToolError } from './protocol'
+import { ToolError } from './protocol.ts'
 
 /** Largest PDF a tool accepts, inline or by URL. */
 export const MAX_PDF_BYTES = 25 * 1024 * 1024

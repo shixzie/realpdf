@@ -1,6 +1,6 @@
 # RealPDF
 
-A real PDF editor that runs **entirely in your browser**. No uploads, no servers, no accounts — your documents never leave your device.
+A real PDF editor that runs **entirely in your browser**. No uploads, no accounts — your documents never leave your device. The only exception is a signing request you choose to send, and that is encrypted in the browser first (see below).
 
 ![RealPDF editor](docs/editor.png)
 
@@ -26,6 +26,8 @@ A real PDF editor that runs **entirely in your browser**. No uploads, no servers
 - **Visible signature**: drag a box on any page (or click for a default size) and it shows "Digitally signed by", the certificate's name, the date and the optional reason and location. You can also fill in an **empty signature field** the PDF already has, or sign invisibly
 - **Countersigning**: an unchanged document is signed as an *incremental update* (the original bytes are kept and the signature is appended), so signatures already in the file stay valid
 - **Certify** (DocMDP): the first signer can lock the document so that any change other than filling forms and signing invalidates it
+- **Signing ID without a certificate file**: type your name and email, enter the 6-digit code RealPDF emails you, and RealPDF's CA issues a certificate for that address (valid one year, subject `CN=<name>, OU=Email verified by RealPDF, E=<email>`). The key pair is generated in the browser as non-extractable and only the public key is sent; the ID is remembered on the device and picked automatically next time. Only the email is verified, not the name
+- **Request signatures** (Export → *Request signatures*): creates a link like `https://realpdf.app/sign/<id>#<key>` to send to the people who should sign. The document is encrypted in the browser with AES-256-GCM before upload and the key exists only in the link's `#fragment`, which browsers never send to the server, so the server stores ciphertext it cannot read (file name and message included). Whoever opens the link signs with their own signing ID or certificate, and the signed copy is uploaded back to the same link (encrypted again); the sender opens the link to see who signed and download the result. Links expire after 30 days, and the sender can delete them earlier from the home screen or the dialog
 - **Remember on this device** (opt-in): the unlocked key is kept in this browser's IndexedDB as a non-extractable WebCrypto key, so later signatures need neither the file nor the password; the browser can sign with it but no script can read it back, and **Forget** removes it. Nothing is uploaded
 - **For agents (MCP)**: `https://realpdf.app/mcp` lets AI agents send a PDF for signature, see who has signed, download the signed copy and verify any PDF's signatures; see [docs/mcp.md](docs/mcp.md)
 
@@ -100,6 +102,7 @@ npm run preview
 | --- | --- |
 | PDF rendering | [pdf.js](https://mozilla.github.io/pdf.js/) — Web Worker + **WebAssembly** decoders for JPEG 2000/ICC/JBIG2 (`wasm/`), plus CMaps and standard font data, all served from your own origin |
 | Editing surface | [fabric.js](https://fabricjs.com/) canvas overlays (one per visible page), coordinates stored in PDF points |
+| Signing service | The Worker's `/api/` routes (`worker/api.ts`): encrypted signing requests in an R2 bucket (`worker/signRequests.ts`), email verification codes sent with Cloudflare Email Sending and a small CA that issues signing certificates (`worker/signingIdentity.ts`, `worker/certificateAuthority.ts`). The Vite dev and preview servers serve the same routes from memory (`worker/devServer.ts`), with the emailed codes readable at `/api/dev/outbox` |
 | Digital signatures | [node-forge](https://github.com/digitalbazaar/forge) reads the PKCS#12 file and encodes the CMS/ASN.1 structures; hashing and the private-key operation run in WebCrypto. The signature, its field and appearance are written as a hand-rolled incremental update (xref table or xref stream, matching the file) over pdf-lib objects (`src/lib/signing/`), loaded only when the signing dialog opens |
 | Saving | [pdf-lib](https://pdf-lib.js.org/) — annotations are re-drawn as native PDF operators, images embedded, new text mapped to Standard-14 with Noto fallback subsets for other scripts and emoji, edited text embedded with its original font (subset) after rewriting the page's content streams to delete the original glyphs, highlights exported with a real Multiply blend mode. The same content-stream rewrite is applied to a scratch page and re-rendered with pdf.js while editing, so the on-screen preview matches the saved file |
 | State | [zustand](https://zustand.docs.pmnd.rs/) store with snapshot-based undo/redo |
@@ -124,12 +127,13 @@ Export works by walking every stored annotation, inverting the pdf.js viewport t
 
 ## Deploying to Cloudflare Workers
 
-The whole app is static, so it deploys as a Workers static-assets project — no
+The editor is static, so it deploys as a Workers static-assets project — no
 origin server, and the pdf.js WebAssembly decoders, fonts and CMaps (plus the
 Noto fallback font slices, emitted as hashed assets) are served
 from your own domain (there is no CDN call to a third party). A small Worker
-(`worker/index.ts`) sits in front of the assets to log/trace requests and to
-redirect `www` to the apex domain.
+(`worker/index.ts`) sits in front of the assets to log/trace requests, to
+redirect `www` to the apex domain, and to serve the signing service under
+`/api/` (see *Signing service setup* below).
 
 ```bash
 npm run deploy      # builds and runs `wrangler deploy`
@@ -173,6 +177,36 @@ assets and a week for `pdfjs-assets/`, plus `nosniff` / frame / referrer
 hardening — because `run_worker_first` bypasses `_headers`, the Worker
 re-applies those rules to every asset response.
 
+### Signing service setup
+
+Signing links and email-verified signing IDs need three things the static app
+does not:
+
+1. **R2 bucket** `realpdf-signing` (binding `SIGN_STORE`). `wrangler deploy`
+   creates it if it does not exist. A daily cron (`17 3 * * *`) deletes expired
+   requests and verification codes.
+2. **Email Sending** for `realpdf.app`, so the `EMAIL` binding can send the
+   codes from `sign@realpdf.app` (Cloudflare dashboard → Email → Email Sending,
+   add the domain and its DNS records).
+3. **The CA** that issues the certificates, as two Worker secrets:
+
+   ```bash
+   node scripts/make-signing-ca.mjs          # writes .signing-ca/ca-key.pem and ca-cert.pem (gitignored)
+   npx wrangler secret put SIGNING_CA_KEY < .signing-ca/ca-key.pem
+   npx wrangler secret put SIGNING_CA_CERT < .signing-ca/ca-cert.pem
+   ```
+
+   Keep `ca-key.pem` somewhere safe offline and delete it from disk: anyone
+   with it can issue RealPDF certificates.
+
+Until email and the CA are set up, `/api/identity/*` answers `503` and the app
+says signing IDs are unavailable (certificate files and signing links keep
+working). Uploads and certificate requests are rate-limited per IP
+(`WRITE_LIMIT`), and verification emails per IP and per address
+(`EMAIL_LIMIT`). For local testing with the real runtime, put the two secrets
+in `.dev.vars` and run `npm run cf:dev`; emails are then written to
+`.wrangler/tmp/email/` instead of being sent.
+
 ### Logs and traces
 
 Workers Logs and Traces are visible in the Cloudflare dashboard under
@@ -211,6 +245,8 @@ APP_URL=http://localhost:4173/ npm test
 - `tests/unit/verify.test.mjs` — signature verification: signer, chain and trust anchors, tampered bytes, content appended after signing, countersignatures and certification, ECDSA
 - `tests/unit/mcp.test.mjs`, `tests/unit/mcp-requests.test.mjs` — the `/mcp` endpoint (JSON-RPC, errors, batches, CORS) and signing requests created by an agent, signed through the app's client with an email-verified certificate, then checked and downloaded by the agent
 - `tests/e2e/digital-sign.test.mjs` — unlock a certificate, draw the signature box, download and verify the signed PDF (byte range, CMS signature, field position, rendered appearance), then countersign it and check both signatures; remember a certificate (stored key not exportable), sign with it after a reload, and forget it
+- `tests/unit/signing-api.test.mjs` — signing requests (versions, write/owner tokens, concurrent uploads, expiry, rate limiting) and email-verified certificates (codes, attempt limits, proof of key possession, issued certificate checked with Node's crypto)
+- `tests/e2e/sign-request.test.mjs` — a sender creates a signing link (only ciphertext is uploaded, the key never is), a signer without a certificate creates a signing ID by email and signs, and the sender downloads the signed copy through the same link and deletes the request
 - `tests/e2e/unicode-text.test.mjs` — added text outside WinAnsi (extended Latin, Greek, Cyrillic, CJK, Hangul, emoji) exports with embedded Noto subsets, WinAnsi-only text embeds nothing extra, typed line breaks survive
 - `tests/e2e/text-edit.test.mjs` — edit embedded-font and standard-font text: text layer deletion, exported font programs, coloured backgrounds
 - `tests/e2e/text-select.test.mjs` — selecting text activates the text tool, its options reflect and restyle the selected text, and the changes survive export
@@ -230,7 +266,8 @@ Cloudflare Workers runtime (`npm run cf:dev`).
 - Very large documents (hundreds of pages) work but page rendering is limited to a window around the viewport; extremely large images increase memory usage.
 - Filling forms flattens by default (recommended); unflattened export relies on pdf-lib copying widgets, which is best-effort.
 - Password-protected PDFs are supported for viewing/editing when you know the password.
-- **Digital signatures are basic PAdES (B-B level).** There is no trusted timestamp (the signing time is the device clock), no revocation data embedded for long-term validation, and no remote or smart-card signing — the certificate must be a `.p12`/`.pfx` file with its private key. Whether a reader shows the signature as *trusted* depends on the certificate: one issued by a CA on the Adobe Approved Trust List or the EU trusted lists validates out of the box, a self-signed one only after the recipient trusts it. Signing a document you edited signs the edited copy, which invalidates signatures already in the original; sign before editing to keep them. Certifying signatures always allow form filling and signing (DocMDP level 2), and new visible signature boxes added after a certification may be reported as changes by strict validators, so later signers should use the document's empty signature fields or sign invisibly.
+- **RealPDF signing IDs verify an email address, not a person.** Readers like Adobe Acrobat show those signatures as intact but the signer as unknown until the recipient trusts RealPDF's CA certificate (download it from `/api/identity/ca.pem`); RealPDF is not on the Adobe Approved Trust List. A signing ID lives in one browser: clearing site data or switching devices means creating a new one (the key cannot be exported, by design).
+- **Digital signatures are basic PAdES (B-B level).** There is no trusted timestamp (the signing time is the device clock), no revocation data embedded for long-term validation, and no remote or smart-card signing — the certificate must be a RealPDF signing ID or a `.p12`/`.pfx` file with its private key. Whether a reader shows the signature as *trusted* depends on the certificate: one issued by a CA on the Adobe Approved Trust List or the EU trusted lists validates out of the box, a self-signed one only after the recipient trusts it. Signing a document you edited signs the edited copy, which invalidates signatures already in the original; sign before editing to keep them. Certifying signatures always allow form filling and signing (DocMDP level 2), and new visible signature boxes added after a certification may be reported as changes by strict validators, so later signers should use the document's empty signature fields or sign invisibly.
 - The library lives in your browser profile: clearing site data removes it, and it is not synced between devices.
 - The Ko-fi support widget loads from `storage.ko-fi.com`; remove that script block in `index.html` if you want the app to make zero third-party requests.
 
@@ -252,6 +289,8 @@ src/
     currentDocument.ts  "bake" the edited document for tools/export
     signing/      PKCS#12 identities, CMS (PAdES) signatures, the incremental-update writer and verification
     signController.ts  signing flow: which bytes to sign, placement, download
+    signRequests.ts  signing links: encryption, the link format, the /api/sign-requests client
+    signRequestController.ts  opening a link in the editor and sending signed copies back
     serialize.ts  annotation JSON (assets kept out of undo snapshots)
     zip.ts        minimal ZIP writer (STORE, optional DEFLATE)
     zipRead.ts    ZIP reader for Office packages

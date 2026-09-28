@@ -1,9 +1,9 @@
 import { tracing } from 'cloudflare:workers'
-import { handleApi, type ApiDeps } from './api'
-import { loadCertificateAuthority, type CertificateAuthority } from './certificateAuthority'
-import { handleMcp, MCP_PATH } from './mcp'
-import { purgeExpiredSignRequests } from './signRequests'
-import { purgeExpiredChallenges } from './signingIdentity'
+import { handleApi, type ApiDeps } from './api.ts'
+import { loadCertificateAuthority, type CertificateAuthority } from './certificateAuthority.ts'
+import { handleMcp, MCP_PATH } from './mcp/index.ts'
+import { purgeExpiredSignRequests } from './signRequests.ts'
+import { purgeExpiredChallenges } from './signingIdentity.ts'
 
 /** Secrets set with `wrangler secret put`; optional (see wrangler.jsonc). */
 type WorkerEnv = Env & { SIGNING_CA_KEY?: string; SIGNING_CA_CERT?: string }

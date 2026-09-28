@@ -10,6 +10,7 @@ import {
   LetterText,
   Loader2,
   Presentation,
+  Send,
   ShieldCheck,
   Wrench,
   type LucideIcon,
@@ -153,6 +154,24 @@ function ExportMenu({ onClose }: { onClose: () => void }) {
         <span className="export-menu-text">
           <span className="export-menu-label">{t('export.signCert')}</span>
           <span className="export-menu-hint">{t('export.signCertHint')}</span>
+        </span>
+      </button>
+      <button
+        type="button"
+        role="menuitem"
+        className="export-menu-item export-menu-item-request"
+        disabled={exporting || Boolean(busy)}
+        onClick={() => {
+          onClose()
+          useStore.getState().setRequestSignOpen(true)
+        }}
+      >
+        <span className="export-menu-icon">
+          <Send size={16} />
+        </span>
+        <span className="export-menu-text">
+          <span className="export-menu-label">{t('export.requestSign')}</span>
+          <span className="export-menu-hint">{t('export.requestSignHint')}</span>
         </span>
       </button>
       <MenuSection title={t('export.images')}>{IMAGE_ENTRIES.map((entry) => item(entry))}</MenuSection>

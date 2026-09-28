@@ -1,7 +1,7 @@
-import type { McpContext, McpDeps } from './context'
-import { dispatch, ErrorCode, PROTOCOL_VERSIONS, RpcError, type ServerInfo, type Tool } from './protocol'
-import { requestTools } from './tools/requests'
-import { verifyPdfTool } from './tools/verify'
+import type { McpContext, McpDeps } from './context.ts'
+import { dispatch, ErrorCode, PROTOCOL_VERSIONS, RpcError, type ServerInfo, type Tool } from './protocol.ts'
+import { requestTools } from './tools/requests.ts'
+import { verifyPdfTool } from './tools/verify.ts'
 
 export const MCP_PATH = '/mcp'
 

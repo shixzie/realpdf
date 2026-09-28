@@ -1,5 +1,5 @@
 import { PDFArray, PDFDocument, PDFName, PDFSignature, PDFString } from 'pdf-lib'
-import { ToolError } from './protocol'
+import { ToolError } from './protocol.ts'
 
 /** An empty signature field to add before a document is sent for signing. */
 export interface SignatureFieldSpec {
