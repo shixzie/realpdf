@@ -51,3 +51,9 @@ npm run deploy     # build + wrangler deploy -> PRODUCTION (realpdf.app); only w
 - `window.__realpdf` (store/canvas handles) is exposed only in dev builds (`src/main.tsx`) for `scripts/visual-check.mjs`; e2e tests use the UI only, so they also pass against a production build.
 - `dist/` and `sample.pdf` are gitignored; `dist/pdfjs-assets/` exists only after a build.
 - `docs/localization.md` and `docs/selection-options.md` cover behavior that isn't obvious from the code; `docs/localization.md` references a removed `scripts/e2e-ui.mjs` — ignore that line.
+
+## Agent skills (pstack)
+
+- `.claude/skills/` and `.claude/agents/` vendor poteto's pstack (cursor/plugins v0.15.5), adapted for Claude Code. Start multi-file work with the `poteto-mode` skill; its playbooks cover features, bug fixes, refactors, PRs and babysitting.
+- `.claude/pstack-models.md` is the per-role model sheet the skills read when they spawn subagents. Change it with `/setup-pstack` or by hand; a missing line falls back to the skill's default.
+- The trunk is `master`: playbooks re-read skills with `git show origin/master:.claude/skills/...`.
