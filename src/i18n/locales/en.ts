@@ -33,10 +33,6 @@ export const en = {
   topbar: {
     openPdf: 'Open file',
     homeTitle: 'Go to start screen',
-    tools: 'Tools',
-    toolsTitle: 'Merge, split and convert PDFs and Office files',
-    library: 'Library',
-    libraryTitle: 'Documents saved in this browser',
     fillForms: 'Fill forms',
     fillingForms: 'Filling forms',
     fillFormsTitle: 'Fill interactive form fields',

@@ -10,6 +10,7 @@ import {
   exportedPixelStats,
   gotoHome,
   launchApp,
+  openLibrary,
   openPdf,
   pageBox,
   pageFonts,
@@ -186,7 +187,7 @@ describe('text editing', () => {
     )
 
     // --------------------------------------------------- local library round trip
-    await page.click('button:has-text("Library")')
+    await openLibrary(page)
     await page.waitForSelector('.library-item', { timeout: 15000 })
     const [libraryDownload] = await Promise.all([
       page.waitForEvent('download', { timeout: 30000 }),

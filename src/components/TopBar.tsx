@@ -2,7 +2,6 @@ import { useRef } from 'react'
 import {
   ChevronLeft,
   ChevronRight,
-  BookOpen,
   ClipboardList,
   FileText,
   FolderOpen,
@@ -13,7 +12,6 @@ import {
   Redo2,
   Sun,
   Undo2,
-  Wrench,
   ZoomIn,
   ZoomOut,
 } from 'lucide-react'
@@ -94,22 +92,6 @@ export function TopBar() {
           }}
         />
         {fileName && <span className="file-name" title={fileName}>{fileName}</span>}
-        <button
-          type="button"
-          className="button"
-          title={t('topbar.toolsTitle')}
-          onClick={() => useStore.getState().setToolsOpen(true)}
-        >
-          <Wrench size={15} /> <span className="topbar-label">{t('topbar.tools')}</span>
-        </button>
-        <button
-          type="button"
-          className="button"
-          title={t('topbar.libraryTitle')}
-          onClick={() => void useStore.getState().openLibrary()}
-        >
-          <BookOpen size={15} /> <span className="topbar-label">{t('topbar.library')}</span>
-        </button>
         {(hasForms || formMode) && (
           <button
             type="button"

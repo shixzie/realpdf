@@ -28,10 +28,6 @@ export const fr: Dictionary = {
   topbar: {
     openPdf: 'Ouvrir un fichier',
     homeTitle: "Aller à l'écran d'accueil",
-    tools: 'Outils',
-    toolsTitle: 'Fusionner, diviser et convertir des PDF et fichiers Office',
-    library: 'Bibliothèque',
-    libraryTitle: 'Documents enregistrés dans ce navigateur',
     fillForms: 'Remplir des formulaires',
     fillingForms: 'Remplissage des formulaires',
     fillFormsTitle: 'Remplir les champs de formulaire interactifs',

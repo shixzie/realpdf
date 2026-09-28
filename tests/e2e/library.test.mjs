@@ -5,7 +5,7 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import { afterAll, beforeAll, describe, it } from 'vitest'
-import { check, clickSavePdf, gotoHome, launchApp, openPdf } from '../helpers/app.mjs'
+import { check, clickSavePdf, gotoHome, launchApp, openLibrary, openPdf } from '../helpers/app.mjs'
 import { OUT_DIR, SAMPLE_PDF } from '../helpers/fixtures.mjs'
 
 describe('local library', () => {
@@ -44,7 +44,7 @@ describe('local library', () => {
     await page.waitForTimeout(800)
 
     // --------------------------------------------------------- in library
-    await page.click('button:has-text("Library")')
+    await openLibrary(page)
     await page.waitForSelector('.library-item')
     check((await page.locator('.library-item').count()) === 1, 'saved document appears in the library')
     const meta = await page.locator('.library-meta').first().innerText()
@@ -78,7 +78,7 @@ describe('local library', () => {
     check(restoredBadge === '1', `restored document keeps its annotations (badge: ${restoredBadge})`)
 
     // ------------------------------------- rebuild the PDF from the library
-    await page.click('button:has-text("Library")')
+    await openLibrary(page)
     await page.waitForSelector('.library-item')
     const [libraryDownload] = await Promise.all([
       page.waitForEvent('download', { timeout: 30000 }),
