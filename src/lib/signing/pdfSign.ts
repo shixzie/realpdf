@@ -61,7 +61,7 @@ export interface SignOptions {
 }
 
 export class SignError extends Error {
-  readonly code: 'encrypted' | 'alreadyCertified' | 'noField' | 'tooLarge'
+  readonly code: 'encrypted' | 'alreadyCertified' | 'noField' | 'tooLarge' | 'certified' | 'certifiedLocked'
   constructor(code: SignError['code']) {
     super(code)
     this.code = code
@@ -216,6 +216,34 @@ export interface SignatureSummary {
   /** True when a certification signature (DocMDP) is present. */
   certified: boolean
   encrypted: boolean
+}
+
+/**
+ * The DocMDP permission of the document's certification signature (1 no
+ * changes, 2 form filling and signing, 3 also annotations), or null when the
+ * document is not certified.
+ */
+function certificationPermission(doc: PDFDocument): 1 | 2 | 3 | null {
+  const signature = doc.catalog.lookupMaybe(PDFName.of('Perms'), PDFDict)?.lookupMaybe(PDFName.of('DocMDP'), PDFDict)
+  if (!signature) return null
+  const references = signature.lookupMaybe(PDFName.of('Reference'), PDFArray)
+  for (let i = 0; i < (references?.size() ?? 0); i += 1) {
+    const params = references?.lookupMaybe(i, PDFDict)?.lookupMaybe(PDFName.of('TransformParams'), PDFDict)
+    const p = params?.lookup(PDFName.of('P'))
+    if (p instanceof PDFNumber && (p.asNumber() === 1 || p.asNumber() === 3)) return p.asNumber() as 1 | 3
+  }
+  return 2
+}
+
+/**
+ * A certification allows only some later changes. With P=1 nothing may be
+ * added; with P=2 signers may only fill existing signature fields, since a
+ * new field breaks the certification. P=3 also allows annotations.
+ */
+function checkCertification(doc: PDFDocument, addsField: boolean) {
+  const permission = certificationPermission(doc)
+  if (permission === 1) throw new SignError('certifiedLocked')
+  if (permission === 2 && addsField) throw new SignError('certified')
 }
 
 /** Existing signatures and empty signature fields (all empty for unreadable files). */
@@ -587,6 +615,7 @@ export async function addSignatureFields(input: Uint8Array, fields: NewSignature
   const update = await openForUpdate(input)
   const { doc } = update
   const { context } = doc
+  checkCertification(doc, true)
   const taken = new Set(collectFields(doc).map((field) => field.name))
   const created: PDFRef[] = []
   for (const field of fields) {
@@ -616,6 +645,7 @@ export async function signPdf(input: Uint8Array, options: SignOptions): Promise<
 
   const fields = collectFields(doc)
   if (options.certify && fields.some(isSigned)) throw new SignError('alreadyCertified')
+  checkCertification(doc, options.placement.kind !== 'field')
   let target: FieldEntry | null = null
   if (options.placement.kind === 'field') {
     const name = options.placement.name

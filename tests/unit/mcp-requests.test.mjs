@@ -158,6 +158,7 @@ describe('signing requests over MCP', () => {
 
     const done = await tool('get_signing_request', { link })
     expect(done.structuredContent.complete).toBe(true)
+    expect(done.structuredContent.document_replaced).toBe(false)
     expect(done.structuredContent.pending_fields).toEqual([])
     expect(done.structuredContent.signatures.map((signature) => [signature.signer, signature.email_verified_by_realpdf])).toEqual([
       ['Grace Hopper', true],
@@ -183,6 +184,28 @@ describe('signing requests over MCP', () => {
     const gone = await tool('get_signing_request', { link })
     expect(gone.isError).toBe(true)
     expect(gone.content[0].text).toContain('No signing request exists')
+  })
+
+  it('warns when a signer uploads a different document instead of signing the one sent', async () => {
+    const created = await tool('create_signing_request', {
+      pdf_base64: (await contract()).toString('base64'),
+      signature_fields: [{ name: 'Client', page: 1, x: 60, y: 60, width: 200, height: 60 }],
+    })
+    const { link, request_id: id } = created.structuredContent
+    const { key } = parseRequestLink(link)
+    const opened = await browser.openRequest(id, key)
+    // Anyone with the link can upload a version: here a different file, signed by the uploader.
+    const p12 = makeRsaPkcs12({ name: 'Mallory' })
+    const mallory = await loadSigningIdentity(p12.bytes, p12.password)
+    const other = await signPdf(await contract(2), { identity: mallory, placement: { kind: 'box', pageIndex: 0, rect: [60, 60, 260, 120] } })
+    await browser.addSignedVersion(opened, other, 'Mallory')
+
+    const status = await tool('get_signing_request', { link })
+    expect(status.structuredContent.pending_fields).toEqual([])
+    expect(status.structuredContent.verification.valid).toBe(true)
+    expect(status.structuredContent.document_replaced).toBe(true)
+    expect(status.structuredContent.complete).toBe(false)
+    expect(status.content[0].text).toContain('WARNING: the latest copy is not the document that was sent')
   })
 
   it('reads requests the app created', async () => {

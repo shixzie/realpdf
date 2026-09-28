@@ -175,8 +175,11 @@ empty `previews` block so Workers Builds can create branch previews with
 Remove the `routes` block if you prefer to attach the domains from the
 Cloudflare dashboard. `public/_headers` adds long-lived caching for hashed
 assets and a week for `pdfjs-assets/`, plus `nosniff` / frame / referrer
-hardening — because `run_worker_first` bypasses `_headers`, the Worker
-re-applies those rules to every asset response.
+hardening, HSTS and a Content-Security-Policy that allows scripts only from
+the app's origin and the Ko-fi widget (so `index.html` has no inline scripts;
+the pre-paint theme and language code is `public/boot.js`) — because
+`run_worker_first` bypasses `_headers`, the Worker re-applies those rules to
+every asset response.
 
 ### Signing service setup
 

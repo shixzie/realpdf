@@ -252,6 +252,21 @@ describe('certificate signing', () => {
     const error = await signPdf(certified, { identity, placement: { kind: 'invisible' }, certify: true }).catch((caught) => caught)
     expect(error).toBeInstanceOf(SignError)
     expect(error.code).toBe('alreadyCertified')
+
+    // A new signature field would break the certification, so only existing fields can be signed.
+    for (const attempt of [
+      signPdf(certified, { identity, placement: box }),
+      signPdf(certified, { identity, placement: { kind: 'invisible' } }),
+      addSignatureFields(certified, [{ pageIndex: 0, rect: [60, 60, 240, 120] }]),
+    ]) {
+      const refused = await attempt.catch((caught) => caught)
+      expect(refused).toBeInstanceOf(SignError)
+      expect(refused.code).toBe('certified')
+    }
+    const prepared = await addSignatureFields(await samplePdf(), [{ pageIndex: 0, rect: [60, 60, 240, 120] }])
+    const certifiedWithField = await signPdf(prepared, { identity, placement: { kind: 'invisible' }, certify: true })
+    const countersigned = await signPdf(certifiedWithField, { identity, placement: { kind: 'field', name: 'Signature1' } })
+    expect(verifyPdfSignatures(countersigned)).toMatchObject([{ valid: true }, { valid: true, coversFile: true }])
   })
 
   it.skipIf(!hasOpenssl())('signs with OpenSSL-made RSA and ECDSA identities', async () => {

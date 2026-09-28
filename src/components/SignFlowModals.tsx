@@ -59,6 +59,7 @@ const ENROLL_ERRORS = new Set([
   'tooManyAttempts',
   'invalidChallenge',
   'rateLimited',
+  'tooManyCodes',
   'unavailable',
   'network',
 ])
