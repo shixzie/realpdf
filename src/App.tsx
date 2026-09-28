@@ -6,6 +6,7 @@ import { ToolOptions } from './components/ToolOptions'
 import { Viewer } from './components/Viewer'
 import { PageSidebar } from './components/PageSidebar'
 import { SignatureModal } from './components/SignatureModal'
+import { DigitalSignatureModal } from './components/DigitalSignatureModal'
 import { FileToolsModal } from './components/FileToolsModal'
 import { LibraryModal } from './components/LibraryModal'
 import { FormsBar } from './components/FormsBar'
@@ -153,6 +154,7 @@ export default function App() {
         <EmptyState />
       )}
       <SignatureModal />
+      <DigitalSignatureModal />
       <FileToolsModal />
       <LibraryModal />
       <ExportOverlay />

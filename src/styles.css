@@ -1693,3 +1693,182 @@ select.form-widget {
     flex-wrap: wrap;
   }
 }
+
+/* ---------- Certificate signing ---------- */
+
+.link-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: none;
+  border: 0;
+  padding: 0;
+  color: var(--accent-ink);
+  font-size: 12.5px;
+  cursor: pointer;
+}
+
+.link-button:hover {
+  text-decoration: underline;
+}
+
+.signature-cert-link {
+  margin: 0 0 12px;
+}
+
+.digital-sign {
+  width: min(560px, 100%);
+}
+
+.digital-sign-intro {
+  margin: 0 0 14px;
+  color: var(--text-muted);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.digital-sign-label,
+.digital-sign-grid label > span {
+  display: block;
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 600;
+  margin-bottom: 6px;
+}
+
+.digital-sign-row {
+  margin-top: 8px;
+}
+
+.digital-sign-file {
+  color: var(--text);
+  font-size: 13px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cert-summary {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 12px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  background: var(--accent-soft);
+  color: var(--accent-ink);
+}
+
+.cert-summary > div {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+  color: var(--text-muted);
+  font-size: 12.5px;
+}
+
+.cert-name {
+  color: var(--text);
+  font-size: 14px;
+}
+
+.cert-warning,
+.cert-error {
+  color: var(--warning);
+  font-size: 12.5px;
+  line-height: 1.45;
+}
+
+.cert-error {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--danger);
+  margin: 10px 0 0;
+}
+
+.cert-note {
+  color: var(--text-dim);
+  line-height: 1.45;
+}
+
+.digital-sign-options {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 14px;
+}
+
+.digital-sign-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.digital-sign-grid label:last-child {
+  grid-column: 1 / -1;
+}
+
+.digital-sign-grid .text-input {
+  width: 100%;
+  min-width: 0;
+}
+
+.digital-sign-options .check {
+  line-height: 1.4;
+}
+
+.digital-sign-options .cert-warning {
+  margin: 0;
+}
+
+.sign-banner {
+  position: fixed;
+  top: 70px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  max-width: calc(100% - 32px);
+  padding: 8px 8px 8px 14px;
+  background: var(--bg-panel);
+  border: 1px solid var(--accent);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  color: var(--text);
+  font-size: 13px;
+}
+
+.sign-banner svg {
+  color: var(--accent);
+  flex: none;
+}
+
+.sign-place-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 6;
+  cursor: crosshair;
+  touch-action: none;
+  background: rgba(14, 165, 233, 0.04);
+  outline: 2px dashed rgba(14, 165, 233, 0.55);
+  outline-offset: -2px;
+}
+
+.sign-place-rect {
+  position: absolute;
+  border: 2px solid #0ea5e9;
+  background: rgba(14, 165, 233, 0.12);
+  border-radius: 2px;
+  pointer-events: none;
+}
+
+@media (max-width: 560px) {
+  .digital-sign-grid {
+    grid-template-columns: 1fr;
+  }
+}

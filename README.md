@@ -19,6 +19,14 @@ A real PDF editor that runs **entirely in your browser**. No uploads, no servers
 - Select, move, resize, rotate and delete annotations, multi-select with Shift
 - Undo/redo, zoom (25%–400%), fit-to-width, page navigation
 
+**Digital signatures (certificate-based)**
+
+- **Sign with your own certificate** (Export → *Sign with certificate*): open a PKCS#12 file (`.p12` / `.pfx`, RSA or ECDSA P-256/384/521) with its password and the PDF is signed **in the browser** — the certificate, its private key and the password never leave the device (the key is imported into WebCrypto as non-extractable and dropped when the dialog closes)
+- Standard **PAdES** signatures (`ETSI.CAdES.detached`, SHA-256, with the signer's certificate chain and the signing-certificate-v2 attribute), which Adobe Acrobat/Reader and other validators check as digitally signed documents
+- **Visible signature**: drag a box on any page (or click for a default size) and it shows "Digitally signed by", the certificate's name, the date and the optional reason and location. You can also fill in an **empty signature field** the PDF already has, or sign invisibly
+- **Countersigning**: an unchanged document is signed as an *incremental update* (the original bytes are kept and the signature is appended), so signatures already in the file stay valid
+- **Certify** (DocMDP): the first signer can lock the document so that any change other than filling forms and signing invalidates it
+
 **Local library**
 
 ![Your library](docs/library.png)
@@ -90,6 +98,7 @@ npm run preview
 | --- | --- |
 | PDF rendering | [pdf.js](https://mozilla.github.io/pdf.js/) — Web Worker + **WebAssembly** decoders for JPEG 2000/ICC/JBIG2 (`wasm/`), plus CMaps and standard font data, all served from your own origin |
 | Editing surface | [fabric.js](https://fabricjs.com/) canvas overlays (one per visible page), coordinates stored in PDF points |
+| Digital signatures | [node-forge](https://github.com/digitalbazaar/forge) reads the PKCS#12 file and encodes the CMS/ASN.1 structures; hashing and the private-key operation run in WebCrypto. The signature, its field and appearance are written as a hand-rolled incremental update (xref table or xref stream, matching the file) over pdf-lib objects (`src/lib/signing/`), loaded only when the signing dialog opens |
 | Saving | [pdf-lib](https://pdf-lib.js.org/) — annotations are re-drawn as native PDF operators, images embedded, new text mapped to Standard-14 with Noto fallback subsets for other scripts and emoji, edited text embedded with its original font (subset) after rewriting the page's content streams to delete the original glyphs, highlights exported with a real Multiply blend mode. The same content-stream rewrite is applied to a scratch page and re-rendered with pdf.js while editing, so the on-screen preview matches the saved file |
 | State | [zustand](https://zustand.docs.pmnd.rs/) store with snapshot-based undo/redo |
 | ZIP export | dependency-free STORE-method zip writer (`src/lib/zip.ts`), with optional DEFLATE via pako for Office packages |
@@ -196,6 +205,8 @@ APP_URL=http://localhost:4173/ npm test
 - `tests/e2e/tools.test.mjs` — merge, split range, PDF→PNG, PDF→text, images→PDF, text→PDF, form filling → exported value verification
 - `tests/e2e/ui.test.mjs` — theme toggle, homepage tool cards, signature image upload, Ko-fi button, language switch (persistence, translated strings, `<html lang>`/title)
 - `tests/e2e/library.test.mjs` — save to the local library, rename, persistence across a reload, restore annotations, rebuild the PDF, delete
+- `tests/unit/sign.test.mjs` — PKCS#12 loading (3DES, AES, OpenSSL-made RSA/ECDSA files), wrong passwords, PAdES signatures over xref tables and xref streams, countersigning, filling an empty signature field, certification — every signature checked with Node's crypto, independently of the app's code
+- `tests/e2e/digital-sign.test.mjs` — unlock a certificate, draw the signature box, download and verify the signed PDF (byte range, CMS signature, field position, rendered appearance), then countersign it and check both signatures
 - `tests/e2e/unicode-text.test.mjs` — added text outside WinAnsi (extended Latin, Greek, Cyrillic, CJK, Hangul, emoji) exports with embedded Noto subsets, WinAnsi-only text embeds nothing extra, typed line breaks survive
 - `tests/e2e/text-edit.test.mjs` — edit embedded-font and standard-font text: text layer deletion, exported font programs, coloured backgrounds
 - `tests/e2e/text-select.test.mjs` — selecting text activates the text tool, its options reflect and restyle the selected text, and the changes survive export
@@ -215,6 +226,7 @@ Cloudflare Workers runtime (`npm run cf:dev`).
 - Very large documents (hundreds of pages) work but page rendering is limited to a window around the viewport; extremely large images increase memory usage.
 - Filling forms flattens by default (recommended); unflattened export relies on pdf-lib copying widgets, which is best-effort.
 - Password-protected PDFs are supported for viewing/editing when you know the password.
+- **Digital signatures are basic PAdES (B-B level).** There is no trusted timestamp (the signing time is the device clock), no revocation data embedded for long-term validation, and no remote or smart-card signing — the certificate must be a `.p12`/`.pfx` file with its private key. Whether a reader shows the signature as *trusted* depends on the certificate: one issued by a CA on the Adobe Approved Trust List or the EU trusted lists validates out of the box, a self-signed one only after the recipient trusts it. Signing a document you edited signs the edited copy, which invalidates signatures already in the original; sign before editing to keep them. Certifying signatures always allow form filling and signing (DocMDP level 2), and new visible signature boxes added after a certification may be reported as changes by strict validators, so later signers should use the document's empty signature fields or sign invisibly.
 - The library lives in your browser profile: clearing site data removes it, and it is not synced between devices.
 - The Ko-fi support widget loads from `storage.ko-fi.com`; remove that script block in `index.html` if you want the app to make zero third-party requests.
 
@@ -234,6 +246,8 @@ src/
     forms.ts      AcroForm discovery + value writing
     pdfOps.ts     merge, extract, image/text conversion
     currentDocument.ts  "bake" the edited document for tools/export
+    signing/      PKCS#12 identities, CMS (PAdES) signatures and the incremental-update writer
+    signController.ts  signing flow: which bytes to sign, placement, download
     serialize.ts  annotation JSON (assets kept out of undo snapshots)
     zip.ts        minimal ZIP writer (STORE, optional DEFLATE)
     zipRead.ts    ZIP reader for Office packages
