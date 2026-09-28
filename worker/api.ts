@@ -52,8 +52,27 @@ function error(code: string, status: number): Response {
 async function readBody(request: Request): Promise<Uint8Array | Response> {
   const declared = Number(request.headers.get('content-length') ?? 0)
   if (declared > MAX_VERSION_BYTES) return error('tooLarge', 413)
-  const body = new Uint8Array(await request.arrayBuffer())
-  if (body.length > MAX_VERSION_BYTES) return error('tooLarge', 413)
+  // Stop reading once the limit is passed, whatever Content-Length said (or when it is missing).
+  const reader = request.body?.getReader()
+  if (!reader) return new Uint8Array(0)
+  const chunks: Uint8Array[] = []
+  let total = 0
+  while (true) {
+    const { done, value } = await reader.read()
+    if (done) break
+    total += value.length
+    if (total > MAX_VERSION_BYTES) {
+      await reader.cancel()
+      return error('tooLarge', 413)
+    }
+    chunks.push(value)
+  }
+  const body = new Uint8Array(total)
+  let offset = 0
+  for (const chunk of chunks) {
+    body.set(chunk, offset)
+    offset += chunk.length
+  }
   return body
 }
 

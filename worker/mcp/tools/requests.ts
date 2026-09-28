@@ -90,12 +90,22 @@ interface RequestSummary {
     intact: boolean
   }>
   pending_fields: string[]
-  /** Every signature field is signed and every signature verifies. */
+  /**
+   * The latest copy does not start with the document as sent, so someone
+   * replaced or rewrote it instead of only adding signatures to it.
+   */
+  document_replaced: boolean
+  /** Every signature field is signed, every signature verifies and the document is the one that was sent. */
   complete: boolean
   verification: VerificationReport
 }
 
-function requestSummary(status: SignRequestStatus, header: RequestHeader, report: VerificationReport): RequestSummary {
+function requestSummary(
+  status: SignRequestStatus,
+  header: RequestHeader,
+  report: VerificationReport,
+  replaced: boolean,
+): RequestSummary {
   return {
     request_id: status.id,
     created_at: new Date(status.createdAt).toISOString(),
@@ -113,7 +123,8 @@ function requestSummary(status: SignRequestStatus, header: RequestHeader, report
       intact: signature.intact,
     })),
     pending_fields: report.emptyFields.map((field) => field.field),
-    complete: report.valid && report.emptyFields.length === 0,
+    document_replaced: replaced,
+    complete: report.valid && report.emptyFields.length === 0 && !replaced,
     verification: report,
   }
 }
@@ -126,6 +137,9 @@ function describeRequest(summary: RequestSummary): string {
   for (const signature of summary.signatures) {
     const email = signature.email ? ` <${signature.email}>${signature.email_verified_by_realpdf ? ' (verified by RealPDF)' : ''}` : ''
     lines.push(`- ${signature.signer ?? 'Unknown signer'}${email} signed "${signature.field}"${signature.signed_at ? ` on ${signature.signed_at}` : ''}${signature.intact ? '' : ' (signature does NOT verify)'}.`)
+  }
+  if (summary.document_replaced) {
+    lines.push('WARNING: the latest copy is not the document that was sent with signatures added; it was replaced or rewritten.')
   }
   if (summary.pending_fields.length) lines.push(`Still waiting on: ${summary.pending_fields.map((name) => `"${name}"`).join(', ')}.`)
   if (summary.complete) lines.push('All signature fields are signed and every signature verifies.')
@@ -212,7 +226,10 @@ export const getSigningRequestTool: Tool<McpContext> = {
     const status = await getSignRequest(context.deps.store, id, now(context)).catch(storeError)
     const { bytes, header } = await readVersion(context, id, key, 'latest')
     const report = await verifyPdf(bytes, { trustAnchors: await trustAnchors(context) })
-    const summary = requestSummary(status, header, report)
+    // Signing only appends to the file, so every version must start with the one that was sent.
+    const original = status.versions.length > 1 ? (await readVersion(context, id, key, 0)).bytes : bytes
+    const replaced = original.length > bytes.length || original.some((byte, index) => byte !== bytes[index])
+    const summary = requestSummary(status, header, report, replaced)
     return { content: [{ type: 'text', text: describeRequest(summary) }], structuredContent: summary as unknown as Record<string, unknown> }
   },
 }

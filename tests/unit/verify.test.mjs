@@ -9,9 +9,9 @@ import path from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { PDFDocument, PDFName, PDFString, StandardFonts } from 'pdf-lib'
 import { loadSigningIdentity } from '../../src/lib/signing/identity.ts'
-import { signPdf } from '../../src/lib/signing/pdfSign.ts'
+import { addSignatureFields, signPdf } from '../../src/lib/signing/pdfSign.ts'
 import { parsePdfDate, verifyPdf, VerifyError } from '../../src/lib/signing/verify.ts'
-import { makeRsaPkcs12 } from '../helpers/signing.mjs'
+import { makeForgedChainPkcs12, makeRsaPkcs12 } from '../helpers/signing.mjs'
 import { OUT_DIR, ensureOutDir } from '../helpers/fixtures.mjs'
 
 async function samplePdf({ objectStreams = false } = {}) {
@@ -23,6 +23,38 @@ async function samplePdf({ objectStreams = false } = {}) {
 }
 
 const box = { kind: 'box', pageIndex: 0, rect: [360, 60, 540, 120] }
+
+/** Appends an incremental update with the given objects (number, dictionary text or full body). */
+function appendObjects(bytes, objects) {
+  const text = Buffer.from(bytes).toString('latin1')
+  const prev = Number(/startxref\s+(\d+)\s*%%EOF\s*$/.exec(text)[1])
+  const root = /\/Root\s+(\d+\s+\d+\s+R)/.exec(text.slice(text.lastIndexOf('trailer')))?.[1] ?? /\/Root\s+(\d+\s+\d+\s+R)/.exec(text)[1]
+  let body = '\n'
+  const offsets = []
+  for (const [number, content] of objects) {
+    offsets.push([number, bytes.length + Buffer.byteLength(body, 'latin1')])
+    body += `${number} 0 obj\n${content}\nendobj\n`
+  }
+  const xrefAt = bytes.length + Buffer.byteLength(body, 'latin1')
+  const size = Math.max(...objects.map(([number]) => number)) + 1
+  body += 'xref\n' + offsets.map(([number, offset]) => `${number} 1\n${String(offset).padStart(10, '0')} 00000 n\r\n`).join('')
+  body += `trailer\n<< /Size ${size + 100} /Root ${root} /Prev ${prev} >>\nstartxref\n${xrefAt}\n%%EOF\n`
+  return new Uint8Array([...bytes, ...Buffer.from(body, 'latin1')])
+}
+
+/** Draws extra text on page 1 through an incremental update, the way an editor would. */
+async function appendContent(bytes, text) {
+  const doc = await PDFDocument.load(bytes)
+  const page = doc.getPage(0)
+  const stream = `BT /F1 18 Tf 72 700 Td (${text}) Tj ET`
+  const number = doc.context.largestObjectNumber + 1
+  const contents = page.node.get(PDFName.of('Contents'))
+  const pageText = page.node.toString().replace(/\/Contents\s+(\[[^\]]*\]|\d+\s+\d+\s+R)/, `/Contents [${contents.toString().replace(/^\[|\]$/g, '')} ${number} 0 R]`)
+  return appendObjects(bytes, [
+    [number, `<< /Length ${stream.length} >>\nstream\n${stream}\nendstream`],
+    [page.ref.objectNumber, pageText],
+  ])
+}
 
 async function identityFor(name) {
   const p12 = makeRsaPkcs12({ name })
@@ -92,6 +124,19 @@ describe('signature verification', () => {
     expect((await verifyPdf(signed, { trustAnchors: [new Uint8Array(other.caDer)] })).signatures[0].trusted).toBe(false)
   })
 
+  it('does not let an end-entity certificate issue a trusted one', async () => {
+    const forged = makeForgedChainPkcs12()
+    const identity = await loadSigningIdentity(forged.bytes, forged.password)
+    const signed = await signPdf(await samplePdf(), { identity, placement: box })
+    const report = await verifyPdf(signed, { trustAnchors: [new Uint8Array(forged.caDer)] })
+    const [signature] = report.signatures
+    expect(signature.intact).toBe(true)
+    expect(signature.signer.email).toBe('ada@example.com')
+    expect(signature.trusted).toBe(false)
+    expect(signature.chainVerified).toBe(false)
+    expect(signature.problems).toContain('The certificate chain is incomplete or does not verify')
+  })
+
   it('detects a changed byte inside the signed range', async () => {
     const { identity } = await identityFor('Ada Lovelace')
     const signed = await signPdf(await samplePdf(), { identity, placement: box })
@@ -123,20 +168,62 @@ describe('signature verification', () => {
   it('orders countersignatures and reports certification', async () => {
     const first = await identityFor('First Signer')
     const second = await identityFor('Second Signer')
-    const once = await signPdf(await samplePdf({ objectStreams: true }), {
+    const prepared = await addSignatureFields(await samplePdf({ objectStreams: true }), [
+      { pageIndex: 0, rect: [360, 60, 540, 120], label: 'Second Signer' },
+    ])
+    const once = await signPdf(prepared, {
       identity: first.identity,
       placement: { kind: 'invisible' },
       certify: true,
     })
-    const twice = await signPdf(once, { identity: second.identity, placement: box })
+    const twice = await signPdf(once, { identity: second.identity, placement: { kind: 'field', name: 'Signature1' } })
     const report = await verifyPdf(twice)
     expect(report.valid).toBe(true)
     expect(report.signatures.map((signature) => signature.signer?.name)).toEqual(['First Signer', 'Second Signer'])
     expect(report.signatures.map((signature) => signature.coversWholeFile)).toEqual([false, true])
     expect(report.signatures.map((signature) => signature.intact)).toEqual([true, true])
     expect(report.signatures.map((signature) => signature.certifies)).toEqual([2, null])
-    expect(report.signatures[0].problems).toEqual(['Later changes were not checked against the permissions this certification allows'])
-    expect(report.signatures[1].problems).toEqual([])
+    expect(report.signatures.map((signature) => signature.unauthorizedChanges)).toEqual([[], []])
+    expect(report.signatures.map((signature) => signature.problems)).toEqual([[], []])
+  })
+
+  it('accepts a countersignature in a new box after an approval signature', async () => {
+    const first = await identityFor('First Signer')
+    const second = await identityFor('Second Signer')
+    const once = await signPdf(await samplePdf(), { identity: first.identity, placement: box })
+    const twice = await signPdf(once, { identity: second.identity, placement: { ...box, rect: [60, 60, 240, 120] } })
+    const report = await verifyPdf(twice)
+    expect(report.valid).toBe(true)
+    expect(report.signatures[0].unauthorizedChanges).toEqual([])
+  })
+
+  it('flags new page content appended after a signature, even when someone signs on top', async () => {
+    const first = await identityFor('First Signer')
+    const second = await identityFor('Second Signer')
+    const once = await signPdf(await samplePdf(), { identity: first.identity, placement: box })
+    const edited = await appendContent(once, 'Amount due: 1,000,000')
+    const twice = await signPdf(edited, { identity: second.identity, placement: { ...box, rect: [60, 60, 240, 120] } })
+    const report = await verifyPdf(twice)
+    expect(report.signatures.map((signature) => signature.intact)).toEqual([true, true])
+    expect(report.signatures[1].coversWholeFile).toBe(true)
+    expect(report.valid).toBe(false)
+    expect(report.signatures[0].unauthorizedChanges).toContain("a page's /Contents changed")
+    expect(report.signatures[0].problems.join(' ')).toMatch(/changed after this signature/)
+  })
+
+  it('flags an update that defines an object twice', async () => {
+    const { identity } = await identityFor('First Signer')
+    const once = await signPdf(await samplePdf(), { identity, placement: box })
+    const doc = await PDFDocument.load(once)
+    const page = doc.getPage(0)
+    const pageText = page.node.toString()
+    const twice = appendObjects(once, [
+      [page.ref.objectNumber, pageText.replace('/Contents', '/Rotate 90 /Contents')],
+      [page.ref.objectNumber, pageText],
+    ])
+    const report = await verifyPdf(twice)
+    expect(report.valid).toBe(false)
+    expect(report.signatures[0].unauthorizedChanges).toContain(`object ${page.ref.objectNumber} is defined twice in one update`)
   })
 
   it.skipIf(!hasOpenssl())('verifies ECDSA signatures from self-signed certificates', async () => {

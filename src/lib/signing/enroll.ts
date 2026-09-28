@@ -17,6 +17,7 @@ export type EnrollErrorCode =
   | 'tooManyAttempts'
   | 'invalidChallenge'
   | 'rateLimited'
+  | 'tooManyCodes'
   | 'unavailable'
   | 'network'
 
@@ -28,6 +29,7 @@ const KNOWN: EnrollErrorCode[] = [
   'tooManyAttempts',
   'invalidChallenge',
   'rateLimited',
+  'tooManyCodes',
   'unavailable',
 ]
 

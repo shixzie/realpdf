@@ -347,7 +347,7 @@ export async function signPlacedSpots(details: SignDetails): Promise<void> {
     console.error(error)
     useStore.getState().setExporting(false)
     const code = (error as { code?: string })?.code
-    const known = code && ['encrypted', 'alreadyCertified', 'noField', 'tooLarge'].includes(code)
+    const known = code && ['encrypted', 'alreadyCertified', 'noField', 'tooLarge', 'certified', 'certifiedLocked'].includes(code)
     const message = known ? t(`digitalSign.errors.${code}`) : ((error as Error)?.message ?? t('toasts.unknownError'))
     useStore.getState().toastMessage('error', t('digitalSign.failed', { message }))
     throw error

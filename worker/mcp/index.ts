@@ -19,6 +19,9 @@ const SERVER: ServerInfo = {
 
 const TOOLS: Tool<McpContext>[] = [...requestTools, verifyPdfTool]
 
+/** Most JSON-RPC messages in one batch. */
+const MAX_BATCH = 10
+
 /** Largest request body accepted (a 25 MB PDF is ~34 MB as base64). */
 const MAX_BODY_BYTES = 40 * 1024 * 1024
 
@@ -78,6 +81,8 @@ export async function handleMcp(request: Request, deps: McpDeps): Promise<Respon
 
   const messages = Array.isArray(body) ? body : [body]
   if (!messages.length) return rpcError(400, ErrorCode.invalidRequest, 'Empty batch')
+  // Each message can download and verify a PDF, so one request may not carry many.
+  if (messages.length > MAX_BATCH) return rpcError(400, ErrorCode.invalidRequest, `At most ${MAX_BATCH} messages per batch`)
   const responses = []
   for (const message of messages) {
     try {

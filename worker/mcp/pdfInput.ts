@@ -58,6 +58,7 @@ async function download(url: string): Promise<Uint8Array> {
   } catch (error) {
     throw new ToolError(`Could not download pdf_url: ${(error as Error).message}`)
   }
+  if (response.url && !response.url.startsWith('https:')) throw new ToolError('pdf_url redirected to a URL that is not https.')
   if (!response.ok) throw new ToolError(`Downloading pdf_url returned HTTP ${response.status}.`)
   const tooLarge = () => new ToolError(`The PDF is larger than ${MAX_PDF_BYTES / 1024 / 1024} MB.`)
   if (Number(response.headers.get('content-length') ?? 0) > MAX_PDF_BYTES) throw tooLarge()

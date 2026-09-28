@@ -15,6 +15,9 @@ import {
 /** Glue between signing requests (src/lib/signRequests.ts) and the editor. */
 
 export function requestErrorMessage(error: unknown): string {
+  // Adding "sign here" fields to a certified document fails before anything is sent.
+  const signCode = (error as { code?: string })?.code
+  if (signCode === 'certified' || signCode === 'certifiedLocked') return t(`digitalSign.errors.${signCode}`)
   const code = error instanceof RequestError ? error.code : 'network'
   return t(`signRequest.errors.${code}`)
 }

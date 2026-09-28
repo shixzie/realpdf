@@ -77,6 +77,59 @@ export function makeRsaPkcs12({ name = 'Ada Lovelace', password = 'secret', algo
   }
 }
 
+/**
+ * A forged chain: a CA issues an ordinary end-entity certificate (what anyone
+ * can get from RealPDF by verifying their own email), and that certificate's
+ * key then "issues" a leaf naming someone else. Verifiers must refuse it,
+ * because an end-entity certificate is not allowed to issue certificates.
+ */
+export function makeForgedChainPkcs12({ password = 'secret' } = {}) {
+  const caKeys = forgeKeys('rsa')
+  const caPem = caKeys.privateKey.export({ type: 'pkcs1', format: 'pem' })
+  const caSubject = [{ name: 'commonName', value: 'RealPDF Test CA' }]
+  const ca = certificate({
+    subject: caSubject,
+    issuer: caSubject,
+    publicKeyPem: caKeys.publicKey.export({ type: 'spki', format: 'pem' }),
+    signingKeyPem: caPem,
+    serial: '01',
+    ca: true,
+  })
+  const attackerKeys = forgeKeys('rsa')
+  const attackerPem = attackerKeys.privateKey.export({ type: 'pkcs1', format: 'pem' })
+  const attackerSubject = [
+    { name: 'commonName', value: 'Mallory' },
+    { name: 'emailAddress', value: 'mallory@example.com' },
+  ]
+  const attacker = certificate({
+    subject: attackerSubject,
+    issuer: caSubject,
+    publicKeyPem: attackerKeys.publicKey.export({ type: 'spki', format: 'pem' }),
+    signingKeyPem: caPem,
+    serial: '02',
+  })
+  const keys = forgeKeys('rsa')
+  const keyPem = keys.privateKey.export({ type: 'pkcs1', format: 'pem' })
+  const forged = certificate({
+    subject: [
+      { name: 'commonName', value: 'Ada Lovelace' },
+      { name: 'emailAddress', value: 'ada@example.com' },
+    ],
+    issuer: attackerSubject,
+    publicKeyPem: keys.publicKey.export({ type: 'spki', format: 'pem' }),
+    signingKeyPem: attackerPem,
+    serial: '03',
+  })
+  const p12 = forge.pkcs12.toPkcs12Asn1(forge.pki.privateKeyFromPem(keyPem), [forged, attacker, ca], password, {
+    algorithm: '3des',
+  })
+  return {
+    bytes: Buffer.from(forge.asn1.toDer(p12).getBytes(), 'binary'),
+    caDer: Buffer.from(forge.asn1.toDer(forge.pki.certificateToAsn1(ca)).getBytes(), 'binary'),
+    password,
+  }
+}
+
 const OID = {
   messageDigest: '1.2.840.113549.1.9.4',
   signingCertificateV2: '1.2.840.113549.1.9.16.2.47',

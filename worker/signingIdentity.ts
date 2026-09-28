@@ -22,8 +22,16 @@ import {
 
 export const CODE_LIFETIME_MS = 10 * 60 * 1000
 export const MAX_CODE_ATTEMPTS = 5
+/**
+ * Codes emailed to one address per day. With five guesses per code this caps
+ * guessing at 50 in a million per address and day, and limits how often
+ * someone can make RealPDF email a stranger.
+ */
+export const MAX_CODES_PER_DAY = 10
+const DAY_MS = 24 * 60 * 60 * 1000
 
 const PREFIX = 'challenges/'
+const LIMIT_PREFIX = 'email-limits/'
 const EMAIL_PATTERN = /^[^\s@<>()[\]\\,;:"]{1,64}@[A-Za-z0-9.-]{1,253}\.[A-Za-z]{2,63}$/
 
 export interface EmailMessage {
@@ -43,6 +51,7 @@ export type IdentityErrorCode =
   | 'wrongCode'
   | 'codeExpired'
   | 'tooManyAttempts'
+  | 'tooManyCodes'
   | 'unavailable'
 
 const STATUS: Record<IdentityErrorCode, number> = {
@@ -54,6 +63,7 @@ const STATUS: Record<IdentityErrorCode, number> = {
   wrongCode: 400,
   codeExpired: 410,
   tooManyAttempts: 429,
+  tooManyCodes: 429,
   unavailable: 503,
 }
 
@@ -76,13 +86,18 @@ interface Challenge {
 
 export function normalizeEmail(input: unknown): string {
   const email = typeof input === 'string' ? input.trim().toLowerCase() : ''
-  if (email.length > 254 || !EMAIL_PATTERN.test(email)) throw new IdentityError('invalidEmail')
+  // Certificates store the address as an IA5String, so it must be ASCII.
+  if (email.length > 254 || !EMAIL_PATTERN.test(email) || !/^[\x21-\x7e]+$/.test(email)) throw new IdentityError('invalidEmail')
   return email
 }
 
 export function normalizeName(input: unknown): string {
   const name = typeof input === 'string' ? input.normalize('NFC').replace(/\s+/g, ' ').trim() : ''
-  if (!name || name.length > 100 || /[\u0000-\u001f\u007f]/.test(name)) throw new IdentityError('invalidName')
+  // Control and format characters such as bidi overrides could make a certificate's
+  // name display as someone else's. ZWNJ and ZWJ stay allowed: some scripts need them.
+  if (!name || name.length > 100 || /[\p{Cc}\p{Co}\p{Cn}\u2028\u2029]|(?![\u200c\u200d])\p{Cf}/u.test(name)) {
+    throw new IdentityError('invalidName')
+  }
   return name
 }
 
@@ -117,6 +132,25 @@ export function verificationEmail(to: string, code: string): EmailMessage {
   }
 }
 
+/** Counts one more code for the address, or refuses once it had MAX_CODES_PER_DAY today. */
+async function countCodeSent(store: BlobStore, email: string, now: number): Promise<void> {
+  // Only a hash of the address is stored.
+  const key = `${LIMIT_PREFIX}${await sha256Hex(`realpdf-email-limit:${email}`)}`
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    const object = await store.get(key)
+    const current = object ? (JSON.parse(await object.text()) as { windowStart: number; sent: number }) : null
+    const fresh = !current || current.windowStart + DAY_MS <= now
+    const next = fresh ? { windowStart: now, sent: 1 } : { windowStart: current.windowStart, sent: current.sent + 1 }
+    if (next.sent > MAX_CODES_PER_DAY) throw new IdentityError('tooManyCodes')
+    const written = await store.put(key, JSON.stringify(next), {
+      onlyIf: object ? { etagMatches: object.etag } : undefined,
+      customMetadata: { expiresAt: String(next.windowStart + DAY_MS) },
+    })
+    if (written) return
+  }
+  throw new IdentityError('tooManyCodes')
+}
+
 export async function startEmailVerification(
   store: BlobStore,
   args: { email: unknown; send: SendEmail | null; now?: number },
@@ -124,6 +158,7 @@ export async function startEmailVerification(
   if (!args.send) throw new IdentityError('unavailable')
   const email = normalizeEmail(args.email)
   const now = args.now ?? Date.now()
+  await countCodeSent(store, email, now)
   const challengeId = randomId(16)
   const code = sixDigitCode()
   const challenge: Challenge = {
@@ -152,19 +187,20 @@ async function redeemCode(store: BlobStore, challengeId: string, code: string, n
       throw new IdentityError('codeExpired')
     }
     if (challenge.attempts >= MAX_CODE_ATTEMPTS) throw new IdentityError('tooManyAttempts')
-    const matches = /^\d{6}$/.test(code) && timingSafeEqual(await hashCode(challengeId, code), challenge.codeHash)
-    if (matches) {
-      await store.delete(key)
-      return challenge.email
-    }
+    // Count the attempt before looking at the code, so parallel guesses cannot
+    // all be checked against the same, not yet counted, attempt.
     const counted = await store.put(
       key,
       JSON.stringify({ ...challenge, attempts: challenge.attempts + 1 }),
       { onlyIf: { etagMatches: object.etag }, customMetadata: { expiresAt: String(challenge.expiresAt) } },
     )
-    if (counted) {
-      throw new IdentityError(challenge.attempts + 1 >= MAX_CODE_ATTEMPTS ? 'tooManyAttempts' : 'wrongCode')
+    if (!counted) continue
+    const matches = /^\d{6}$/.test(code) && timingSafeEqual(await hashCode(challengeId, code), challenge.codeHash)
+    if (matches) {
+      await store.delete(key)
+      return challenge.email
     }
+    throw new IdentityError(challenge.attempts + 1 >= MAX_CODE_ATTEMPTS ? 'tooManyAttempts' : 'wrongCode')
   }
   throw new IdentityError('wrongCode')
 }
@@ -208,18 +244,20 @@ export async function issueVerifiedCertificate(
   return { certificate, chain: [ca.certificate.der], email, name }
 }
 
-/** Removes expired verification challenges. Run from the Worker's daily cron. */
+/** Removes expired verification challenges and daily counters. Run from the Worker's daily cron. */
 export async function purgeExpiredChallenges(store: BlobStore, now = Date.now()): Promise<number> {
   let removed = 0
-  let cursor: string | undefined
-  do {
-    const page = await store.list({ prefix: PREFIX, cursor, include: ['customMetadata'] })
-    const expired = page.objects
-      .filter((object) => Number(object.customMetadata?.expiresAt) <= now)
-      .map((object) => object.key)
-    if (expired.length) await store.delete(expired)
-    removed += expired.length
-    cursor = page.truncated ? page.cursor : undefined
-  } while (cursor)
+  for (const prefix of [PREFIX, LIMIT_PREFIX]) {
+    let cursor: string | undefined
+    do {
+      const page = await store.list({ prefix, cursor, include: ['customMetadata'] })
+      const expired = page.objects
+        .filter((object) => Number(object.customMetadata?.expiresAt) <= now)
+        .map((object) => object.key)
+      if (expired.length) await store.delete(expired)
+      if (prefix === PREFIX) removed += expired.length
+      cursor = page.truncated ? page.cursor : undefined
+    } while (cursor)
+  }
   return removed
 }

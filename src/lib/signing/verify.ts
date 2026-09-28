@@ -1,3 +1,4 @@
+import forge from 'node-forge'
 import {
   PDFArray,
   PDFDict,
@@ -11,6 +12,7 @@ import {
 } from 'pdf-lib'
 import { asn1Date, bytesEqual, children, oidOf, parseDer, type Asn1 } from './der'
 import { certificateInfo, parseCertificate, type ParsedCertificate } from './identity'
+import { laterChanges } from './revisions'
 
 /**
  * Verifies the digital signatures in a PDF the way a reader does: each
@@ -47,6 +49,11 @@ export interface VerifiedSignature {
   coversWholeFile: boolean
   /** DocMDP permissions (1 no changes, 2 form filling and signing, 3 also annotations) when this signature certifies the document. */
   certifies: 1 | 2 | 3 | null
+  /**
+   * Changes made after this signature that it does not allow: anything beyond
+   * adding signatures (and, for a certification, beyond what its permissions allow).
+   */
+  unauthorizedChanges: string[]
   /** Every certificate in the chain carries a valid signature from the next one. */
   chainVerified: boolean
   /** The chain ends at one of the trust anchors passed in; null when none were given. */
@@ -69,7 +76,7 @@ export interface VerificationReport {
   signatures: VerifiedSignature[]
   emptyFields: EmptySignatureField[]
   encrypted: boolean
-  /** At least one signature, all intact, and the last one covers the whole file. */
+  /** At least one signature, all intact, no unauthorized changes after any of them, and the last one covers the whole file. */
   valid: boolean
 }
 
@@ -93,6 +100,8 @@ const OID = {
   rsaEncryption: '1.2.840.113549.1.1.1',
   rsaPss: '1.2.840.113549.1.1.10',
   ecPublicKey: '1.2.840.10045.2.1',
+  basicConstraints: '2.5.29.19',
+  keyUsage: '2.5.29.15',
 }
 
 const DIGESTS: Record<string, string> = {
@@ -274,6 +283,39 @@ interface CertificateEntry {
   tbs: Uint8Array<ArrayBuffer>
   signatureAlgorithm: Asn1 | undefined
   signature: Uint8Array
+  /** basicConstraints says cA and keyUsage (when present) allows keyCertSign. */
+  isCa: boolean
+}
+
+/** The value of each extension in a TBSCertificate, by OID. */
+function extensionsOf(tbs: Asn1 | undefined): Map<string, Asn1 | null> {
+  const out = new Map<string, Asn1 | null>()
+  const wrapper = children(tbs).find((field) => field.tagClass === forge.asn1.Class.CONTEXT_SPECIFIC && field.type === 3)
+  for (const extension of children(children(wrapper)[0])) {
+    const parts = children(extension)
+    const oid = oidOf(parts[0])
+    const value = parts[parts.length - 1]
+    if (!oid || typeof value?.value !== 'string') continue
+    try {
+      out.set(oid, parseDer(binaryBytes(value.value)))
+    } catch {
+      out.set(oid, null)
+    }
+  }
+  return out
+}
+
+/** Whether a certificate may issue others (RFC 5280 4.2.1.3 and 4.2.1.9). */
+function isCaCertificate(tbs: Asn1 | undefined): boolean {
+  const extensions = extensionsOf(tbs)
+  const cA = children(extensions.get(OID.basicConstraints) ?? undefined)[0]
+  if (cA?.type !== forge.asn1.Type.BOOLEAN || !cA.value || cA.value === '\x00') return false
+  if (!extensions.has(OID.keyUsage)) return true
+  const usage = extensions.get(OID.keyUsage) as (Asn1 & { bitStringContents?: string }) | null
+  // forge decodes BIT STRINGs that look like DER and keeps the raw bytes in bitStringContents.
+  const raw = binaryBytes(typeof usage?.value === 'string' ? usage.value : usage?.bitStringContents)
+  // Byte 0 is the unused-bits count; keyCertSign is bit 5, 0x04 of the first byte.
+  return raw.length > 1 && (raw[1] & 0x04) !== 0
 }
 
 function readCertificate(der: Uint8Array<ArrayBuffer>): CertificateEntry {
@@ -282,7 +324,13 @@ function readCertificate(der: Uint8Array<ArrayBuffer>): CertificateEntry {
   const node = children(parseDer(der))
   // BIT STRING content starts with the unused-bits count.
   const signature = der.subarray(signatureValue.contentStart + 1, signatureValue.end)
-  return { parsed: parseCertificate(der), tbs: slice(der, tbs), signatureAlgorithm: node[1], signature }
+  return {
+    parsed: parseCertificate(der),
+    tbs: slice(der, tbs),
+    signatureAlgorithm: node[1],
+    signature,
+    isCa: isCaCertificate(node[0]),
+  }
 }
 
 function tryReadCertificate(der: Uint8Array<ArrayBuffer>): CertificateEntry | null {
@@ -295,6 +343,8 @@ function tryReadCertificate(der: Uint8Array<ArrayBuffer>): CertificateEntry | nu
 
 async function issuedBy(child: CertificateEntry, issuer: CertificateEntry): Promise<boolean> {
   if (!bytesEqual(child.parsed.issuerDer, issuer.parsed.subjectDer)) return false
+  // Only a CA may issue certificates; a self-signed end-entity certificate may still vouch for itself.
+  if (!issuer.isCa && !bytesEqual(issuer.parsed.der, child.parsed.der)) return false
   try {
     return await verifyWith(issuer.parsed, child.signatureAlgorithm, null, child.signature, child.tbs)
   } catch {
@@ -597,6 +647,7 @@ async function verifySignature(
     intact: false,
     coversWholeFile: false,
     certifies: certificationLevel(doc, field),
+    unauthorizedChanges: [],
     chainVerified: false,
     trusted: anchors.length ? false : null,
     chain: [],
@@ -697,18 +748,31 @@ export async function verifyPdf(bytes: Uint8Array, options: VerifyOptions = {}):
     }
   }
   // Oldest first: a signature that covers less of the file was made earlier.
-  const signatures = signed.sort((x, y) => x.end - y.end).map((entry) => entry.signature)
+  signed.sort((x, y) => x.end - y.end)
+  const signatures = signed.map((entry) => entry.signature)
   const last = signatures[signatures.length - 1]
   if (last && !last.coversWholeFile) last.problems.push('The file was changed after the last signature')
-  for (const signature of signatures) {
-    if (signature.certifies && !signature.coversWholeFile) {
-      signature.problems.push('Later changes were not checked against the permissions this certification allows')
+  for (const { signature, end } of signed) {
+    if (signature.coversWholeFile || !signature.intact) continue
+    const changes = await laterChanges(bytes, end, doc)
+    const unauthorized = [...changes.other]
+    if (changes.addedAnnotations && signature.certifies !== 3) unauthorized.push('annotations were added')
+    if (signature.certifies === 1) unauthorized.push('this certification allows no changes at all')
+    if (signature.certifies === 2 && changes.addedSignatureFields) {
+      unauthorized.push('signature fields were added, which this certification does not allow')
+    }
+    signature.unauthorizedChanges = unauthorized
+    if (unauthorized.length) {
+      signature.problems.push(`The document was changed after this signature in ways it does not allow: ${unauthorized.join('; ')}`)
     }
   }
   return {
     signatures,
     emptyFields,
     encrypted: doc.isEncrypted,
-    valid: signatures.length > 0 && signatures.every((signature) => signature.intact) && Boolean(last?.coversWholeFile),
+    valid:
+      signatures.length > 0 &&
+      signatures.every((signature) => signature.intact && !signature.unauthorizedChanges.length) &&
+      Boolean(last?.coversWholeFile),
   }
 }

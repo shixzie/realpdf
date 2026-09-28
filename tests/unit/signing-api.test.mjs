@@ -211,6 +211,59 @@ describe('email-verified certificates API', () => {
     expect(await purgeExpiredChallenges(deps.store, expiresAt + 1)).toBe(1)
   })
 
+  it('counts parallel guesses before checking them', async () => {
+    const { callJson, outbox } = service()
+    const { challengeId } = await (await callJson('POST', '/api/identity/verify-email', { email: 'c@example.org' })).json()
+    const code = outbox[0].text.match(/\b(\d{6})\b/)[1]
+    const key = await browserKey()
+    const proof = await key.prove(challengeId)
+    const wrong = Array.from({ length: 29 }, (_, index) => String((Number(code) + index + 1) % 1_000_000).padStart(6, '0'))
+    const results = await Promise.all(
+      [...wrong, code].map((value) =>
+        callJson('POST', '/api/identity/certificate', {
+          challengeId,
+          code: value,
+          name: 'C',
+          publicKey: key.spki.toString('base64'),
+          proof,
+        }).then((response) => response.json()),
+      ),
+    )
+    // Only five guesses are ever compared, and the right code came too late.
+    expect(results.filter((result) => result.certificate)).toHaveLength(0)
+    expect(results.every((result) => ['wrongCode', 'tooManyAttempts'].includes(result.error))).toBe(true)
+  })
+
+  it('emails one address at most ten codes a day', async () => {
+    const { callJson, deps } = service()
+    const statuses = []
+    for (let i = 0; i < 11; i += 1) {
+      const response = await callJson('POST', '/api/identity/verify-email', { email: 'd@example.org' })
+      statuses.push(response.status === 201 ? 'sent' : (await response.json()).error)
+    }
+    expect(statuses).toEqual([...Array(10).fill('sent'), 'tooManyCodes'])
+    // Other addresses are unaffected, and the daily counter is purged after a day.
+    expect((await callJson('POST', '/api/identity/verify-email', { email: 'e@example.org' })).status).toBe(201)
+    await purgeExpiredChallenges(deps.store, Date.now() + 25 * 60 * 60 * 1000)
+    expect((await deps.store.list({ prefix: 'email-limits/' })).objects).toHaveLength(0)
+  })
+
+  it('refuses names that could display as someone else', async () => {
+    const { callJson, outbox } = service()
+    const { challengeId } = await (await callJson('POST', '/api/identity/verify-email', { email: 'f@example.org' })).json()
+    const code = outbox[0].text.match(/\b(\d{6})\b/)[1]
+    const key = await browserKey()
+    const response = await callJson('POST', '/api/identity/certificate', {
+      challengeId,
+      code,
+      name: `Mallory ${String.fromCharCode(0x202e)}ecalevoL adA`,
+      publicKey: key.spki.toString('base64'),
+      proof: await key.prove(challengeId),
+    })
+    expect((await response.json()).error).toBe('invalidName')
+    expect((await (await callJson('POST', '/api/identity/verify-email', { email: 'jos\u00e9@example.org' })).json()).error).toBe('invalidEmail')
+  })
+
   it('validates input and reports a missing email service or CA', async () => {
     const { callJson } = service({ sendEmail: null, certificateAuthority: async () => null })
     expect((await (await callJson('POST', '/api/identity/verify-email', { email: 'nope' })).json()).error).toBe('unavailable')

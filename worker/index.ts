@@ -14,6 +14,12 @@ const SECURITY_HEADERS: Record<string, string> = {
   'X-Content-Type-Options': 'nosniff',
   'Referrer-Policy': 'strict-origin-when-cross-origin',
   'X-Frame-Options': 'SAMEORIGIN',
+  'Strict-Transport-Security': 'max-age=31536000',
+  // Scripts only from this origin (plus the Ko-fi widget); signing keys, decrypted
+  // documents and request links live in this page. 'wasm-unsafe-eval' is for pdf.js's
+  // image decoders; styles stay inline-friendly for React and the Ko-fi widget.
+  'Content-Security-Policy':
+    "default-src 'self'; script-src 'self' 'wasm-unsafe-eval' https://storage.ko-fi.com; style-src 'self' 'unsafe-inline' https://storage.ko-fi.com https://fonts.googleapis.com; font-src 'self' data: blob: https://fonts.gstatic.com; img-src 'self' data: blob: https://storage.ko-fi.com https://ko-fi.com; connect-src 'self' data: blob:; worker-src 'self' blob:; frame-src https://ko-fi.com; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'self'",
 }
 
 function cacheControlFor(pathname: string): string | undefined {
