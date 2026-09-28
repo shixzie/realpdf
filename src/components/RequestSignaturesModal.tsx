@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import { ArrowRight, CheckCircle2, Copy, ExternalLink, Lock, Mail, Trash2, UserPlus, X } from 'lucide-react'
 import { useStore, type RequestSigner } from '../store'
 import { useTranslation } from '../i18n'
@@ -45,7 +45,7 @@ function mailLink(
 }
 
 /** Lists this device's requests with how many signed copies each has. */
-export function MyRequestsList({ title, compact = false }: { title: string; compact?: boolean }) {
+export function MyRequestsList({ title, empty = null }: { title?: string; empty?: ReactNode }) {
   const { t } = useTranslation()
   const [entries, setEntries] = useState<MyRequest[]>(() => listMyRequests())
   const [statuses, setStatuses] = useState<Record<string, RequestStatus | null>>({})
@@ -62,12 +62,12 @@ export function MyRequestsList({ title, compact = false }: { title: string; comp
     }
   }, [entries])
 
-  if (!entries.length) return null
+  if (!entries.length) return empty
   const formatDate = (time: number) => new Date(time).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
 
   return (
-    <div className={`my-requests ${compact ? 'is-compact' : ''}`}>
-      <span className="my-requests-title">{title}</span>
+    <div className="my-requests">
+      {title && <span className="my-requests-title">{title}</span>}
       {entries.map((entry) => {
         const status = statuses[entry.id]
         const signed = status ? status.versions.length - 1 : 0

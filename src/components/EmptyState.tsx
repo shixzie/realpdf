@@ -6,9 +6,11 @@ import {
   FileText,
   FileType2,
   FolderOpen,
-  History,
+  Library,
   PenLine,
   Scissors,
+  Send,
+  Wrench,
 } from 'lucide-react'
 import { useStore, type PendingAction, type ToolsTab } from '../store'
 import { openDocumentFile } from '../lib/openDocument'
@@ -71,39 +73,48 @@ export function EmptyState() {
 
   return (
     <div className="empty">
-      <div className="empty-card">
-        <div className="empty-logo">
-          <FileText size={30} />
-        </div>
-        <h1>{t('empty.title')}</h1>
-        <p>{t('empty.subtitle')}</p>
-        <button type="button" className="button button-primary button-lg" onClick={() => pickFile(null)}>
-          <FolderOpen size={18} /> {t('empty.choose')}
-        </button>
-        <span className="empty-hint">{t('empty.dragHint')}</span>
-        {loading && (
-          <span className="empty-hint">
-            {window.location.pathname.startsWith('/sign/') ? t('signRequest.opening') : t('empty.opening')}
-          </span>
-        )}
-        <input
-          ref={inputRef}
-          type="file"
-          accept="application/pdf,.pdf,.docx,.xlsx,.pptx"
-          hidden
-          onChange={(event) => {
-            const file = event.target.files?.[0]
-            event.target.value = ''
-            if (file) void openDocumentFile(file)
-            else useStore.getState().setPendingAction(null)
-          }}
-        />
-
-        {recent.length > 0 && (
-          <div className="home-recent">
-            <span className="home-recent-title">
-              <History size={13} /> {t('empty.recent')}
+      <div className="home">
+        <div className="empty-card">
+          <div className="empty-logo">
+            <FileText size={30} />
+          </div>
+          <h1>{t('empty.title')}</h1>
+          <p>{t('empty.subtitle')}</p>
+          <button type="button" className="button button-primary button-lg" onClick={() => pickFile(null)}>
+            <FolderOpen size={18} /> {t('empty.choose')}
+          </button>
+          <span className="empty-hint">{t('empty.dragHint')}</span>
+          {loading && (
+            <span className="empty-hint">
+              {window.location.pathname.startsWith('/sign/') ? t('signRequest.opening') : t('empty.opening')}
             </span>
+          )}
+          <input
+            ref={inputRef}
+            type="file"
+            accept="application/pdf,.pdf,.docx,.xlsx,.pptx"
+            hidden
+            onChange={(event) => {
+              const file = event.target.files?.[0]
+              event.target.value = ''
+              if (file) void openDocumentFile(file)
+              else useStore.getState().setPendingAction(null)
+            }}
+          />
+        </div>
+
+        <section className="home-section home-library" aria-labelledby="home-library-title">
+          <div className="home-section-head">
+            <h2 id="home-library-title">
+              <Library size={15} /> {t('library.title')}
+            </h2>
+            {recent.length > 0 && (
+              <button type="button" className="link-button" onClick={() => void useStore.getState().openLibrary()}>
+                {t('empty.viewAll')}
+              </button>
+            )}
+          </div>
+          {recent.length > 0 ? (
             <div className="home-recent-grid">
               {recent.map((entry) => (
                 <button
@@ -125,43 +136,57 @@ export function EmptyState() {
                 </button>
               ))}
             </div>
+          ) : (
+            <p className="home-section-empty">{t('library.empty')}</p>
+          )}
+        </section>
+
+        <section className="home-section home-requests" aria-labelledby="home-requests-title">
+          <div className="home-section-head">
+            <h2 id="home-requests-title">
+              <Send size={15} /> {t('empty.requests')}
+            </h2>
           </div>
-        )}
+          <MyRequestsList empty={<p className="home-section-empty">{t('empty.requestsEmpty')}</p>} />
+        </section>
 
-        <div className="home-requests">
-          <MyRequestsList title={t('empty.requests')} compact />
-        </div>
-
-        <div className="home-tools">
-          {TOOL_CARDS.map((card) => {
-            const Icon = card.icon
-            return (
-              <button
-                key={card.titleKey}
-                type="button"
-                className="home-tool"
-                onClick={() => {
-                  if (typeof card.action === 'string') {
-                    pickFile(card.action)
-                  } else {
-                    const state = useStore.getState()
-                    state.setPendingAction(null)
-                    state.setToolsOpen(true, card.action.tab)
-                  }
-                }}
-              >
-                <Icon size={18} />
-                <strong>{t(card.titleKey)}</strong>
-                <span>{t(card.textKey)}</span>
-              </button>
-            )
-          })}
-          <button type="button" className="home-tool home-tool-accent" onClick={() => pickFile(null)}>
-            <PenLine size={18} />
-            <strong>{t('empty.annotateTitle')}</strong>
-            <span>{t('empty.annotateText')}</span>
-          </button>
-        </div>
+        <section className="home-section" aria-labelledby="home-tools-title">
+          <div className="home-section-head">
+            <h2 id="home-tools-title">
+              <Wrench size={15} /> {t('empty.tools')}
+            </h2>
+          </div>
+          <div className="home-tools">
+            {TOOL_CARDS.map((card) => {
+              const Icon = card.icon
+              return (
+                <button
+                  key={card.titleKey}
+                  type="button"
+                  className="home-tool"
+                  onClick={() => {
+                    if (typeof card.action === 'string') {
+                      pickFile(card.action)
+                    } else {
+                      const state = useStore.getState()
+                      state.setPendingAction(null)
+                      state.setToolsOpen(true, card.action.tab)
+                    }
+                  }}
+                >
+                  <Icon size={18} />
+                  <strong>{t(card.titleKey)}</strong>
+                  <span>{t(card.textKey)}</span>
+                </button>
+              )
+            })}
+            <button type="button" className="home-tool home-tool-accent" onClick={() => pickFile(null)}>
+              <PenLine size={18} />
+              <strong>{t('empty.annotateTitle')}</strong>
+              <span>{t('empty.annotateText')}</span>
+            </button>
+          </div>
+        </section>
 
         <SocialLinks />
       </div>
