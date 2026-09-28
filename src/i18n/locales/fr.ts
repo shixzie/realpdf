@@ -486,6 +486,13 @@ export const fr: Dictionary = {
   kofi: {
     text: 'Soutenez-moi',
   },
+  support: {
+    title: 'Soutenir RealPDF',
+    intro: "RealPDF est gratuit et fonctionne entièrement dans votre navigateur. S'il vous est utile, vous pouvez contribuer sur Ko-fi directement ici.",
+    frameTitle: 'Panneau de soutien Ko-fi',
+    failed: "Le panneau Ko-fi n'a pas pu se charger ici. Vous pouvez toujours soutenir RealPDF sur la page Ko-fi.",
+    openKofi: 'Ouvrir sur Ko-fi',
+  },
   social: {
     label: 'Retrouvez-moi sur',
     github: 'GitHub',

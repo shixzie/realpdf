@@ -130,6 +130,26 @@ describe('ui', () => {
     const kofiIndex = order.findIndex((label) => label.includes('Support'))
     const saveIndex = order.findIndex((label) => label.includes('Export'))
     check(kofiIndex > -1 && saveIndex > -1 && kofiIndex < saveIndex, 'Ko-fi button sits beside (before) Export')
+    const popups = []
+    const onPopup = (popup) => popups.push(popup)
+    page.context().on('page', onPopup)
+    await kofi.click()
+    const supportDialog = page.locator('.support-modal')
+    await supportDialog.waitFor({ timeout: 3000 }).catch(() => {})
+    check((await supportDialog.count()) === 1, 'Support opens an in-app Ko-fi dialog')
+    const embedSrc = await supportDialog.locator('iframe').getAttribute('src').catch(() => null)
+    check(
+      (embedSrc || '').startsWith('https://ko-fi.com/shixzie/') && (embedSrc || '').includes('embed=true'),
+      `Support dialog embeds the Ko-fi panel (src: ${embedSrc})`,
+    )
+    check(
+      (await supportDialog.locator('a[href="https://ko-fi.com/shixzie"]').count()) === 1,
+      'Support dialog keeps a link to the Ko-fi page as a fallback',
+    )
+    check(popups.length === 0, 'Support does not open a new window')
+    page.context().off('page', onPopup)
+    await supportDialog.locator('button:has-text("Done")').click()
+    check((await page.locator('.support-modal').count()) === 0, 'Support dialog closes')
 
     // -------------------------------------------------------- localization
     const languageSelect = page.locator('select.select-language')

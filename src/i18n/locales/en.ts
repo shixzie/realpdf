@@ -482,6 +482,13 @@ export const en = {
   kofi: {
     text: 'Support me',
   },
+  support: {
+    title: 'Support RealPDF',
+    intro: 'RealPDF is free and runs entirely in your browser. If it helps you, you can chip in on Ko-fi right here.',
+    frameTitle: 'Ko-fi support panel',
+    failed: "The Ko-fi panel couldn't load here. You can still support RealPDF on the Ko-fi page.",
+    openKofi: 'Open on Ko-fi',
+  },
   social: {
     label: 'Find me on',
     github: 'GitHub',
