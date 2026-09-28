@@ -1,4 +1,4 @@
-import { useRef } from 'react'
+import { useCallback, useRef, useState } from 'react'
 import {
   ChevronLeft,
   ChevronRight,
@@ -22,6 +22,7 @@ import { useTranslation } from '../i18n'
 import { LanguagePicker } from './LanguagePicker'
 import { ExportControl } from './ExportControl'
 import { SignControl } from './SignControl'
+import { KOFI_PAGE_URL, SupportModal } from './SupportModal'
 
 export function TopBar() {
   const { t } = useTranslation()
@@ -36,6 +37,8 @@ export function TopBar() {
   const undoCount = useStore((state) => state.undoStack.length)
   const redoCount = useStore((state) => state.redoStack.length)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const [supportOpen, setSupportOpen] = useState(false)
+  const closeSupport = useCallback(() => setSupportOpen(false), [])
 
   const currentIndex = Math.max(
     0,
@@ -202,13 +205,20 @@ export function TopBar() {
       </button>
       <a
         className="button button-kofi"
-        href="https://ko-fi.com/shixzie"
+        href={KOFI_PAGE_URL}
         target="_blank"
         rel="noreferrer noopener"
         title={t('topbar.supportTitle')}
+        onClick={(event) => {
+          // Modified clicks still open Ko-fi in a new tab, as a link should.
+          if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return
+          event.preventDefault()
+          setSupportOpen(true)
+        }}
       >
         <Heart size={15} /> <span className="topbar-label">{t('topbar.support')}</span>
       </a>
+      {supportOpen && <SupportModal onClose={closeSupport} />}
 
       {pages.length > 0 && <SignControl />}
       {pages.length > 0 && <ExportControl />}
