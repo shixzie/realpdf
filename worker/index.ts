@@ -15,11 +15,11 @@ const SECURITY_HEADERS: Record<string, string> = {
   'Referrer-Policy': 'strict-origin-when-cross-origin',
   'X-Frame-Options': 'SAMEORIGIN',
   'Strict-Transport-Security': 'max-age=31536000',
-  // Scripts only from this origin (plus the Ko-fi widget); signing keys, decrypted
-  // documents and request links live in this page. 'wasm-unsafe-eval' is for pdf.js's
-  // image decoders; styles stay inline-friendly for React and the Ko-fi widget.
+  // Scripts only from this origin: signing keys, decrypted documents and request
+  // links live in this page. 'wasm-unsafe-eval' is for pdf.js's image decoders,
+  // inline styles are for React, and ko-fi.com is framed by the Support dialog.
   'Content-Security-Policy':
-    "default-src 'self'; script-src 'self' 'wasm-unsafe-eval' https://storage.ko-fi.com; style-src 'self' 'unsafe-inline' https://storage.ko-fi.com https://fonts.googleapis.com; font-src 'self' data: blob: https://fonts.gstatic.com; img-src 'self' data: blob: https://storage.ko-fi.com https://ko-fi.com; connect-src 'self' data: blob:; worker-src 'self' blob:; frame-src https://ko-fi.com; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'self'",
+    "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; font-src 'self' data: blob:; img-src 'self' data: blob:; connect-src 'self' data: blob:; worker-src 'self' blob:; frame-src https://ko-fi.com; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'self'",
 }
 
 function cacheControlFor(pathname: string): string | undefined {

@@ -3,7 +3,7 @@
   Referrer-Policy: strict-origin-when-cross-origin
   X-Frame-Options: SAMEORIGIN
   Strict-Transport-Security: max-age=31536000
-  Content-Security-Policy: default-src 'self'; script-src 'self' 'wasm-unsafe-eval' https://storage.ko-fi.com; style-src 'self' 'unsafe-inline' https://storage.ko-fi.com https://fonts.googleapis.com; font-src 'self' data: blob: https://fonts.gstatic.com; img-src 'self' data: blob: https://storage.ko-fi.com https://ko-fi.com; connect-src 'self' data: blob:; worker-src 'self' blob:; frame-src https://ko-fi.com; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'self'
+  Content-Security-Policy: default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; font-src 'self' data: blob:; img-src 'self' data: blob:; connect-src 'self' data: blob:; worker-src 'self' blob:; frame-src https://ko-fi.com; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'self'
 
 /
   Cache-Control: public, max-age=0, must-revalidate
