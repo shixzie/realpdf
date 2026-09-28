@@ -9,7 +9,7 @@ import {
   parseDer,
   toBinary,
   type Asn1,
-} from './der'
+} from './der.ts'
 
 /**
  * A signing identity read from a PKCS#12 (.p12/.pfx) file. The private key is

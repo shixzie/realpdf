@@ -14,6 +14,7 @@ import { useStore, type PendingAction, type ToolsTab } from '../store'
 import { openDocumentFile } from '../lib/openDocument'
 import { useTranslation } from '../i18n'
 import { SocialLinks } from './SocialLinks'
+import { MyRequestsList } from './RequestSignaturesModal'
 
 const TOOL_CARDS: Array<{
   action: PendingAction | { tab: ToolsTab }
@@ -80,7 +81,11 @@ export function EmptyState() {
           <FolderOpen size={18} /> {t('empty.choose')}
         </button>
         <span className="empty-hint">{t('empty.dragHint')}</span>
-        {loading && <span className="empty-hint">{t('empty.opening')}</span>}
+        {loading && (
+          <span className="empty-hint">
+            {window.location.pathname.startsWith('/sign/') ? t('signRequest.opening') : t('empty.opening')}
+          </span>
+        )}
         <input
           ref={inputRef}
           type="file"
@@ -122,6 +127,10 @@ export function EmptyState() {
             </div>
           </div>
         )}
+
+        <div className="home-requests">
+          <MyRequestsList title={t('empty.requests')} compact />
+        </div>
 
         <div className="home-tools">
           {TOOL_CARDS.map((card) => {

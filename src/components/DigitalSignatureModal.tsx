@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { AlertTriangle, BadgeCheck, FileKey, KeyRound, Loader2, ShieldCheck, X } from 'lucide-react'
+import { AlertTriangle, BadgeCheck, FileKey, KeyRound, Loader2, ShieldCheck, Trash2, X } from 'lucide-react'
 import { useStore } from '../store'
 import { useTranslation } from '../i18n'
 import {
@@ -9,14 +9,19 @@ import {
   type PlacementChoice,
   type SigningContext,
 } from '../lib/signController'
-import type { SigningIdentity } from '../lib/signing'
+import type { SavedIdentityMeta, SigningIdentity } from '../lib/signing'
+import { SigningIdSetup } from './SigningIdSetup'
 
 type PlacementMode = 'box' | 'invisible' | `field:${string}`
+/** How the signer gets an identity: pick a saved one, create one by email, or open a file. */
+type IdentityView = 'choose' | 'create' | 'file'
 
 /**
- * Certificate-based signing: unlock a PKCS#12 file, choose where the
- * signature goes, then sign and download. While the user draws the signature
- * box the dialog stays mounted (keeping its state) and shows a banner instead.
+ * Certificate-based signing. The signer uses the signing ID saved on this
+ * device (picked automatically), creates one by verifying their email, or
+ * unlocks a PKCS#12 file; then chooses where the signature goes and signs.
+ * While the user draws the signature box the dialog stays mounted (keeping
+ * its state) and shows a banner instead.
  */
 export function DigitalSignatureModal() {
   const { t } = useTranslation()
@@ -34,13 +39,45 @@ export function DigitalSignatureModal() {
   const [certify, setCertify] = useState(false)
   const [context, setContext] = useState<SigningContext | null>(null)
   const [signing, setSigning] = useState(false)
+  const [saved, setSaved] = useState<SavedIdentityMeta[]>([])
+  const [savedId, setSavedId] = useState<string | null>(null)
+  const [remember, setRemember] = useState(false)
+  const [view, setView] = useState<IdentityView>('create')
   const open = stage !== 'closed'
 
-  // Fresh state for every opening; the unlocked key is dropped on close.
+  const refreshSaved = async () => {
+    const { listSavedIdentities } = await loadSigning()
+    const list = await listSavedIdentities()
+    setSaved(list)
+    return list
+  }
+
+  const pickSaved = async (id: string) => {
+    setCertError(null)
+    try {
+      const { getSavedIdentity } = await loadSigning()
+      const restored = await getSavedIdentity(id)
+      if (!restored) throw new Error('missing')
+      setIdentity(restored)
+      setSavedId(id)
+    } catch {
+      setCertError(t('digitalSign.savedMissing'))
+      await refreshSaved()
+    }
+  }
+
+  // Fresh state for every opening; the unlocked key is dropped on close. The
+  // most recently saved signing ID is selected so returning signers go
+  // straight to signing.
   useEffect(() => {
     if (open) {
       void signingContext().then(setContext).catch(() => setContext(null))
-      void loadSigning()
+      void refreshSaved().then((list) => {
+        if (list[0]) {
+          setView('choose')
+          void pickSaved(list[0].id)
+        }
+      })
       return
     }
     setFile(null)
@@ -52,6 +89,9 @@ export function DigitalSignatureModal() {
     setMode('box')
     setCertify(false)
     setContext(null)
+    setSavedId(null)
+    setRemember(false)
+    setView('create')
   }, [open])
 
   const close = () => useStore.getState().setDigitalSign('closed')
@@ -109,9 +149,19 @@ export function DigitalSignatureModal() {
     setUnlocking(true)
     setCertError(null)
     try {
-      const { loadSigningIdentity } = await loadSigning()
-      setIdentity(await loadSigningIdentity(file.bytes, password))
+      const { loadSigningIdentity, rememberIdentity } = await loadSigning()
+      const unlocked = await loadSigningIdentity(file.bytes, password)
+      setIdentity(unlocked)
       setPassword('')
+      if (remember) {
+        try {
+          setSavedId((await rememberIdentity(unlocked)).id)
+          await refreshSaved()
+        } catch (error) {
+          console.error(error)
+          useStore.getState().toastMessage('error', t('digitalSign.rememberFailed'))
+        }
+      }
     } catch (error) {
       const code = (error as { code?: string })?.code
       setCertError(code ? t(`digitalSign.errors.${code}`) : String((error as Error)?.message ?? error))
@@ -128,6 +178,15 @@ export function DigitalSignatureModal() {
   const now = Date.now()
   const info = identity?.info
   const formatDate = (date: Date) => date.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })
+
+  const forget = async (id: string) => {
+    const { forgetIdentity } = await loadSigning()
+    await forgetIdentity(id)
+    if (savedId === id) setSavedId(null)
+    const list = await refreshSaved()
+    if (!list.length) setView('create')
+    useStore.getState().toastMessage('info', t('digitalSign.forgotten'))
+  }
 
   const submit = () => {
     if (mode === 'box') {
@@ -166,53 +225,151 @@ export function DigitalSignatureModal() {
                 <span className="cert-warning">{t('digitalSign.notYetValid', { date: formatDate(info.notBefore) })}</span>
               )}
               {info.selfSigned && <span className="cert-note">{t('digitalSign.selfSigned')}</span>}
+              {savedId && <span className="cert-note cert-remembered">{t('digitalSign.remembered')}</span>}
             </div>
-            <button
-              type="button"
-              className="button button-ghost"
-              onClick={() => {
-                setIdentity(null)
-                setFile(null)
-                fileRef.current?.click()
-              }}
-            >
-              {t('signature.replace')}
-            </button>
+            <div className="cert-actions">
+              <button
+                type="button"
+                className="button button-ghost cert-switch"
+                onClick={() => {
+                  setIdentity(null)
+                  setSavedId(null)
+                  setFile(null)
+                  setView(saved.length ? 'choose' : 'create')
+                }}
+              >
+                {t('digitalSign.switch')}
+              </button>
+              {savedId && (
+                <button
+                  type="button"
+                  className="button button-ghost cert-forget"
+                  onClick={() => {
+                    const id = savedId
+                    setIdentity(null)
+                    void forget(id)
+                  }}
+                >
+                  <Trash2 size={14} /> {t('digitalSign.forget')}
+                </button>
+              )}
+            </div>
           </div>
         ) : (
           <div className="digital-sign-unlock">
-            <label className="digital-sign-label">{t('digitalSign.certificate')}</label>
-            <div className="modal-row digital-sign-row">
-              <button type="button" className="button" onClick={() => fileRef.current?.click()}>
-                <FileKey size={15} /> {t('digitalSign.chooseFile')}
-              </button>
-              {file && <span className="digital-sign-file">{file.name}</span>}
-            </div>
-            {file && (
-              <form
-                className="modal-row digital-sign-row"
-                onSubmit={(event) => {
-                  event.preventDefault()
-                  void unlock()
-                }}
-              >
-                <input
-                  className="text-input"
-                  type="password"
-                  name="certificate-password"
-                  autoComplete="off"
-                  placeholder={t('digitalSign.password')}
-                  aria-label={t('digitalSign.password')}
-                  value={password}
-                  autoFocus
-                  onChange={(event) => setPassword(event.target.value)}
-                />
-                <button type="submit" className="button button-primary" disabled={unlocking}>
-                  {unlocking ? <Loader2 size={15} className="spin" /> : <KeyRound size={15} />}{' '}
-                  {unlocking ? t('digitalSign.unlocking') : t('digitalSign.unlock')}
-                </button>
-              </form>
+            {view === 'choose' && saved.length > 0 && (
+              <div className="saved-certs">
+                <label className="digital-sign-label">{t('digitalSign.savedTitle')}</label>
+                {saved.map((entry) => (
+                  <div key={entry.id} className="saved-cert">
+                    <BadgeCheck size={16} />
+                    <div>
+                      <strong>{entry.info.name}</strong>
+                      <span>{t('digitalSign.issuedBy', { issuer: entry.info.issuer })}</span>
+                    </div>
+                    <button type="button" className="button button-primary saved-cert-use" onClick={() => void pickSaved(entry.id)}>
+                      {t('digitalSign.useSaved')}
+                    </button>
+                    <button
+                      type="button"
+                      className="icon-button saved-cert-forget"
+                      title={t('digitalSign.forget')}
+                      aria-label={t('digitalSign.forget')}
+                      onClick={() => void forget(entry.id)}
+                    >
+                      <Trash2 size={15} />
+                    </button>
+                  </div>
+                ))}
+              </div>
             )}
+            {view === 'create' && !file && (
+              <SigningIdSetup
+                onReady={(created, meta) => {
+                  setIdentity(created)
+                  setSavedId(meta.id)
+                  void refreshSaved()
+                }}
+              />
+            )}
+            {(view === 'file' || file) && (
+              <div className="digital-sign-file-section">
+                <label className="digital-sign-label">{t('digitalSign.certificate')}</label>
+                <div className="modal-row digital-sign-row">
+                  <button type="button" className="button" onClick={() => fileRef.current?.click()}>
+                    <FileKey size={15} /> {t('digitalSign.chooseFile')}
+                  </button>
+                  {file && <span className="digital-sign-file">{file.name}</span>}
+                </div>
+                {file && (
+                  <form
+                    className="modal-row digital-sign-row"
+                    onSubmit={(event) => {
+                      event.preventDefault()
+                      void unlock()
+                    }}
+                  >
+                    <input
+                      className="text-input"
+                      type="password"
+                      name="certificate-password"
+                      autoComplete="off"
+                      placeholder={t('digitalSign.password')}
+                      aria-label={t('digitalSign.password')}
+                      value={password}
+                      autoFocus
+                      onChange={(event) => setPassword(event.target.value)}
+                    />
+                    <button type="submit" className="button button-primary" disabled={unlocking}>
+                      {unlocking ? <Loader2 size={15} className="spin" /> : <KeyRound size={15} />}{' '}
+                      {unlocking ? t('digitalSign.unlocking') : t('digitalSign.unlock')}
+                    </button>
+                  </form>
+                )}
+                {file && (
+                  <label className="check digital-sign-remember">
+                    <input
+                      type="checkbox"
+                      name="certificate-remember"
+                      checked={remember}
+                      onChange={(event) => setRemember(event.target.checked)}
+                    />
+                    {t('digitalSign.remember')}
+                  </label>
+                )}
+              </div>
+            )}
+            <div className="digital-sign-alt">
+              {view !== 'choose' && saved.length > 0 && (
+                <button
+                  type="button"
+                  className="link-button"
+                  onClick={() => {
+                    setFile(null)
+                    setView('choose')
+                  }}
+                >
+                  {t('digitalSign.useSavedId')}
+                </button>
+              )}
+              {(view !== 'create' || file) && (
+                <button
+                  type="button"
+                  className="link-button digital-sign-create"
+                  onClick={() => {
+                    setFile(null)
+                    setView('create')
+                  }}
+                >
+                  {t('digitalSign.createId')}
+                </button>
+              )}
+              {view !== 'file' && !file && (
+                <button type="button" className="link-button digital-sign-use-file" onClick={() => setView('file')}>
+                  {t('digitalSign.useFile')}
+                </button>
+              )}
+            </div>
             {certError && (
               <p className="cert-error" role="alert">
                 <AlertTriangle size={14} /> {certError}
@@ -232,6 +389,7 @@ export function DigitalSignatureModal() {
             if (!chosen) return
             setCertError(null)
             setIdentity(null)
+            setView('file')
             void chosen.arrayBuffer().then((buffer) => setFile({ name: chosen.name, bytes: new Uint8Array(buffer) }))
           }}
         />

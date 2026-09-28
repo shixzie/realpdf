@@ -1872,3 +1872,289 @@ select.form-widget {
     grid-template-columns: 1fr;
   }
 }
+
+.saved-certs {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.saved-cert {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 8px 8px 12px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  color: var(--accent-ink);
+}
+
+.saved-cert > div {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.saved-cert strong {
+  color: var(--text);
+  font-size: 13px;
+}
+
+.cert-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+}
+
+.cert-remembered {
+  color: var(--success);
+}
+
+.digital-sign-remember {
+  margin-top: 10px;
+}
+
+.digital-sign-alt {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 16px;
+  margin-top: 12px;
+}
+
+.signing-id {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.signing-id-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  color: var(--accent-ink);
+}
+
+.signing-id-head > div {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  color: var(--text-muted);
+  font-size: 12.5px;
+  line-height: 1.45;
+}
+
+.signing-id-head strong {
+  color: var(--text);
+  font-size: 14px;
+}
+
+.signing-id-form {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px 12px;
+  align-items: end;
+}
+
+.signing-id-form label > span {
+  display: block;
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 600;
+  margin-bottom: 6px;
+}
+
+.signing-id-form .text-input {
+  width: 100%;
+  min-width: 0;
+}
+
+.signing-id-form > button,
+.signing-id-sent,
+.signing-id-links {
+  grid-column: 1 / -1;
+}
+
+.signing-id-form > button {
+  justify-self: start;
+}
+
+.signing-id-sent {
+  margin: 0;
+  color: var(--text);
+  font-size: 13px;
+}
+
+.signing-id-code {
+  font-size: 18px;
+  letter-spacing: 4px;
+  font-variant-numeric: tabular-nums;
+}
+
+.signing-id-links {
+  display: flex;
+  gap: 16px;
+}
+
+.request-sign {
+  width: min(600px, 100%);
+}
+
+.request-sign-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.request-sign-form .digital-sign-grid label:last-child {
+  grid-column: auto;
+}
+
+.request-sign-privacy {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  margin: 0;
+  color: var(--text-dim);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.request-sign-privacy svg {
+  flex: none;
+  margin-top: 2px;
+}
+
+.request-sign-status {
+  margin: 0 0 12px;
+  color: var(--success);
+  font-size: 13px;
+}
+
+.request-sign-link-row {
+  flex-wrap: wrap;
+}
+
+.request-link {
+  flex: 1 1 260px;
+  min-width: 0;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px;
+}
+
+.request-sign-list:not(:empty) {
+  margin-top: 18px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
+}
+
+.my-requests {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  text-align: left;
+}
+
+.my-requests-title {
+  color: var(--text-muted);
+  font-size: 11.5px;
+  font-weight: 650;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.my-request {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 8px 8px 12px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+}
+
+.my-request > div {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.my-request strong {
+  color: var(--text);
+  font-size: 13px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.my-request-signed {
+  color: var(--success);
+}
+
+.my-request-open {
+  text-decoration: none;
+}
+
+.home-requests:empty {
+  display: none;
+}
+
+.home-requests {
+  width: 100%;
+  margin-top: 22px;
+}
+
+.sign-request-bar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 10px 14px 0;
+  padding: 10px 12px;
+  border: 1px solid var(--accent);
+  border-radius: var(--radius);
+  background: var(--accent-soft);
+  color: var(--accent-ink);
+}
+
+.sign-request-bar.is-done {
+  border-color: var(--success);
+  color: var(--success);
+}
+
+.sign-request-text {
+  flex: 1 1 240px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  color: var(--text-muted);
+  font-size: 12.5px;
+}
+
+.sign-request-text strong {
+  color: var(--text);
+  font-size: 13.5px;
+}
+
+.sign-request-message {
+  color: var(--text);
+  font-style: italic;
+}
+
+@media (max-width: 560px) {
+  .signing-id-form {
+    grid-template-columns: 1fr;
+  }
+}
+
+.signing-id-head svg {
+  flex: none;
+  margin-top: 1px;
+}

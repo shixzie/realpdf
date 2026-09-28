@@ -7,6 +7,8 @@ import { Viewer } from './components/Viewer'
 import { PageSidebar } from './components/PageSidebar'
 import { SignatureModal } from './components/SignatureModal'
 import { DigitalSignatureModal } from './components/DigitalSignatureModal'
+import { RequestSignaturesModal } from './components/RequestSignaturesModal'
+import { SignRequestBar } from './components/SignRequestBar'
 import { FileToolsModal } from './components/FileToolsModal'
 import { LibraryModal } from './components/LibraryModal'
 import { FormsBar } from './components/FormsBar'
@@ -14,6 +16,8 @@ import { EmptyState } from './components/EmptyState'
 import { ExportOverlay, Toast } from './components/Overlays'
 import { isSupportedFileName, openDocumentFile } from './lib/openDocument'
 import { runExport } from './lib/exportController'
+import { parseRequestLocation } from './lib/signRequests'
+import { openRequestFromLink } from './lib/signRequestController'
 import { activeCanvas, deleteSelection } from './lib/canvasRegistry'
 import type { Tool } from './types'
 
@@ -118,6 +122,20 @@ export default function App() {
     return () => window.removeEventListener('keydown', onKeyDown)
   }, [])
 
+  // A signing link (/sign/<id>#<key>) opens its document on arrival. When
+  // the request is closed (home, another file) the address goes back to /.
+  useEffect(() => {
+    const link = parseRequestLocation()
+    if (link) void openRequestFromLink(link.id, link.key)
+    let previous = useStore.getState().signRequest
+    return useStore.subscribe((state) => {
+      if (previous && !state.signRequest && window.location.pathname.startsWith('/sign/')) {
+        window.history.replaceState(null, '', '/')
+      }
+      previous = state.signRequest
+    })
+  }, [])
+
   useEffect(() => {
     const onDragOver = (event: DragEvent) => {
       if (Array.from(event.dataTransfer?.types ?? []).includes('Files')) event.preventDefault()
@@ -146,6 +164,7 @@ export default function App() {
           <ToolRail />
           <div className="main">
             {formMode ? <FormsBar /> : <ToolOptions />}
+            <SignRequestBar />
             <Viewer />
           </div>
           <PageSidebar />
@@ -155,6 +174,7 @@ export default function App() {
       )}
       <SignatureModal />
       <DigitalSignatureModal />
+      <RequestSignaturesModal />
       <FileToolsModal />
       <LibraryModal />
       <ExportOverlay />
