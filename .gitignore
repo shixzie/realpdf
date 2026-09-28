@@ -9,3 +9,5 @@ tsconfig.tsbuildinfo
 
 .wrangler
 .dev.vars
+
+.signing-ca

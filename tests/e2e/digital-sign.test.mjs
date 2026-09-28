@@ -180,15 +180,14 @@ describe('digital signatures', () => {
     check(stored?.count === 1 && stored?.name === 'Charles Babbage', `one identity is remembered (${JSON.stringify(stored)})`)
     check(stored?.extractable === false && stored?.exported === false, 'the remembered key cannot be exported')
 
-    // After a reload the certificate is offered without the file or password.
+    // After a reload the certificate is selected without the file or password.
     await page.reload()
     await page.waitForSelector('.empty-card')
     await openPdf(page, SAMPLE_PDF)
     await openSignDialog(page)
-    await page.waitForSelector('.saved-cert')
-    check((await page.locator('.saved-cert').innerText()).includes('Charles Babbage'), 'saved certificate is listed')
-    await page.click('.saved-cert-use')
     await page.waitForSelector('.cert-summary')
+    check((await page.locator('.cert-name').innerText()) === 'Charles Babbage', 'saved certificate is selected')
+    check((await page.locator('.cert-remembered').count()) === 1, 'it is marked as remembered')
     await page.selectOption('select[name="signature-placement"]', 'invisible')
     const savedPath = path.join(OUT_DIR, 'digitally-signed-saved.pdf')
     const [download] = await Promise.all([
@@ -199,17 +198,22 @@ describe('digital signatures', () => {
     const [result] = verifyPdfSignatures(fs.readFileSync(savedPath))
     check(result?.valid === true && String(result?.signer).includes('Charles Babbage'), 'signs with the remembered key')
 
-    // Forgetting removes it.
+    // Switching lists the saved certificates; forgetting removes it.
     await openSignDialog(page)
+    await page.waitForSelector('.cert-summary')
+    await page.click('.cert-switch')
     await page.waitForSelector('.saved-cert')
+    check((await page.locator('.saved-cert').innerText()).includes('Charles Babbage'), 'saved certificate is listed')
     await page.click('.saved-cert-forget')
     await page.waitForSelector('.saved-cert', { state: 'detached' })
+    await page.waitForSelector('.signing-id')
     await page.reload()
     await page.waitForSelector('.empty-card')
     await openPdf(page, SAMPLE_PDF)
     await openSignDialog(page)
+    await page.waitForSelector('.signing-id')
     await page.waitForTimeout(500)
-    check((await page.locator('.saved-cert').count()) === 0, 'forgotten certificate is gone after a reload')
+    check((await page.locator('.cert-summary').count()) === 0, 'forgotten certificate is gone after a reload')
     check(pageErrors.length === 0, `no browser errors: ${pageErrors.join(' | ')}`)
   })
 })

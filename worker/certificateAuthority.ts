@@ -1,6 +1,6 @@
 import forge from 'node-forge'
-import { children, der, encodeDer, fromBinary, oidOf, parseDer, toBinary, type Asn1 } from '../src/lib/signing/der'
-import { parseCertificate, type ParsedCertificate } from '../src/lib/signing/identity'
+import { children, der, encodeDer, fromBinary, oidOf, parseDer, toBinary, type Asn1 } from '../src/lib/signing/der.ts'
+import { parseCertificate, type ParsedCertificate } from '../src/lib/signing/identity.ts'
 
 /**
  * RealPDF's certificate authority: issues X.509 signing certificates for

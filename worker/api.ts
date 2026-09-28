@@ -1,6 +1,6 @@
-import type { BlobStore } from './store'
-import { toBase64 } from './encoding'
-import { derToPem, type CertificateAuthority } from './certificateAuthority'
+import type { BlobStore } from './store.ts'
+import { toBase64 } from './encoding.ts'
+import { derToPem, type CertificateAuthority } from './certificateAuthority.ts'
 import {
   addSignRequestVersion,
   createSignRequest,
@@ -9,8 +9,8 @@ import {
   MAX_VERSION_BYTES,
   readSignRequestVersion,
   SignRequestError,
-} from './signRequests'
-import { IdentityError, issueVerifiedCertificate, startEmailVerification, type SendEmail } from './signingIdentity'
+} from './signRequests.ts'
+import { IdentityError, issueVerifiedCertificate, startEmailVerification, type SendEmail } from './signingIdentity.ts'
 
 /**
  * HTTP routes under /api/ for signing requests and email-verified

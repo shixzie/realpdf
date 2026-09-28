@@ -1,5 +1,5 @@
-import type { BlobStore } from './store'
-import { randomId, sha256Hex, timingSafeEqual } from './encoding'
+import type { BlobStore } from './store.ts'
+import { randomId, sha256Hex, timingSafeEqual } from './encoding.ts'
 
 /**
  * Signing requests: a document someone sends to others to sign. The browser

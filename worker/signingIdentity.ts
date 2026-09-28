@@ -1,11 +1,11 @@
-import type { BlobStore } from './store'
-import { fromBase64, randomId, sha256Hex, timingSafeEqual } from './encoding'
+import type { BlobStore } from './store.ts'
+import { fromBase64, randomId, sha256Hex, timingSafeEqual } from './encoding.ts'
 import {
   importSubjectPublicKey,
   issueCertificate,
   verifyWithSubjectKey,
   type CertificateAuthority,
-} from './certificateAuthority'
+} from './certificateAuthority.ts'
 
 /**
  * Email-verified signing certificates. The flow has two calls:

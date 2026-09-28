@@ -17,6 +17,7 @@ import {
   type LibraryMeta,
 } from './lib/library'
 import { restoreAssets } from './lib/assets'
+import type { RequestHeader } from './lib/signRequests'
 import { t } from './i18n'
 
 export type ToolsTab = 'merge' | 'split' | 'convert' | 'office'
@@ -33,6 +34,20 @@ export interface SignaturePlacementRequest {
   width: number
   height: number
   nonce: number
+}
+
+/** A signing request opened from its link (see src/lib/signRequests.ts). */
+export interface ActiveSignRequest {
+  id: string
+  key: string
+  header: RequestHeader
+  /** Versions stored so far; 1 means nobody has signed yet. */
+  versions: number
+  expiresAt: number
+  /** Created on this device. */
+  owner: boolean
+  /** Signed in this tab and sent back. */
+  signedHere: boolean
 }
 
 function initialTheme(): Theme {
@@ -99,6 +114,8 @@ interface AppState {
   formFlatten: boolean
   digitalSign: DigitalSignStage
   signPlacement: SignaturePlacementRequest | null
+  requestSignOpen: boolean
+  signRequest: ActiveSignRequest | null
 
   load: (args: LoadArgs) => void
   close: () => void
@@ -142,6 +159,8 @@ interface AppState {
   setFormFlatten: (flatten: boolean) => void
   setDigitalSign: (stage: DigitalSignStage) => void
   placeSignature: (placement: Omit<SignaturePlacementRequest, 'nonce'>) => void
+  setRequestSignOpen: (open: boolean) => void
+  setSignRequest: (request: ActiveSignRequest | null) => void
   setLoading: (loading: boolean) => void
   setExporting: (exporting: boolean, progress?: number) => void
   setError: (message: string | null) => void
@@ -240,6 +259,8 @@ export const useStore = create<AppState>()((set, get) => ({
   formFlatten: true,
   digitalSign: 'closed',
   signPlacement: null,
+  requestSignOpen: false,
+  signRequest: null,
 
   load: ({ bytes, fileName, pdf, pages }) =>
     set({
@@ -264,6 +285,8 @@ export const useStore = create<AppState>()((set, get) => ({
       projectId: null,
       digitalSign: 'closed',
       signPlacement: null,
+      requestSignOpen: false,
+      signRequest: null,
     }),
 
   close: () =>
@@ -286,6 +309,8 @@ export const useStore = create<AppState>()((set, get) => ({
       selectionPage: null,
       digitalSign: 'closed',
       signPlacement: null,
+      requestSignOpen: false,
+      signRequest: null,
     }),
 
   setZoom: (zoom) => set({ zoom: Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, zoom)) }),
@@ -579,6 +604,8 @@ export const useStore = create<AppState>()((set, get) => ({
   setDigitalSign: (stage) => set({ digitalSign: stage, signPlacement: null }),
   placeSignature: (placement) =>
     set({ digitalSign: 'form', signPlacement: { ...placement, nonce: Date.now() + Math.random() } }),
+  setRequestSignOpen: (open) => set({ requestSignOpen: open }),
+  setSignRequest: (request) => set({ signRequest: request }),
 
   enterFormMode: async () => {
     const state = get()
