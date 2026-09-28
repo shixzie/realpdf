@@ -1,7 +1,7 @@
 import { verifyPdf, VerifyError, type VerificationReport, type VerifiedSignature } from '../../../src/lib/signing/verify'
 import { pdfInputProperties, readPdfArgument } from '../pdfInput'
 import { ToolError, type Tool } from '../protocol'
-import type { McpContext } from '../context'
+import { trustAnchors, type McpContext } from '../context'
 
 function describeSignature(signature: VerifiedSignature, index: number): string {
   const who = signature.signer ? `${signature.signer.name}${signature.signer.email ? ` <${signature.signer.email}>` : ''}` : 'unknown signer'
@@ -10,7 +10,7 @@ function describeSignature(signature: VerifiedSignature, index: number): string 
   const certifies = signature.certifies ? `, certifies the document (DocMDP P=${signature.certifies})` : ''
   const trust =
     signature.trusted === true
-      ? ', issued by a trusted RealPDF certificate authority'
+      ? ', email verified by RealPDF'
       : signature.signer?.selfSigned
         ? ', self-signed certificate'
         : ''
@@ -55,7 +55,7 @@ export const verifyPdfTool: Tool<McpContext> = {
     const bytes = await readPdfArgument(args)
     let report: VerificationReport
     try {
-      report = await verifyPdf(bytes, { trustAnchors: context.trustAnchors })
+      report = await verifyPdf(bytes, { trustAnchors: await trustAnchors(context) })
     } catch (error) {
       if (error instanceof VerifyError) throw new ToolError(`Could not read the PDF: ${error.message}`)
       throw error

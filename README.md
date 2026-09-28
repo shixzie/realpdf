@@ -27,6 +27,7 @@ A real PDF editor that runs **entirely in your browser**. No uploads, no servers
 - **Countersigning**: an unchanged document is signed as an *incremental update* (the original bytes are kept and the signature is appended), so signatures already in the file stay valid
 - **Certify** (DocMDP): the first signer can lock the document so that any change other than filling forms and signing invalidates it
 - **Remember on this device** (opt-in): the unlocked key is kept in this browser's IndexedDB as a non-extractable WebCrypto key, so later signatures need neither the file nor the password; the browser can sign with it but no script can read it back, and **Forget** removes it. Nothing is uploaded
+- **For agents (MCP)**: `https://realpdf.app/mcp` lets AI agents send a PDF for signature, see who has signed, download the signed copy and verify any PDF's signatures; see [docs/mcp.md](docs/mcp.md)
 
 **Local library**
 
@@ -207,6 +208,8 @@ APP_URL=http://localhost:4173/ npm test
 - `tests/e2e/ui.test.mjs` — theme toggle, homepage tool cards, signature image upload, Ko-fi button, language switch (persistence, translated strings, `<html lang>`/title)
 - `tests/e2e/library.test.mjs` — save to the local library, rename, persistence across a reload, restore annotations, rebuild the PDF, delete
 - `tests/unit/sign.test.mjs` — PKCS#12 loading (3DES, AES, OpenSSL-made RSA/ECDSA files), wrong passwords, PAdES signatures over xref tables and xref streams, countersigning, filling an empty signature field, certification — every signature checked with Node's crypto, independently of the app's code
+- `tests/unit/verify.test.mjs` — signature verification: signer, chain and trust anchors, tampered bytes, content appended after signing, countersignatures and certification, ECDSA
+- `tests/unit/mcp.test.mjs`, `tests/unit/mcp-requests.test.mjs` — the `/mcp` endpoint (JSON-RPC, errors, batches, CORS) and signing requests created by an agent, signed through the app's client with an email-verified certificate, then checked and downloaded by the agent
 - `tests/e2e/digital-sign.test.mjs` — unlock a certificate, draw the signature box, download and verify the signed PDF (byte range, CMS signature, field position, rendered appearance), then countersign it and check both signatures; remember a certificate (stored key not exportable), sign with it after a reload, and forget it
 - `tests/e2e/unicode-text.test.mjs` — added text outside WinAnsi (extended Latin, Greek, Cyrillic, CJK, Hangul, emoji) exports with embedded Noto subsets, WinAnsi-only text embeds nothing extra, typed line breaks survive
 - `tests/e2e/text-edit.test.mjs` — edit embedded-font and standard-font text: text layer deletion, exported font programs, coloured backgrounds
@@ -247,7 +250,7 @@ src/
     forms.ts      AcroForm discovery + value writing
     pdfOps.ts     merge, extract, image/text conversion
     currentDocument.ts  "bake" the edited document for tools/export
-    signing/      PKCS#12 identities, CMS (PAdES) signatures and the incremental-update writer
+    signing/      PKCS#12 identities, CMS (PAdES) signatures, the incremental-update writer and verification
     signController.ts  signing flow: which bytes to sign, placement, download
     serialize.ts  annotation JSON (assets kept out of undo snapshots)
     zip.ts        minimal ZIP writer (STORE, optional DEFLATE)

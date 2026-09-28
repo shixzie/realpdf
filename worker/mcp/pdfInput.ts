@@ -59,9 +59,30 @@ async function download(url: string): Promise<Uint8Array> {
     throw new ToolError(`Could not download pdf_url: ${(error as Error).message}`)
   }
   if (!response.ok) throw new ToolError(`Downloading pdf_url returned HTTP ${response.status}.`)
-  const declared = Number(response.headers.get('content-length') ?? 0)
-  if (declared > MAX_PDF_BYTES) throw new ToolError(`The PDF is larger than ${MAX_PDF_BYTES / 1024 / 1024} MB.`)
-  return new Uint8Array(await response.arrayBuffer())
+  const tooLarge = () => new ToolError(`The PDF is larger than ${MAX_PDF_BYTES / 1024 / 1024} MB.`)
+  if (Number(response.headers.get('content-length') ?? 0) > MAX_PDF_BYTES) throw tooLarge()
+  // Stop reading once the limit is passed, whatever Content-Length said.
+  const reader = response.body?.getReader()
+  if (!reader) return new Uint8Array(await response.arrayBuffer())
+  const chunks: Uint8Array[] = []
+  let total = 0
+  while (true) {
+    const { done, value } = await reader.read()
+    if (done) break
+    total += value.length
+    if (total > MAX_PDF_BYTES) {
+      await reader.cancel()
+      throw tooLarge()
+    }
+    chunks.push(value)
+  }
+  const out = new Uint8Array(total)
+  let offset = 0
+  for (const chunk of chunks) {
+    out.set(chunk, offset)
+    offset += chunk.length
+  }
+  return out
 }
 
 /** Reads the PDF a tool was given as pdf_base64 or pdf_url. */

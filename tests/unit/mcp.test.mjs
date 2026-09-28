@@ -8,8 +8,9 @@ import { handleMcp } from '../../worker/mcp/index.ts'
 import { loadSigningIdentity } from '../../src/lib/signing/identity.ts'
 import { signPdf } from '../../src/lib/signing/pdfSign.ts'
 import { makeRsaPkcs12 } from '../helpers/signing.mjs'
+import { memoryStore } from '../../worker/store.ts'
 
-const env = {}
+const deps = { store: memoryStore(), certificateAuthority: async () => null }
 const ENDPOINT = 'https://realpdf.app/mcp'
 
 async function post(body, headers = {}) {
@@ -19,7 +20,7 @@ async function post(body, headers = {}) {
       headers: { 'Content-Type': 'application/json', Accept: 'application/json, text/event-stream', ...headers },
       body: typeof body === 'string' ? body : JSON.stringify(body),
     }),
-    env,
+    deps,
   )
   const text = await response.text()
   return { status: response.status, headers: response.headers, body: text ? JSON.parse(text) : null }
@@ -120,9 +121,9 @@ describe('MCP endpoint', () => {
   })
 
   it('offers no SSE stream and answers CORS preflights', async () => {
-    const get = await handleMcp(new Request(ENDPOINT, { method: 'GET' }), env)
+    const get = await handleMcp(new Request(ENDPOINT, { method: 'GET' }), deps)
     expect(get.status).toBe(405)
-    const options = await handleMcp(new Request(ENDPOINT, { method: 'OPTIONS' }), env)
+    const options = await handleMcp(new Request(ENDPOINT, { method: 'OPTIONS' }), deps)
     expect(options.status).toBe(204)
     expect(options.headers.get('Access-Control-Allow-Headers')).toContain('Mcp-Protocol-Version')
   })
