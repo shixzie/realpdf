@@ -1872,3 +1872,49 @@ select.form-widget {
     grid-template-columns: 1fr;
   }
 }
+
+.saved-certs {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.saved-cert {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 8px 8px 12px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  color: var(--accent-ink);
+}
+
+.saved-cert > div {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.saved-cert strong {
+  color: var(--text);
+  font-size: 13px;
+}
+
+.cert-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+}
+
+.cert-remembered {
+  color: var(--success);
+}
+
+.digital-sign-remember {
+  margin-top: 10px;
+}

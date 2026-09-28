@@ -2,7 +2,8 @@
  * Certificate signing suite: unlock a PKCS#12 file, draw the signature box on
  * a page, download the signed PDF and verify it independently (Node crypto for
  * the CMS signature, pdf.js for the signature field). Then open the signed
- * file and countersign it, which must keep the first signature valid.
+ * file and countersign it, which must keep the first signature valid, and
+ * remember a certificate on the device, reuse it after a reload and forget it.
  */
 import fs from 'node:fs'
 import path from 'node:path'
@@ -140,6 +141,75 @@ describe('digital signatures', () => {
     check(results.every((result) => result.valid), 'both signatures verify')
     check(results[1]?.coversFile === true && results[0]?.coversFile === false, 'the new signature covers the whole file')
     check(String(results[1]?.signer).includes('Charles Babbage'), 'the second signer is recorded')
+    check(pageErrors.length === 0, `no browser errors: ${pageErrors.join(' | ')}`)
+  })
+
+  it('remembers a certificate on this device as a non-exportable key', async () => {
+    const { page, pageErrors } = app
+    await gotoHome(page)
+    await openPdf(page, SAMPLE_PDF)
+    await openSignDialog(page)
+    await page.setInputFiles('.digital-sign-file-input', secondPath)
+    await page.check('input[name="certificate-remember"]')
+    await page.fill('input[name="certificate-password"]', second.password)
+    await page.click('.digital-sign-unlock button[type="submit"]')
+    await page.waitForSelector('.cert-remembered')
+    await page.click('.modal-head .icon-button')
+
+    // The stored key is the CryptoKey itself and cannot be exported.
+    const stored = await page.evaluate(
+      () =>
+        new Promise((resolve) => {
+          const request = indexedDB.open('realpdf-signing')
+          request.onsuccess = () => {
+            const read = request.result.transaction('identities').objectStore('identities').getAll()
+            read.onsuccess = async () => {
+              const [entry] = read.result
+              let exported = true
+              try {
+                await crypto.subtle.exportKey('pkcs8', entry.key)
+              } catch {
+                exported = false
+              }
+              resolve({ count: read.result.length, extractable: entry.key.extractable, exported, name: entry.info.name })
+            }
+          }
+          request.onerror = () => resolve(null)
+        }),
+    )
+    check(stored?.count === 1 && stored?.name === 'Charles Babbage', `one identity is remembered (${JSON.stringify(stored)})`)
+    check(stored?.extractable === false && stored?.exported === false, 'the remembered key cannot be exported')
+
+    // After a reload the certificate is offered without the file or password.
+    await page.reload()
+    await page.waitForSelector('.empty-card')
+    await openPdf(page, SAMPLE_PDF)
+    await openSignDialog(page)
+    await page.waitForSelector('.saved-cert')
+    check((await page.locator('.saved-cert').innerText()).includes('Charles Babbage'), 'saved certificate is listed')
+    await page.click('.saved-cert-use')
+    await page.waitForSelector('.cert-summary')
+    await page.selectOption('select[name="signature-placement"]', 'invisible')
+    const savedPath = path.join(OUT_DIR, 'digitally-signed-saved.pdf')
+    const [download] = await Promise.all([
+      page.waitForEvent('download', { timeout: 30000 }),
+      page.click('.digital-sign-submit'),
+    ])
+    await download.saveAs(savedPath)
+    const [result] = verifyPdfSignatures(fs.readFileSync(savedPath))
+    check(result?.valid === true && String(result?.signer).includes('Charles Babbage'), 'signs with the remembered key')
+
+    // Forgetting removes it.
+    await openSignDialog(page)
+    await page.waitForSelector('.saved-cert')
+    await page.click('.saved-cert-forget')
+    await page.waitForSelector('.saved-cert', { state: 'detached' })
+    await page.reload()
+    await page.waitForSelector('.empty-card')
+    await openPdf(page, SAMPLE_PDF)
+    await openSignDialog(page)
+    await page.waitForTimeout(500)
+    check((await page.locator('.saved-cert').count()) === 0, 'forgotten certificate is gone after a reload')
     check(pageErrors.length === 0, `no browser errors: ${pageErrors.join(' | ')}`)
   })
 })
