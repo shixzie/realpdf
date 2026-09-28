@@ -150,7 +150,7 @@ export function EmptyState() {
           <MyRequestsList empty={<p className="home-section-empty">{t('empty.requestsEmpty')}</p>} />
         </section>
 
-        <section className="home-section" aria-labelledby="home-tools-title">
+        <section className="home-section home-tools-section" aria-labelledby="home-tools-title">
           <div className="home-section-head">
             <h2 id="home-tools-title">
               <Wrench size={15} /> {t('empty.tools')}
