@@ -479,9 +479,6 @@ export const en = {
   canvas: {
     textPlaceholder: 'Type here',
   },
-  kofi: {
-    text: 'Support me',
-  },
   support: {
     title: 'Support RealPDF',
     intro: 'RealPDF is free and runs entirely in your browser. If it helps you, you can chip in on Ko-fi right here.',
