@@ -1,4 +1,5 @@
 import { tracing } from 'cloudflare:workers'
+import { handleMcp, MCP_PATH } from './mcp'
 
 // These mirror public/_headers. With assets.run_worker_first enabled the
 // assets layer no longer applies _headers to responses, so the Worker does.
@@ -56,6 +57,13 @@ export default {
         span.setAttribute('url.redirect.target', location)
         logEvent('redirect', { ...base, status: 301, location })
         return new Response(null, { status: 301, headers: { Location: location } })
+      }
+
+      if (url.pathname === MCP_PATH) {
+        const response = await handleMcp(request, env)
+        span.setAttribute('http.response.status_code', response.status)
+        logEvent('mcp', { ...base, status: response.status, durationMs: Math.round(performance.now() - startedAt) })
+        return response
       }
 
       try {
