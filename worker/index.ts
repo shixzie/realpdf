@@ -1,6 +1,7 @@
 import { tracing } from 'cloudflare:workers'
 import { handleApi, type ApiDeps } from './api.ts'
 import { loadCertificateAuthority, type CertificateAuthority } from './certificateAuthority.ts'
+import { handleMcp, MCP_PATH } from './mcp/index.ts'
 import { purgeExpiredSignRequests } from './signRequests.ts'
 import { purgeExpiredChallenges } from './signingIdentity.ts'
 
@@ -96,6 +97,13 @@ export default {
         span.setAttribute('url.redirect.target', location)
         logEvent('redirect', { ...base, status: 301, location })
         return new Response(null, { status: 301, headers: { Location: location } })
+      }
+
+      if (url.pathname === MCP_PATH) {
+        const response = await handleMcp(request, apiDeps(env))
+        span.setAttribute('http.response.status_code', response.status)
+        logEvent('mcp', { ...base, status: response.status, durationMs: Math.round(performance.now() - startedAt) })
+        return response
       }
 
       try {

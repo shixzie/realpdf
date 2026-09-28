@@ -29,6 +29,7 @@ A real PDF editor that runs **entirely in your browser**. No uploads, no account
 - **Signing ID without a certificate file**: type your name and email, enter the 6-digit code RealPDF emails you, and RealPDF's CA issues a certificate for that address (valid one year, subject `CN=<name>, OU=Email verified by RealPDF, E=<email>`). The key pair is generated in the browser as non-extractable and only the public key is sent; the ID is remembered on the device and picked automatically next time. Only the email is verified, not the name
 - **Request signatures** (Export → *Request signatures*): creates a link like `https://realpdf.app/sign/<id>#<key>` to send to the people who should sign. The document is encrypted in the browser with AES-256-GCM before upload and the key exists only in the link's `#fragment`, which browsers never send to the server, so the server stores ciphertext it cannot read (file name and message included). Whoever opens the link signs with their own signing ID or certificate, and the signed copy is uploaded back to the same link (encrypted again); the sender opens the link to see who signed and download the result. Links expire after 30 days, and the sender can delete them earlier from the home screen or the dialog
 - **Remember on this device** (opt-in): the unlocked key is kept in this browser's IndexedDB as a non-extractable WebCrypto key, so later signatures need neither the file nor the password; the browser can sign with it but no script can read it back, and **Forget** removes it. Nothing is uploaded
+- **For agents (MCP)**: `https://realpdf.app/mcp` lets AI agents send a PDF for signature, see who has signed, download the signed copy and verify any PDF's signatures; see [docs/mcp.md](docs/mcp.md)
 
 **Local library**
 
@@ -241,6 +242,8 @@ APP_URL=http://localhost:4173/ npm test
 - `tests/e2e/ui.test.mjs` — theme toggle, homepage tool cards, signature image upload, Ko-fi button, language switch (persistence, translated strings, `<html lang>`/title)
 - `tests/e2e/library.test.mjs` — save to the local library, rename, persistence across a reload, restore annotations, rebuild the PDF, delete
 - `tests/unit/sign.test.mjs` — PKCS#12 loading (3DES, AES, OpenSSL-made RSA/ECDSA files), wrong passwords, PAdES signatures over xref tables and xref streams, countersigning, filling an empty signature field, certification — every signature checked with Node's crypto, independently of the app's code
+- `tests/unit/verify.test.mjs` — signature verification: signer, chain and trust anchors, tampered bytes, content appended after signing, countersignatures and certification, ECDSA
+- `tests/unit/mcp.test.mjs`, `tests/unit/mcp-requests.test.mjs` — the `/mcp` endpoint (JSON-RPC, errors, batches, CORS) and signing requests created by an agent, signed through the app's client with an email-verified certificate, then checked and downloaded by the agent
 - `tests/e2e/digital-sign.test.mjs` — unlock a certificate, draw the signature box, download and verify the signed PDF (byte range, CMS signature, field position, rendered appearance), then countersign it and check both signatures; remember a certificate (stored key not exportable), sign with it after a reload, and forget it
 - `tests/unit/signing-api.test.mjs` — signing requests (versions, write/owner tokens, concurrent uploads, expiry, rate limiting) and email-verified certificates (codes, attempt limits, proof of key possession, issued certificate checked with Node's crypto)
 - `tests/e2e/sign-request.test.mjs` — a sender creates a signing link (only ciphertext is uploaded, the key never is), a signer without a certificate creates a signing ID by email and signs, and the sender downloads the signed copy through the same link and deletes the request
@@ -284,7 +287,7 @@ src/
     forms.ts      AcroForm discovery + value writing
     pdfOps.ts     merge, extract, image/text conversion
     currentDocument.ts  "bake" the edited document for tools/export
-    signing/      PKCS#12 identities, CMS (PAdES) signatures and the incremental-update writer
+    signing/      PKCS#12 identities, CMS (PAdES) signatures, the incremental-update writer and verification
     signController.ts  signing flow: which bytes to sign, placement, download
     signRequests.ts  signing links: encryption, the link format, the /api/sign-requests client
     signRequestController.ts  opening a link in the editor and sending signed copies back
