@@ -14,8 +14,14 @@ cd "$repo" || exit 1
 # Main worktree is the first entry; everything else is a candidate.
 main_wt=$(git worktree list --porcelain | awk '/^worktree /{print $2; exit}')
 
-# origin/main drives the merge check. Best-effort; stale is fine for a first pass.
-git fetch origin main --quiet 2>/dev/null || echo "warn: could not fetch origin/main; merged column may be stale" >&2
+# The trunk drives the merge check: origin/HEAD when set, else master, else main.
+trunk=$(git symbolic-ref --quiet --short refs/remotes/origin/HEAD 2>/dev/null | sed 's#^origin/##')
+if [ -z "$trunk" ]; then
+	trunk=master
+	git show-ref --verify --quiet refs/remotes/origin/master || trunk=main
+fi
+# Best-effort; stale is fine for a first pass.
+git fetch origin "$trunk" --quiet 2>/dev/null || echo "warn: could not fetch origin/$trunk; merged column may be stale" >&2
 
 # PR state by branch, fetched once. Empty if gh is unavailable.
 prs=$(mktemp)
@@ -37,9 +43,9 @@ git worktree list --porcelain | awk '/^worktree /{print $2}' | while read -r wt;
 	head_ts=$(git -C "$wt" log -1 --format='%ct' HEAD 2>/dev/null || echo 0)
 	age=$([ "$head_ts" -gt 0 ] 2>/dev/null && echo "$(( (now - head_ts) / 86400 ))d" || echo "?")
 
-	# Squash-merged branches are not ancestors of main, so PR state is the
+	# Squash-merged branches are not ancestors of the trunk, so PR state is the
 	# real signal; merge-base only catches fast-forward/rebase merges.
-	git merge-base --is-ancestor "$head" origin/main 2>/dev/null && merged=YES || merged=no
+	git merge-base --is-ancestor "$head" "origin/$trunk" 2>/dev/null && merged=YES || merged=no
 
 	# Distinguish real WIP (tracked edits) from disposable untracked scratch.
 	porcelain=$(git -C "$wt" status --porcelain 2>/dev/null)
@@ -65,9 +71,10 @@ git worktree list --porcelain | awk '/^worktree /{print $2}' | while read -r wt;
 	last="-"; last_ts=0
 	if [ -d "$transcripts" ]; then
 		f=$(rg -l -e "${wt}/" -e "${wt}\"" "$transcripts" 2>/dev/null \
-			| xargs stat -f '%m %N' 2>/dev/null | sort -rn | head -1)
+			| while read -r t; do echo "$(stat -c %Y "$t" 2>/dev/null || stat -f %m "$t") $t"; done \
+			| sort -rn | head -1)
 		if [ -n "$f" ]; then last_ts=$(echo "$f" | awk '{print $1}')
-			last=$(date -r "$last_ts" '+%Y-%m-%d' 2>/dev/null); fi
+			last=$(date -d "@$last_ts" '+%Y-%m-%d' 2>/dev/null || date -r "$last_ts" '+%Y-%m-%d' 2>/dev/null); fi
 	fi
 	recent=$([ "$last_ts" -gt 0 ] 2>/dev/null && [ $(( (now - last_ts) / 86400 )) -le 4 ] && echo yes || echo no)
 
