@@ -10,6 +10,7 @@ import {
   PDFString,
   StandardFonts,
   type PDFFont,
+  type PDFImage,
   type PDFPage,
   type PDFObject,
 } from 'pdf-lib'
@@ -49,6 +50,8 @@ export interface SignOptions {
   placement: SignaturePlacement
   /** Text drawn in a visible signature. */
   lines?: SignatureLine[]
+  /** PNG of the handwritten signature, drawn beside the text in a visible signature. */
+  image?: Uint8Array
   reason?: string
   location?: string
   contactInfo?: string
@@ -199,6 +202,8 @@ function rectOf(dict: PDFDict): [number, number, number, number] {
 
 export interface SignatureFieldInfo {
   name: string
+  /** Who should sign here (the field's tooltip), when the sender said. */
+  label?: string
   pageIndex: number
   rect: [number, number, number, number]
 }
@@ -224,7 +229,9 @@ export async function readSignatureSummary(bytes: Uint8Array): Promise<Signature
       if (!widget) continue
       const rect = rectOf(widget.dict)
       if (rect[2] - rect[0] < 1 || rect[3] - rect[1] < 1) continue
-      empty.push({ name: field.name, pageIndex: pageIndexOf(doc, widget), rect })
+      const tooltip = field.dict.lookup(PDFName.of('TU'))
+      const label = tooltip instanceof PDFString || tooltip instanceof PDFHexString ? tooltip.decodeText().trim() : ''
+      empty.push({ name: field.name, pageIndex: pageIndexOf(doc, widget), rect, ...(label ? { label } : {}) })
     }
     const perms = doc.catalog.lookupMaybe(PDFName.of('Perms'), PDFDict)
     return {
@@ -238,10 +245,10 @@ export async function readSignatureSummary(bytes: Uint8Array): Promise<Signature
   }
 }
 
-function uniqueFieldName(fields: FieldEntry[]): string {
-  const taken = new Set(fields.map((field) => field.name))
+function uniqueFieldName(taken: Set<string>): string {
   let index = 1
   while (taken.has(`Signature${index}`)) index += 1
+  taken.add(`Signature${index}`)
   return `Signature${index}`
 }
 
@@ -288,16 +295,15 @@ function safeText(font: PDFFont, text: string): string {
   }
 }
 
-/**
- * Draws the appearance in an upright box of `width` x `height` (the box as
- * the viewer shows it). /Matrix undoes the page rotation so the text reads
- * horizontally on screen.
- */
-async function buildAppearance(doc: PDFDocument, lines: SignatureLine[], width: number, height: number, rotation: number) {
-  const faces = await appearanceFonts(doc, lines)
-  const pad = Math.min(4, width * 0.05, height * 0.08)
-  const innerWidth = Math.max(1, width - pad * 2)
-  const innerHeight = Math.max(1, height - pad * 2)
+interface Area {
+  x: number
+  y: number
+  width: number
+  height: number
+}
+
+/** Text lines stacked from the top of `area`, shrunk to fit its width and height. */
+function lineOps(lines: SignatureLine[], faces: Faces, area: Area): string {
   const prepared = lines
     .filter((line) => line.text.trim())
     .map((line) => {
@@ -307,19 +313,63 @@ async function buildAppearance(doc: PDFDocument, lines: SignatureLine[], width: 
     })
   const leading = 1.22
   const totalScale = prepared.reduce((sum, line) => sum + line.scale * leading, 0) || 1
-  const body = Math.max(2, Math.min(11, innerHeight / totalScale))
+  const body = Math.max(2, Math.min(11, area.height / totalScale))
 
   let ops = 'q\n0.08 0.16 0.35 rg\n'
-  let cursor = height - pad
+  let cursor = area.y + area.height
   for (const line of prepared) {
-    const size = Math.max(1.5, Math.min(body * line.scale, innerWidth / Math.max(line.unitWidth, 0.001)))
+    const size = Math.max(1.5, Math.min(body * line.scale, area.width / Math.max(line.unitWidth, 0.001)))
     cursor -= body * line.scale * leading
     const baseline = cursor + body * line.scale * (leading - 1) + size * 0.22
     const name = line.font === faces.bold && faces.bold !== faces.regular ? '/F2' : '/F1'
-    ops += `BT ${name} ${size.toFixed(3)} Tf ${pad.toFixed(3)} ${baseline.toFixed(3)} Td ${line.font.encodeText(line.text).toString()} Tj ET\n`
+    ops += `BT ${name} ${size.toFixed(3)} Tf ${area.x.toFixed(3)} ${baseline.toFixed(3)} Td ${line.font.encodeText(line.text).toString()} Tj ET\n`
   }
-  ops += 'Q\n'
+  return `${ops}Q\n`
+}
+
+/**
+ * Draws the appearance in an upright box of `width` x `height` (the box as
+ * the viewer shows it). /Matrix undoes the page rotation so the text reads
+ * horizontally on screen. With a handwritten image, a wide box puts the image
+ * on the left and the text on the right; a squarer one puts the text below.
+ */
+async function buildAppearance(
+  doc: PDFDocument,
+  lines: SignatureLine[],
+  width: number,
+  height: number,
+  rotation: number,
+  image?: PDFImage,
+) {
+  const faces = await appearanceFonts(doc, lines)
+  const pad = Math.min(4, width * 0.05, height * 0.08)
+  const inner: Area = { x: pad, y: pad, width: Math.max(1, width - pad * 2), height: Math.max(1, height - pad * 2) }
+
+  let ops = ''
+  if (image) {
+    let picture: Area
+    let text: Area
+    if (inner.width / inner.height >= 2.4) {
+      const split = inner.width * 0.55
+      picture = { ...inner, width: split }
+      text = { x: inner.x + split + pad, y: inner.y, width: Math.max(1, inner.width - split - pad), height: inner.height }
+    } else {
+      const textHeight = Math.min(inner.height * 0.34, 26)
+      picture = { x: inner.x, y: inner.y + textHeight, width: inner.width, height: Math.max(1, inner.height - textHeight) }
+      text = { ...inner, height: textHeight }
+    }
+    const scale = Math.min(picture.width / image.width, picture.height / image.height)
+    const drawnWidth = image.width * scale
+    const drawnHeight = image.height * scale
+    const left = picture.x + (picture.width - drawnWidth) / 2
+    const bottom = picture.y + (picture.height - drawnHeight) / 2
+    ops += `q ${drawnWidth.toFixed(3)} 0 0 ${drawnHeight.toFixed(3)} ${left.toFixed(3)} ${bottom.toFixed(3)} cm /Im1 Do Q\n`
+    ops += lineOps(lines, faces, text)
+  } else {
+    ops += lineOps(lines, faces, inner)
+  }
   for (const font of new Set([faces.regular, faces.bold])) await font.embed()
+  if (image) await image.embed()
 
   const radians = (rotation * Math.PI) / 180
   const cos = Math.round(Math.cos(radians))
@@ -331,7 +381,7 @@ async function buildAppearance(doc: PDFDocument, lines: SignatureLine[], width: 
     Subtype: 'Form',
     BBox: [0, 0, width, height],
     Matrix: [cos, sin, -sin, cos, 0, 0],
-    Resources: { Font: fonts },
+    Resources: image ? { Font: fonts, XObject: { Im1: image.ref } } : { Font: fonts },
   })
   return doc.context.register(stream)
 }
@@ -375,7 +425,18 @@ function trailerEntries(doc: PDFDocument, size: number, prev: number): string {
   return entries
 }
 
-export async function signPdf(input: Uint8Array, options: SignOptions): Promise<Uint8Array> {
+/** A document loaded for an incremental update of the bytes it came from. */
+interface Update {
+  bytes: Uint8Array
+  tail: XrefTail
+  doc: PDFDocument
+  /** First object number created by this update. */
+  firstNew: number
+  /** Existing objects this update rewrites. */
+  modified: Set<PDFRef>
+}
+
+async function openForUpdate(input: Uint8Array): Promise<Update> {
   let bytes = input
   let tail = readXrefTail(bytes)
   if (!tail) {
@@ -393,139 +454,62 @@ export async function signPdf(input: Uint8Array, options: SignOptions): Promise<
     if ((error as Error)?.name === 'EncryptedPDFError') throw new SignError('encrypted')
     throw error
   }
-  const { context, catalog } = doc
+  const { context } = doc
   if (context.trailerInfo.Encrypt) throw new SignError('encrypted')
   context.largestObjectNumber = Math.max(context.largestObjectNumber, tail.size - 1)
-  const firstNew = context.largestObjectNumber + 1
-  const modified = new Set<PDFRef>()
   const catalogRef = context.trailerInfo.Root
   if (!(catalogRef instanceof PDFRef)) throw new Error('The document catalog is not an indirect object')
-  modified.add(catalogRef)
+  return { bytes, tail, doc, firstNew: context.largestObjectNumber + 1, modified: new Set([catalogRef]) }
+}
 
-  const fields = collectFields(doc)
-  if (options.certify && fields.some(isSigned)) throw new SignError('alreadyCertified')
-  let target: FieldEntry | null = null
-  if (options.placement.kind === 'field') {
-    const name = options.placement.name
-    target = fields.find((field) => field.name === name && isEmptySignatureField(field)) ?? null
-    if (!target?.ref) throw new SignError('noField')
-  }
-
-  // Signature dictionary with placeholders for /ByteRange and /Contents.
-  const reserve = 4096 + options.identity.certificate.length + options.identity.chain.reduce((sum, cert) => sum + cert.length, 0)
-  const contents = PDFHexString.of('0'.repeat(reserve * 2))
-  const byteRange = PDFArray.withContext(context)
-  byteRange.push(PDFNumber.of(0))
-  for (let i = 0; i < 3; i += 1) byteRange.push(PDFName.of(BYTE_RANGE_PLACEHOLDER))
-  const signature = context.obj({
-    Type: 'Sig',
-    Filter: 'Adobe.PPKLite',
-    SubFilter: 'ETSI.CAdES.detached',
-    M: PDFString.of(pdfDate(options.date ?? new Date())),
-    Prop_Build: { App: { Name: 'RealPDF' } },
-  })
-  signature.set(PDFName.of('ByteRange'), byteRange)
-  signature.set(PDFName.of('Contents'), contents)
-  signature.set(PDFName.of('Name'), PDFHexString.fromText(options.identity.info.name))
-  if (options.reason) signature.set(PDFName.of('Reason'), PDFHexString.fromText(options.reason))
-  if (options.location) signature.set(PDFName.of('Location'), PDFHexString.fromText(options.location))
-  if (options.contactInfo) signature.set(PDFName.of('ContactInfo'), PDFHexString.fromText(options.contactInfo))
-  if (options.certify) {
-    signature.set(
-      PDFName.of('Reference'),
-      context.obj([
-        {
-          Type: 'SigRef',
-          TransformMethod: 'DocMDP',
-          TransformParams: { Type: 'TransformParams', P: 2, V: '1.2' },
-        },
-      ]),
-    )
-  }
-  const signatureRef = context.register(signature)
-
-  const lines = options.lines ?? []
-  const appearanceFor = async (page: PDFPage, rect: [number, number, number, number]) => {
-    const [x1, y1, x2, y2] = rect
-    const rotation = ((page.getRotation().angle % 360) + 360) % 360
-    const quarter = rotation === 90 || rotation === 270
-    const width = Math.abs(quarter ? y2 - y1 : x2 - x1)
-    const height = Math.abs(quarter ? x2 - x1 : y2 - y1)
-    return context.obj({ N: await buildAppearance(doc, lines, width, height, rotation) })
-  }
-
-  let widgetRef: PDFRef | null = null
-  if (target?.ref) {
-    // Fill in an existing empty field: set its value and redraw its widget.
-    target.dict.set(PDFName.of('V'), signatureRef)
-    modified.add(target.ref)
-    const widget = widgetOf(target)
-    if (widget) {
-      const page = doc.getPage(pageIndexOf(doc, widget))
-      widget.dict.set(PDFName.of('AP'), await appearanceFor(page, rectOf(widget.dict)))
-      if (widget.ref) modified.add(widget.ref)
-    }
+/** Adds a widget annotation to a page's /Annots. */
+function attachToPage(update: Update, page: PDFPage, widgetRef: PDFRef) {
+  const { context } = update.doc
+  const annots = page.node.get(PDFName.of('Annots'))
+  if (annots instanceof PDFRef) {
+    context.lookup(annots, PDFArray).push(widgetRef)
+    update.modified.add(annots)
+  } else if (annots instanceof PDFArray) {
+    annots.push(widgetRef)
   } else {
-    // A new field merged with its widget annotation.
-    const placement = options.placement
-    const pageIndex = placement.kind === 'box' ? placement.pageIndex : 0
-    const page = doc.getPage(Math.max(0, Math.min(doc.getPageCount() - 1, pageIndex)))
-    const widget = context.obj({
-      Type: 'Annot',
-      Subtype: 'Widget',
-      FT: 'Sig',
-      F: 132, // Print + Locked
-      P: page.ref,
-      Rect: placement.kind === 'box' ? placement.rect.map((value) => Number(value.toFixed(3))) : [0, 0, 0, 0],
-    })
-    widget.set(PDFName.of('T'), PDFString.of(uniqueFieldName(fields)))
-    widget.set(PDFName.of('V'), signatureRef)
-    if (placement.kind === 'box') {
-      widget.set(PDFName.of('AP'), await appearanceFor(page, placement.rect))
-    } else {
-      const empty = context.formXObject([], { BBox: [0, 0, 0, 0] })
-      widget.set(PDFName.of('AP'), context.obj({ N: context.register(empty) }))
-    }
-    widgetRef = context.register(widget)
-
-    const annots = page.node.get(PDFName.of('Annots'))
-    if (annots instanceof PDFRef) {
-      context.lookup(annots, PDFArray).push(widgetRef)
-      modified.add(annots)
-    } else if (annots instanceof PDFArray) {
-      annots.push(widgetRef)
-    } else {
-      page.node.set(PDFName.of('Annots'), context.obj([widgetRef]))
-    }
-    modified.add(page.ref)
+    page.node.set(PDFName.of('Annots'), context.obj([widgetRef]))
   }
+  update.modified.add(page.ref)
+}
 
-  const acroFormEntry = catalog.get(PDFName.of('AcroForm'))
+/** The /AcroForm dictionary, created when missing; `fields` are appended to its /Fields. */
+function acroFormOf(update: Update, fields: PDFRef[]): PDFDict {
+  const { context, catalog } = update.doc
+  const entry = catalog.get(PDFName.of('AcroForm'))
   let acroForm: PDFDict
-  if (acroFormEntry instanceof PDFRef) {
-    acroForm = context.lookup(acroFormEntry, PDFDict)
-    modified.add(acroFormEntry)
-  } else if (acroFormEntry instanceof PDFDict) {
-    acroForm = acroFormEntry
+  if (entry instanceof PDFRef) {
+    acroForm = context.lookup(entry, PDFDict)
+    update.modified.add(entry)
+  } else if (entry instanceof PDFDict) {
+    acroForm = entry
   } else {
     acroForm = context.obj({})
     catalog.set(PDFName.of('AcroForm'), acroForm)
   }
-  if (widgetRef) {
-    const fieldsEntry = acroForm.get(PDFName.of('Fields'))
-    if (fieldsEntry instanceof PDFRef) {
-      context.lookup(fieldsEntry, PDFArray).push(widgetRef)
-      modified.add(fieldsEntry)
-    } else if (fieldsEntry instanceof PDFArray) {
-      fieldsEntry.push(widgetRef)
+  if (fields.length) {
+    const list = acroForm.get(PDFName.of('Fields'))
+    if (list instanceof PDFRef) {
+      const array = context.lookup(list, PDFArray)
+      for (const field of fields) array.push(field)
+      update.modified.add(list)
+    } else if (list instanceof PDFArray) {
+      for (const field of fields) list.push(field)
     } else {
-      acroForm.set(PDFName.of('Fields'), context.obj([widgetRef]))
+      acroForm.set(PDFName.of('Fields'), context.obj(fields))
     }
   }
-  acroForm.set(PDFName.of('SigFlags'), PDFNumber.of(3))
-  if (options.certify) catalog.set(PDFName.of('Perms'), context.obj({ DocMDP: signatureRef }))
+  return acroForm
+}
 
-  // Serialize the update: changed objects, then every object created above.
+/** Serializes the changed and new objects after the original bytes, with a cross-reference section. */
+function writeUpdate(update: Update): Uint8Array {
+  const { bytes, tail, doc, firstNew, modified } = update
+  const { context } = doc
   const refs = new Map<number, PDFRef>()
   for (const ref of modified) refs.set(ref.objectNumber, ref)
   for (const [ref] of context.enumerateIndirectObjects()) {
@@ -582,15 +566,155 @@ export async function signPdf(input: Uint8Array, options: SignOptions): Promise<
     table += `trailer\n<< ${trailerEntries(doc, largest + 1, tail.offset)} >>\nstartxref\n${position}\n%%EOF\n`
     parts.push(encoder.encode(table))
   }
+  return concat([bytes, ...parts])
+}
 
-  const output = concat([bytes, ...parts])
+export interface NewSignatureField {
+  /** Zero-based page index. */
+  pageIndex: number
+  /** Widget rectangle in PDF user space: [x1, y1, x2, y2]. */
+  rect: [number, number, number, number]
+  /** Who should sign here, stored as the field's tooltip. */
+  label?: string
+}
+
+/**
+ * Adds empty signature fields ("sign here" spots for the people asked to
+ * sign) as an incremental update, so signatures already in the file stay valid.
+ */
+export async function addSignatureFields(input: Uint8Array, fields: NewSignatureField[]): Promise<Uint8Array> {
+  if (!fields.length) return input
+  const update = await openForUpdate(input)
+  const { doc } = update
+  const { context } = doc
+  const taken = new Set(collectFields(doc).map((field) => field.name))
+  const created: PDFRef[] = []
+  for (const field of fields) {
+    const page = doc.getPage(Math.max(0, Math.min(doc.getPageCount() - 1, field.pageIndex)))
+    const widget = context.obj({
+      Type: 'Annot',
+      Subtype: 'Widget',
+      FT: 'Sig',
+      F: 4, // Print
+      P: page.ref,
+      Rect: field.rect.map((value) => Number(value.toFixed(3))),
+    })
+    widget.set(PDFName.of('T'), PDFString.of(uniqueFieldName(taken)))
+    if (field.label) widget.set(PDFName.of('TU'), PDFHexString.fromText(field.label))
+    const ref = context.register(widget)
+    attachToPage(update, page, ref)
+    created.push(ref)
+  }
+  acroFormOf(update, created)
+  return writeUpdate(update)
+}
+
+export async function signPdf(input: Uint8Array, options: SignOptions): Promise<Uint8Array> {
+  const update = await openForUpdate(input)
+  const { bytes, doc, modified } = update
+  const { context, catalog } = doc
+
+  const fields = collectFields(doc)
+  if (options.certify && fields.some(isSigned)) throw new SignError('alreadyCertified')
+  let target: FieldEntry | null = null
+  if (options.placement.kind === 'field') {
+    const name = options.placement.name
+    target = fields.find((field) => field.name === name && isEmptySignatureField(field)) ?? null
+    if (!target?.ref) throw new SignError('noField')
+  }
+
+  // Signature dictionary with placeholders for /ByteRange and /Contents.
+  const reserve = 4096 + options.identity.certificate.length + options.identity.chain.reduce((sum, cert) => sum + cert.length, 0)
+  const contents = PDFHexString.of('0'.repeat(reserve * 2))
+  const byteRange = PDFArray.withContext(context)
+  byteRange.push(PDFNumber.of(0))
+  for (let i = 0; i < 3; i += 1) byteRange.push(PDFName.of(BYTE_RANGE_PLACEHOLDER))
+  const signature = context.obj({
+    Type: 'Sig',
+    Filter: 'Adobe.PPKLite',
+    SubFilter: 'ETSI.CAdES.detached',
+    M: PDFString.of(pdfDate(options.date ?? new Date())),
+    Prop_Build: { App: { Name: 'RealPDF' } },
+  })
+  signature.set(PDFName.of('ByteRange'), byteRange)
+  signature.set(PDFName.of('Contents'), contents)
+  signature.set(PDFName.of('Name'), PDFHexString.fromText(options.identity.info.name))
+  if (options.reason) signature.set(PDFName.of('Reason'), PDFHexString.fromText(options.reason))
+  if (options.location) signature.set(PDFName.of('Location'), PDFHexString.fromText(options.location))
+  if (options.contactInfo) signature.set(PDFName.of('ContactInfo'), PDFHexString.fromText(options.contactInfo))
+  if (options.certify) {
+    signature.set(
+      PDFName.of('Reference'),
+      context.obj([
+        {
+          Type: 'SigRef',
+          TransformMethod: 'DocMDP',
+          TransformParams: { Type: 'TransformParams', P: 2, V: '1.2' },
+        },
+      ]),
+    )
+  }
+  const signatureRef = context.register(signature)
+
+  const lines = options.lines ?? []
+  const image = options.image ? await doc.embedPng(options.image) : undefined
+  const appearanceFor = async (page: PDFPage, rect: [number, number, number, number]) => {
+    const [x1, y1, x2, y2] = rect
+    const rotation = ((page.getRotation().angle % 360) + 360) % 360
+    const quarter = rotation === 90 || rotation === 270
+    const width = Math.abs(quarter ? y2 - y1 : x2 - x1)
+    const height = Math.abs(quarter ? x2 - x1 : y2 - y1)
+    return context.obj({ N: await buildAppearance(doc, lines, width, height, rotation, image) })
+  }
+
+  let widgetRef: PDFRef | null = null
+  if (target?.ref) {
+    // Fill in an existing empty field: set its value and redraw its widget.
+    target.dict.set(PDFName.of('V'), signatureRef)
+    modified.add(target.ref)
+    const widget = widgetOf(target)
+    if (widget) {
+      const page = doc.getPage(pageIndexOf(doc, widget))
+      widget.dict.set(PDFName.of('AP'), await appearanceFor(page, rectOf(widget.dict)))
+      if (widget.ref) modified.add(widget.ref)
+    }
+  } else {
+    // A new field merged with its widget annotation.
+    const placement = options.placement
+    const pageIndex = placement.kind === 'box' ? placement.pageIndex : 0
+    const page = doc.getPage(Math.max(0, Math.min(doc.getPageCount() - 1, pageIndex)))
+    const widget = context.obj({
+      Type: 'Annot',
+      Subtype: 'Widget',
+      FT: 'Sig',
+      F: 132, // Print + Locked
+      P: page.ref,
+      Rect: placement.kind === 'box' ? placement.rect.map((value) => Number(value.toFixed(3))) : [0, 0, 0, 0],
+    })
+    widget.set(PDFName.of('T'), PDFString.of(uniqueFieldName(new Set(fields.map((field) => field.name)))))
+    widget.set(PDFName.of('V'), signatureRef)
+    if (placement.kind === 'box') {
+      widget.set(PDFName.of('AP'), await appearanceFor(page, placement.rect))
+    } else {
+      const empty = context.formXObject([], { BBox: [0, 0, 0, 0] })
+      widget.set(PDFName.of('AP'), context.obj({ N: context.register(empty) }))
+    }
+    widgetRef = context.register(widget)
+    attachToPage(update, page, widgetRef)
+  }
+
+  const acroForm = acroFormOf(update, widgetRef ? [widgetRef] : [])
+  acroForm.set(PDFName.of('SigFlags'), PDFNumber.of(3))
+  if (options.certify) catalog.set(PDFName.of('Perms'), context.obj({ DocMDP: signatureRef }))
+
+  const output = writeUpdate(update)
 
   // Fill in /ByteRange around the /Contents placeholder, then sign.
-  const update = latin1(output, bytes.length)
+  const written = latin1(output, bytes.length)
   const placeholder = contents.toString()
-  const contentsAt = update.indexOf(placeholder)
+  const contentsAt = written.indexOf(placeholder)
   const rangeText = byteRange.toString()
-  const rangeAt = update.indexOf(rangeText)
+  const rangeAt = written.indexOf(rangeText)
   if (contentsAt < 0 || rangeAt < 0) throw new Error('Signature placeholders not found')
   const gapStart = bytes.length + contentsAt
   const gapEnd = gapStart + placeholder.length

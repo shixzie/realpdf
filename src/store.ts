@@ -17,24 +17,70 @@ import {
   type LibraryMeta,
 } from './lib/library'
 import { restoreAssets } from './lib/assets'
-import type { RequestHeader } from './lib/signRequests'
+import type { MyRequest, RequestHeader } from './lib/signRequests'
+import type { SignatureFieldInfo } from './lib/signing/pdfSign'
+import type { SigningIdentity } from './lib/signing/identity'
 import { t } from './i18n'
 
 export type ToolsTab = 'merge' | 'split' | 'convert' | 'office'
 export type PendingAction = ToolsTab | 'forms'
 export type Theme = 'dark' | 'light'
-/** Certificate signing flow: the dialog, or picking where the signature goes. */
-export type DigitalSignStage = 'closed' | 'form' | 'placing'
+/**
+ * The Sign flow. Signing yourself: adopt a signature, place it, review, done.
+ * Requesting signatures: list the signers, place their fields, send.
+ */
+export type SignStep = 'adopt' | 'place' | 'review' | 'done' | 'signers' | 'sent'
+export interface SignFlow {
+  mode: 'self' | 'request'
+  step: SignStep
+}
 
-/** A box drawn for a visible signature, in page view coordinates (points at zoom 1). */
-export interface SignaturePlacementRequest {
+/** A signature (or, when requesting, a signer's field) placed on a page, in view coordinates (points at zoom 1). */
+export interface SignSpot {
+  id: string
   pageIndex: number
   x: number
   y: number
   width: number
   height: number
-  nonce: number
+  /** The existing empty signature field this spot fills. */
+  field?: string
+  /** The signer this field is for, when requesting signatures. */
+  signer?: string
 }
+
+/** Who is signing: an unlocked certificate and the signature they adopted. */
+export interface ActiveSigner {
+  identity: SigningIdentity
+  /** Id of the signing ID saved on this device, when it is saved. */
+  savedId: string | null
+  /** The handwritten signature as a PNG data URL. */
+  image: string
+}
+
+export interface RequestSigner {
+  id: string
+  name: string
+  email: string
+}
+
+/** What the sender filled in while requesting signatures. */
+export interface RequestDraft {
+  from: string
+  message: string
+  signers: RequestSigner[]
+  /** Signer whose fields are being placed. */
+  activeSigner: string | null
+  created: (MyRequest & { link: string }) | null
+}
+
+export const emptyRequestDraft = (): RequestDraft => ({
+  from: '',
+  message: '',
+  signers: [{ id: uid(), name: '', email: '' }],
+  activeSigner: null,
+  created: null,
+})
 
 /** A signing request opened from its link (see src/lib/signRequests.ts). */
 export interface ActiveSignRequest {
@@ -112,9 +158,12 @@ interface AppState {
   formWidgets: Record<string, FormWidget[]>
   formValues: Record<string, FormValue>
   formFlatten: boolean
-  digitalSign: DigitalSignStage
-  signPlacement: SignaturePlacementRequest | null
-  requestSignOpen: boolean
+  signFlow: SignFlow | null
+  signSpots: SignSpot[]
+  /** Empty signature fields of the document that can be signed in place. */
+  signFields: SignatureFieldInfo[]
+  signer: ActiveSigner | null
+  requestDraft: RequestDraft
   signRequest: ActiveSignRequest | null
 
   load: (args: LoadArgs) => void
@@ -157,9 +206,14 @@ interface AppState {
   exitFormMode: () => void
   setFormValue: (fieldName: string, value: FormValue) => void
   setFormFlatten: (flatten: boolean) => void
-  setDigitalSign: (stage: DigitalSignStage) => void
-  placeSignature: (placement: Omit<SignaturePlacementRequest, 'nonce'>) => void
-  setRequestSignOpen: (open: boolean) => void
+  setSignFlow: (flow: SignFlow | null) => void
+  setSignStep: (step: SignStep) => void
+  addSignSpot: (spot: Omit<SignSpot, 'id'>) => void
+  updateSignSpot: (id: string, patch: Partial<SignSpot>) => void
+  removeSignSpot: (id: string) => void
+  setSignFields: (fields: SignatureFieldInfo[]) => void
+  setSigner: (signer: ActiveSigner | null) => void
+  updateRequestDraft: (patch: Partial<RequestDraft>) => void
   setSignRequest: (request: ActiveSignRequest | null) => void
   setLoading: (loading: boolean) => void
   setExporting: (exporting: boolean, progress?: number) => void
@@ -257,9 +311,11 @@ export const useStore = create<AppState>()((set, get) => ({
   formWidgets: {},
   formValues: {},
   formFlatten: true,
-  digitalSign: 'closed',
-  signPlacement: null,
-  requestSignOpen: false,
+  signFlow: null,
+  signSpots: [],
+  signFields: [],
+  signer: null,
+  requestDraft: emptyRequestDraft(),
   signRequest: null,
 
   load: ({ bytes, fileName, pdf, pages }) =>
@@ -283,9 +339,10 @@ export const useStore = create<AppState>()((set, get) => ({
       formValues: {},
       hasForms: false,
       projectId: null,
-      digitalSign: 'closed',
-      signPlacement: null,
-      requestSignOpen: false,
+      signFlow: null,
+      signSpots: [],
+      signFields: [],
+      signer: null,
       signRequest: null,
     }),
 
@@ -307,9 +364,10 @@ export const useStore = create<AppState>()((set, get) => ({
       toolsOpen: false,
       projectId: null,
       selectionPage: null,
-      digitalSign: 'closed',
-      signPlacement: null,
-      requestSignOpen: false,
+      signFlow: null,
+      signSpots: [],
+      signFields: [],
+      signer: null,
       signRequest: null,
     }),
 
@@ -601,10 +659,19 @@ export const useStore = create<AppState>()((set, get) => ({
   setToolsOpen: (open, tab) => set({ toolsOpen: open, toolsTab: tab ?? get().toolsTab }),
   setToolsTab: (tab) => set({ toolsTab: tab }),
   setHasForms: (hasForms) => set({ hasForms }),
-  setDigitalSign: (stage) => set({ digitalSign: stage, signPlacement: null }),
-  placeSignature: (placement) =>
-    set({ digitalSign: 'form', signPlacement: { ...placement, nonce: Date.now() + Math.random() } }),
-  setRequestSignOpen: (open) => set({ requestSignOpen: open }),
+  // Closing the flow drops the placed spots and the unlocked key.
+  setSignFlow: (flow) => set(flow ? { signFlow: flow } : { signFlow: null, signSpots: [], signFields: [], signer: null }),
+  setSignStep: (step) => {
+    const flow = get().signFlow
+    if (flow) set({ signFlow: { ...flow, step } })
+  },
+  addSignSpot: (spot) => set({ signSpots: [...get().signSpots, { ...spot, id: uid() }] }),
+  updateSignSpot: (id, patch) =>
+    set({ signSpots: get().signSpots.map((spot) => (spot.id === id ? { ...spot, ...patch } : spot)) }),
+  removeSignSpot: (id) => set({ signSpots: get().signSpots.filter((spot) => spot.id !== id) }),
+  setSignFields: (signFields) => set({ signFields }),
+  setSigner: (signer) => set({ signer }),
+  updateRequestDraft: (patch) => set({ requestDraft: { ...get().requestDraft, ...patch } }),
   setSignRequest: (request) => set({ signRequest: request }),
 
   enterFormMode: async () => {

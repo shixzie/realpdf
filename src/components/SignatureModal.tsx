@@ -2,68 +2,12 @@ import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } f
 import { Check, Eraser, Image as ImageIcon, PenLine, ShieldCheck, Upload, X } from 'lucide-react'
 import { useStore } from '../store'
 import { commitCanvas, getCanvas, insertImageObject } from '../lib/canvasRegistry'
-import { loadImage } from '../lib/assets'
+import { prepareUploadedSignature, trimCanvas } from '../lib/signatureImage'
+import { startSigning } from '../lib/signController'
 import { useTranslation } from '../i18n'
 
 const WIDTH = 640
 const HEIGHT = 240
-
-/** Crops fully transparent borders and returns a PNG data URL. */
-function trimCanvas(source: HTMLCanvasElement): string | null {
-  const context = source.getContext('2d')
-  if (!context) return null
-  const { data } = context.getImageData(0, 0, source.width, source.height)
-  let minX = source.width
-  let minY = source.height
-  let maxX = -1
-  let maxY = -1
-  for (let y = 0; y < source.height; y += 1) {
-    for (let x = 0; x < source.width; x += 1) {
-      const alpha = data[(y * source.width + x) * 4 + 3]
-      if (alpha > 8) {
-        if (x < minX) minX = x
-        if (y < minY) minY = y
-        if (x > maxX) maxX = x
-        if (y > maxY) maxY = y
-      }
-    }
-  }
-  if (maxX < 0 || maxY < 0) return null
-  const pad = 8
-  minX = Math.max(0, minX - pad)
-  minY = Math.max(0, minY - pad)
-  maxX = Math.min(source.width - 1, maxX + pad)
-  maxY = Math.min(source.height - 1, maxY + pad)
-  const out = document.createElement('canvas')
-  out.width = maxX - minX + 1
-  out.height = maxY - minY + 1
-  const outContext = out.getContext('2d')
-  if (!outContext) return null
-  outContext.drawImage(source, minX, minY, out.width, out.height, 0, 0, out.width, out.height)
-  return out.toDataURL('image/png')
-}
-
-/** Makes near-white pixels transparent and crops the result. */
-async function prepareUploadedSignature(src: string, removeWhite: boolean): Promise<string | null> {
-  const image = await loadImage(src)
-  const canvas = document.createElement('canvas')
-  canvas.width = Math.max(1, image.naturalWidth)
-  canvas.height = Math.max(1, image.naturalHeight)
-  const context = canvas.getContext('2d')
-  if (!context) return null
-  context.drawImage(image, 0, 0)
-  if (removeWhite) {
-    const imageData = context.getImageData(0, 0, canvas.width, canvas.height)
-    const pixels = imageData.data
-    for (let i = 0; i < pixels.length; i += 4) {
-      const luminance = 0.299 * pixels[i] + 0.587 * pixels[i + 1] + 0.114 * pixels[i + 2]
-      const alpha = Math.max(0, Math.min(255, Math.round((238 - luminance) * 2.6)))
-      pixels[i + 3] = Math.min(pixels[i + 3], alpha)
-    }
-    context.putImageData(imageData, 0, 0)
-  }
-  return trimCanvas(canvas)
-}
 
 export function SignatureModal() {
   const { t } = useTranslation()
@@ -218,7 +162,7 @@ export function SignatureModal() {
           className="link-button signature-cert-link"
           onClick={() => {
             close()
-            useStore.getState().setDigitalSign('form')
+            void startSigning('self')
           }}
         >
           <ShieldCheck size={14} /> {t('signature.certLink')}

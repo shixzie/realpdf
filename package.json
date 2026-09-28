@@ -18,6 +18,9 @@
     "cf:dev": "npm run build && wrangler dev"
   },
   "dependencies": {
+    "@fontsource/caveat": "^5.3.0",
+    "@fontsource/dancing-script": "^5.3.0",
+    "@fontsource/homemade-apple": "^5.3.0",
     "@fontsource/noto-emoji": "^5.3.2",
     "@fontsource/noto-sans-kr": "^5.3.0",
     "@fontsource/noto-sans-sc": "^5.3.0",

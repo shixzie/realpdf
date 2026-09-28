@@ -10,8 +10,6 @@ import {
   LetterText,
   Loader2,
   Presentation,
-  Send,
-  ShieldCheck,
   Wrench,
   type LucideIcon,
 } from 'lucide-react'
@@ -48,7 +46,7 @@ const OFFICE_ENTRIES: MenuEntry[] = [
   { id: 'pptx', labelKey: 'export.pptx', hintKey: 'export.pptxHint', icon: Presentation },
 ]
 
-function useMenuDismiss(open: boolean, close: () => void) {
+export function useMenuDismiss(open: boolean, close: () => void) {
   const ref = useRef<HTMLDivElement>(null)
   useEffect(() => {
     if (!open) return
@@ -136,42 +134,6 @@ function ExportMenu({ onClose }: { onClose: () => void }) {
         <span className="export-menu-text">
           <span className="export-menu-label">{t('export.saveAsPdf')}</span>
           <span className="export-menu-hint">{t('export.saveAsPdfHint')}</span>
-        </span>
-      </button>
-      <button
-        type="button"
-        role="menuitem"
-        className="export-menu-item export-menu-item-sign"
-        disabled={exporting || Boolean(busy)}
-        onClick={() => {
-          onClose()
-          useStore.getState().setDigitalSign('form')
-        }}
-      >
-        <span className="export-menu-icon">
-          <ShieldCheck size={16} />
-        </span>
-        <span className="export-menu-text">
-          <span className="export-menu-label">{t('export.signCert')}</span>
-          <span className="export-menu-hint">{t('export.signCertHint')}</span>
-        </span>
-      </button>
-      <button
-        type="button"
-        role="menuitem"
-        className="export-menu-item export-menu-item-request"
-        disabled={exporting || Boolean(busy)}
-        onClick={() => {
-          onClose()
-          useStore.getState().setRequestSignOpen(true)
-        }}
-      >
-        <span className="export-menu-icon">
-          <Send size={16} />
-        </span>
-        <span className="export-menu-text">
-          <span className="export-menu-label">{t('export.requestSign')}</span>
-          <span className="export-menu-hint">{t('export.requestSignHint')}</span>
         </span>
       </button>
       <MenuSection title={t('export.images')}>{IMAGE_ENTRIES.map((entry) => item(entry))}</MenuSection>

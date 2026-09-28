@@ -41,7 +41,7 @@ import {
 import { imageFileToDataUrl } from '../lib/assets'
 import { useTranslation } from '../i18n'
 import { FormsLayer } from './FormsLayer'
-import { SignaturePlacementLayer } from './SignaturePlacementLayer'
+import { SignSpotsLayer } from './SignSpotsLayer'
 
 interface PageViewProps {
   pageIndex: number
@@ -62,7 +62,7 @@ export function PageView({ pageIndex }: PageViewProps) {
   const tool = useStore((state) => state.tool)
   const settings = useStore((state) => state.settings)
   const formMode = useStore((state) => state.formMode)
-  const placingSignature = useStore((state) => state.digitalSign === 'placing')
+  const placingSignature = useStore((state) => state.signFlow?.step === 'place')
   const pdf = useStore((state) => state.pdf)
   const bytes = useStore((state) => state.bytes)
 
@@ -648,7 +648,7 @@ export function PageView({ pageIndex }: PageViewProps) {
       <div ref={hostRef} className="page-overlay" />
       {formMode && <FormsLayer page={page} />}
       {placingSignature && (
-        <SignaturePlacementLayer pageIndex={pageIndex} zoom={zoom} width={page.width} height={page.height} />
+        <SignSpotsLayer pageIndex={pageIndex} zoom={zoom} width={page.width} height={page.height} />
       )}
       <div className="page-number" aria-hidden>
         {pageIndex + 1}

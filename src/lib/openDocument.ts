@@ -97,6 +97,33 @@ export async function openDocumentFile(file: File): Promise<void> {
   }
 }
 
+/**
+ * Replaces the open document with a new version of itself (a signed copy),
+ * keeping the zoom and the page in view instead of starting over.
+ */
+export async function replaceDocumentBytes(bytes: Uint8Array, fileName: string): Promise<void> {
+  const before = useStore.getState()
+  const { zoom, fitNonce } = before
+  const index = Math.max(
+    0,
+    before.pages.findIndex((page) => page.id === before.currentPageId),
+  )
+  const loaded = await loadPdfDocument(bytes, (submit) => submit(''))
+  // One batched update, so the viewer neither refits nor jumps to the top.
+  useStore.getState().load({ bytes, fileName, pdf: loaded.pdf, pages: loaded.pages })
+  useStore.setState({ zoom, fitNonce })
+  const page = useStore.getState().pages[index]
+  if (page) {
+    useStore.getState().setCurrentPage(page.id)
+    useStore.getState().requestScrollTo(page.id)
+  }
+  void pdfHasFormFields(bytes)
+    .then((hasForms) => {
+      if (useStore.getState().bytes === bytes) useStore.getState().setHasForms(hasForms)
+    })
+    .catch(() => undefined)
+}
+
 /** Opens raw PDF bytes (used by merge/split/convert tools). */
 export async function openPdfBytes(bytes: Uint8Array, fileName: string): Promise<void> {
   const store = useStore.getState()

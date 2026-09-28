@@ -4,13 +4,14 @@
  * checked with Node's crypto (tests/helpers/signing.mjs), not the app's code.
  */
 import { execFileSync } from 'node:child_process'
+import zlib from 'node:zlib'
 import fs from 'node:fs'
 import path from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { PDFDocument, PDFName, PDFString, StandardFonts } from 'pdf-lib'
 import * as pdfjs from 'pdfjs-dist/legacy/build/pdf.mjs'
 import { CertificateError, loadSigningIdentity } from '../../src/lib/signing/identity.ts'
-import { readSignatureSummary, SignError, signPdf } from '../../src/lib/signing/pdfSign.ts'
+import { addSignatureFields, readSignatureSummary, SignError, signPdf } from '../../src/lib/signing/pdfSign.ts'
 import { makeRsaPkcs12, verifyPdfSignatures } from '../helpers/signing.mjs'
 import { OUT_DIR, ensureOutDir } from '../helpers/fixtures.mjs'
 
@@ -36,6 +37,39 @@ const lines = [
   { text: 'Ada Lovelace', bold: true, scale: 1.3 },
   { text: 'Date: 2026-09-28 12:00:00 +00:00', scale: 0.8 },
 ]
+
+/** A small RGBA PNG: a dark stroke on a transparent background, like an adopted signature. */
+function signaturePng(width = 60, height = 20) {
+  const rows = []
+  for (let y = 0; y < height; y += 1) {
+    const row = Buffer.alloc(1 + width * 4)
+    for (let x = 0; x < width; x += 1) {
+      const ink = Math.abs(y - height / 2 - Math.sin(x / 6) * 5) < 2
+      row.set([17, 24, 39, ink ? 255 : 0], 1 + x * 4)
+    }
+    rows.push(row)
+  }
+  const chunk = (type, data) => {
+    const body = Buffer.concat([Buffer.from(type), data])
+    const length = Buffer.alloc(4)
+    length.writeUInt32BE(data.length)
+    const crc = Buffer.alloc(4)
+    crc.writeUInt32BE(zlib.crc32(body))
+    return Buffer.concat([length, body, crc])
+  }
+  const header = Buffer.alloc(13)
+  header.writeUInt32BE(width, 0)
+  header.writeUInt32BE(height, 4)
+  header.set([8, 6, 0, 0, 0], 8)
+  return new Uint8Array(
+    Buffer.concat([
+      Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+      chunk('IHDR', header),
+      chunk('IDAT', zlib.deflateSync(Buffer.concat(rows))),
+      chunk('IEND', Buffer.alloc(0)),
+    ]),
+  )
+}
 
 function hasOpenssl() {
   try {
@@ -171,6 +205,39 @@ describe('certificate signing', () => {
     expect(widget?.fieldName).toBe('Client')
     const missing = await signPdf(signed, { identity, placement: { kind: 'field', name: 'Client' } }).catch((caught) => caught)
     expect(missing.code).toBe('noField')
+  })
+
+  it('adds labelled "sign here" fields incrementally, then fills one with a handwritten signature', async () => {
+    const p12 = makeRsaPkcs12()
+    const identity = await loadSigningIdentity(p12.bytes, p12.password)
+    // An earlier signature must survive both the new fields and the next signature.
+    const first = await signPdf(await samplePdf(), { identity, placement: { kind: 'invisible' } })
+    const prepared = await addSignatureFields(first, [
+      { pageIndex: 0, rect: [72, 80, 252, 136], label: 'Grace Hopper' },
+      { pageIndex: 1, rect: [300, 80, 480, 136], label: 'Alan Turing' },
+    ])
+    expect(Buffer.from(prepared.subarray(0, first.length)).equals(Buffer.from(first))).toBe(true)
+    expect(verifyPdfSignatures(prepared)).toMatchObject([{ valid: true, coversFile: false }])
+    const summary = await readSignatureSummary(prepared)
+    expect(summary.signed).toBe(1)
+    expect(summary.empty).toEqual([
+      { name: 'Signature2', label: 'Grace Hopper', pageIndex: 0, rect: [72, 80, 252, 136] },
+      { name: 'Signature3', label: 'Alan Turing', pageIndex: 1, rect: [300, 80, 480, 136] },
+    ])
+
+    const signed = await signPdf(prepared, {
+      identity,
+      placement: { kind: 'field', name: 'Signature2' },
+      lines,
+      image: signaturePng(),
+    })
+    expect(verifyPdfSignatures(signed)).toMatchObject([{ valid: true }, { valid: true, coversFile: true }])
+    const update = Buffer.from(signed.subarray(prepared.length)).toString('latin1')
+    expect(update).toMatch(/\/Subtype \/Image/)
+    expect(update).toMatch(/\/XObject <<\s*\/Im1 \d+ 0 R/)
+    const after = await readSignatureSummary(signed)
+    expect(after.signed).toBe(2)
+    expect(after.empty.map((field) => field.label)).toEqual(['Alan Turing'])
   })
 
   it('certifies a document with DocMDP, and only as the first signature', async () => {
