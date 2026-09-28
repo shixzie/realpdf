@@ -26,6 +26,7 @@ A real PDF editor that runs **entirely in your browser**. No uploads, no servers
 - **Visible signature**: drag a box on any page (or click for a default size) and it shows "Digitally signed by", the certificate's name, the date and the optional reason and location. You can also fill in an **empty signature field** the PDF already has, or sign invisibly
 - **Countersigning**: an unchanged document is signed as an *incremental update* (the original bytes are kept and the signature is appended), so signatures already in the file stay valid
 - **Certify** (DocMDP): the first signer can lock the document so that any change other than filling forms and signing invalidates it
+- **Remember on this device** (opt-in): the unlocked key is kept in this browser's IndexedDB as a non-extractable WebCrypto key, so later signatures need neither the file nor the password; the browser can sign with it but no script can read it back, and **Forget** removes it. Nothing is uploaded
 
 **Local library**
 
@@ -206,7 +207,7 @@ APP_URL=http://localhost:4173/ npm test
 - `tests/e2e/ui.test.mjs` — theme toggle, homepage tool cards, signature image upload, Ko-fi button, language switch (persistence, translated strings, `<html lang>`/title)
 - `tests/e2e/library.test.mjs` — save to the local library, rename, persistence across a reload, restore annotations, rebuild the PDF, delete
 - `tests/unit/sign.test.mjs` — PKCS#12 loading (3DES, AES, OpenSSL-made RSA/ECDSA files), wrong passwords, PAdES signatures over xref tables and xref streams, countersigning, filling an empty signature field, certification — every signature checked with Node's crypto, independently of the app's code
-- `tests/e2e/digital-sign.test.mjs` — unlock a certificate, draw the signature box, download and verify the signed PDF (byte range, CMS signature, field position, rendered appearance), then countersign it and check both signatures
+- `tests/e2e/digital-sign.test.mjs` — unlock a certificate, draw the signature box, download and verify the signed PDF (byte range, CMS signature, field position, rendered appearance), then countersign it and check both signatures; remember a certificate (stored key not exportable), sign with it after a reload, and forget it
 - `tests/e2e/unicode-text.test.mjs` — added text outside WinAnsi (extended Latin, Greek, Cyrillic, CJK, Hangul, emoji) exports with embedded Noto subsets, WinAnsi-only text embeds nothing extra, typed line breaks survive
 - `tests/e2e/text-edit.test.mjs` — edit embedded-font and standard-font text: text layer deletion, exported font programs, coloured backgrounds
 - `tests/e2e/text-select.test.mjs` — selecting text activates the text tool, its options reflect and restyle the selected text, and the changes survive export

@@ -35,6 +35,25 @@
       "head_sampling_rate": 1
     }
   },
+  // Signing requests (encrypted in the browser) and email verification
+  // challenges. `wrangler deploy` creates the bucket if it does not exist.
+  "r2_buckets": [{ "binding": "SIGN_STORE", "bucket_name": "realpdf-signing" }],
+  // Sends the verification codes for email-verified signing certificates.
+  // Needs Email Sending enabled for realpdf.app in the Cloudflare dashboard.
+  "send_email": [{ "name": "EMAIL", "allowed_sender_addresses": ["sign@realpdf.app"] }],
+  "vars": { "SIGNING_EMAIL_FROM": "sign@realpdf.app" },
+  // Per-IP limits for uploads and certificate requests, and per-IP and
+  // per-address limits for verification emails.
+  "ratelimits": [
+    { "name": "WRITE_LIMIT", "namespace_id": "1001", "simple": { "limit": 30, "period": 60 } },
+    { "name": "EMAIL_LIMIT", "namespace_id": "1002", "simple": { "limit": 3, "period": 60 } }
+  ],
+  // Daily cleanup of expired signing requests and verification codes.
+  "triggers": { "crons": ["17 3 * * *"] },
+  // The CA that issues email-verified certificates comes from two secrets,
+  // SIGNING_CA_KEY and SIGNING_CA_CERT (see README "Email-verified signing
+  // certificates"). They are optional: without them the certificate
+  // endpoints answer 503 and everything else keeps working.
   // Attaches the custom domains to this Worker on deploy. Remove this block if
   // you prefer to add the domains in the Cloudflare dashboard instead.
   // www is attached here and 301-redirects to the apex domain in the Worker
