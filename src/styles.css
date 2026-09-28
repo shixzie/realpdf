@@ -791,14 +791,21 @@ button {
   flex: 1;
   min-height: 0;
   display: flex;
-  align-items: center;
-  justify-content: center;
   padding: 32px;
   overflow: auto;
 }
 
+/* Auto margins centre the column while it fits and fall back to the top when
+   it does not, so a tall home never clips above the scroll origin. */
+.home {
+  width: min(760px, 100%);
+  margin: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
 .empty-card {
-  width: min(560px, 100%);
   background: var(--bg-panel);
   border: 1px solid var(--border);
   border-radius: 16px;
@@ -1316,11 +1323,49 @@ select.form-widget {
   fill: #c2410c;
 }
 
+.home-section {
+  padding: 18px 20px 20px;
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  box-shadow: var(--shadow);
+}
+
+.home-section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.home-section-head h2 {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 11.5px;
+  font-weight: 650;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.home-section-head h2 svg {
+  color: var(--accent);
+}
+
+.home-section-empty {
+  margin: 0;
+  color: var(--text-dim);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
 .home-tools {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(3, 1fr);
   gap: 10px;
-  margin-top: 26px;
   text-align: left;
 }
 
@@ -1331,6 +1376,7 @@ select.form-widget {
   column-gap: 10px;
   row-gap: 2px;
   align-items: center;
+  align-content: center;
   padding: 12px 14px;
   border: 1px solid var(--border);
   border-radius: var(--radius);
@@ -1378,9 +1424,7 @@ select.form-widget {
   justify-content: center;
   flex-wrap: wrap;
   gap: 8px;
-  margin-top: 24px;
-  padding-top: 18px;
-  border-top: 1px solid var(--border);
+  padding: 4px 0 8px;
 }
 
 .social-links-label {
@@ -1489,6 +1533,18 @@ select.form-widget {
 }
 
 @media (max-width: 860px) {
+  .home-tools {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+@media (max-width: 560px) {
+  .empty {
+    padding: 16px;
+  }
+  .empty-card {
+    padding: 28px 20px 24px;
+  }
   .home-tools {
     grid-template-columns: 1fr;
   }
@@ -1618,23 +1674,6 @@ select.form-widget {
 }
 
 /* ---------- Homepage recent work ---------- */
-
-.home-recent {
-  margin-top: 24px;
-  text-align: left;
-}
-
-.home-recent-title {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  color: var(--text-muted);
-  font-size: 11.5px;
-  font-weight: 650;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  margin-bottom: 8px;
-}
 
 .home-recent-grid {
   display: grid;
@@ -1970,15 +2009,6 @@ select.form-widget {
 
 .my-request-open {
   text-decoration: none;
-}
-
-.home-requests:empty {
-  display: none;
-}
-
-.home-requests {
-  width: 100%;
-  margin-top: 22px;
 }
 
 .sign-request-bar {

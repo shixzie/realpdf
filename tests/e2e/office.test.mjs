@@ -7,7 +7,7 @@ import path from 'node:path'
 import { afterAll, beforeAll, describe, it } from 'vitest'
 import { PDFDict, PDFDocument, PDFName } from 'pdf-lib'
 import * as pdfjs from 'pdfjs-dist/legacy/build/pdf.mjs'
-import { check, gotoHome, launchApp, openPdf, pdfText, savePdf } from '../helpers/app.mjs'
+import { check, gotoHome, launchApp, openFileTools, openPdf, pdfText, savePdf } from '../helpers/app.mjs'
 import { OUT_DIR, SAMPLE_PDF } from '../helpers/fixtures.mjs'
 import { buildOfficeFixtures } from '../helpers/officeFixtures.mjs'
 import { readZip, zipText } from '../../src/lib/zipRead.ts'
@@ -43,11 +43,7 @@ describe('office formats', () => {
     const { page, pageErrors } = app
     const fixtures = buildOfficeFixtures()
 
-    const openTools = async (tab) => {
-      const already = await page.locator('.modal-wide').count()
-      if (!already) await page.click('button[title="Merge, split and convert PDFs and Office files"]')
-      await page.click(`.tab:has-text("${tab}")`)
-    }
+    const openTools = (tab) => openFileTools(page, tab)
 
     const importOffice = async (filePath) => {
       await openTools('Office')

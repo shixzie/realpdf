@@ -5,7 +5,7 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import { afterAll, beforeAll, describe, it } from 'vitest'
-import { check, gotoHome, launchApp, openPdf, pdfText } from '../helpers/app.mjs'
+import { check, gotoHome, launchApp, openFileTools, openPdf, pdfText } from '../helpers/app.mjs'
 import { OUT_DIR, SAMPLE_PDF, buildFormPdf } from '../helpers/fixtures.mjs'
 
 describe('document tools', () => {
@@ -22,11 +22,7 @@ describe('document tools', () => {
   it('merges, splits, converts and fills forms', async () => {
     const { page, context, pageErrors } = app
 
-    const openTools = async (tab) => {
-      const already = await page.locator('.modal-wide').count()
-      if (!already) await page.click('button[title="Merge, split and convert PDFs and Office files"]')
-      await page.click(`.tab:has-text("${tab}")`)
-    }
+    const openTools = (tab) => openFileTools(page, tab)
 
     await gotoHome(page)
     await openPdf(page, SAMPLE_PDF, { resetZoom: false })

@@ -81,6 +81,25 @@ export function clickSavePdf(page) {
   })()
 }
 
+/** Opens the document tools on `tab`: from the export menu in the editor, from the home tool cards otherwise. */
+export async function openFileTools(page, tab) {
+  if (!(await page.locator('.modal-wide').count())) {
+    if (await page.locator('.export-trigger').count()) {
+      await page.click('.export-trigger')
+      await page.click('.export-menu-tools')
+    } else {
+      await page.click('.home-tool:has-text("Merge PDFs")')
+    }
+  }
+  await page.click(`.tab:has-text("${tab}")`)
+}
+
+/** Opens the library from the home screen, leaving the editor first if a document is open. */
+export async function openLibrary(page) {
+  if (!(await page.locator('.empty-card').count())) await page.click('.brand-home')
+  await page.click('.home-library button:has-text("View all")')
+}
+
 /** Saves the document as PDF and stores the download. */
 export async function savePdf(page, filePath) {
   const [download] = await Promise.all([

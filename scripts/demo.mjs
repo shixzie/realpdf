@@ -139,7 +139,9 @@ await page.click('button:has-text("Add signature")')
 await wait(900)
 
 // ------------------------------------------------------------- document tools
-await page.click('button[title="Merge, split and convert documents"]')
+await page.click('.export-trigger')
+await page.click('.export-menu-tools')
+await page.click('.tab:has-text("Merge")')
 await wait(500)
 await page.setInputFiles('input[accept="application/pdf,.pdf"][multiple]', [
   path.resolve('sample.pdf'),
