@@ -22,16 +22,11 @@ export function SupportModal({ onClose }: { onClose: () => void }) {
   }, [frame])
 
   useEffect(() => {
-    // Ko-fi's floating widget sits above everything and would cover the dialog.
-    document.body.classList.add('support-open')
     const onKey = (event: KeyboardEvent) => {
       if (event.key === 'Escape') onClose()
     }
     window.addEventListener('keydown', onKey)
-    return () => {
-      document.body.classList.remove('support-open')
-      window.removeEventListener('keydown', onKey)
-    }
+    return () => window.removeEventListener('keydown', onKey)
   }, [onClose])
 
   return (

@@ -5,7 +5,6 @@ import { useStore } from './store'
 import { getCanvas } from './lib/canvasRegistry'
 import { serializeCanvas } from './lib/serialize'
 import { initLocale } from './i18n'
-import { initKofiWidget } from './lib/kofi'
 import './styles.css'
 
 initLocale()
@@ -23,4 +22,3 @@ createRoot(container).render(
   </StrictMode>,
 )
 
-initKofiWidget()

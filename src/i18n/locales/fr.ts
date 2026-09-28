@@ -486,9 +486,6 @@ export const fr: Dictionary = {
   canvas: {
     textPlaceholder: 'Saisissez le texte',
   },
-  kofi: {
-    text: 'Soutenez-moi',
-  },
   support: {
     title: 'Soutenir RealPDF',
     intro: "RealPDF est gratuit et fonctionne entièrement dans votre navigateur. S'il vous est utile, vous pouvez contribuer sur Ko-fi directement ici.",

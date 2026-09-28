@@ -1407,11 +1407,6 @@ select.form-widget {
   color: #52525b;
 }
 
-body.support-open .floatingchat-container-wrap,
-body.support-open .floatingchat-container-wrap-mobi {
-  display: none !important;
-}
-
 .support-external {
   display: inline-flex;
   align-items: center;
