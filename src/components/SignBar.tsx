@@ -67,12 +67,24 @@ export function SignBar() {
   }
 
   const remaining = fields.filter((field) => !spots.some((spot) => spot.field === field.name)).length
+  // Every "Sign here" field is filled: DocuSign's "Ready to finish?".
+  const ready = fields.length > 0 && remaining === 0
   return (
-    <div className="sign-bar" role="status">
-      <PenLine size={16} />
+    <div className={`sign-bar ${ready ? 'is-ready' : ''}`} role="status">
+      {ready ? <Check size={16} /> : <PenLine size={16} />}
       <div className="sign-bar-text">
-        <strong>{remaining ? t('sign.fillTagsTitle', { count: remaining }) : t('sign.placeTitle')}</strong>
-        <span>{spots.length ? t('sign.signaturesPlaced', { count: spots.length }) : t('sign.placeHint')}</span>
+        <strong>
+          {ready ? t('sign.readyTitle') : remaining ? t('sign.fillTagsTitle', { count: remaining }) : t('sign.placeTitle')}
+        </strong>
+        <span>
+          {ready
+            ? t('sign.readyHint')
+            : spots.length
+              ? t('sign.signaturesPlaced', { count: spots.length })
+              : remaining
+                ? t('sign.fillTagsHint')
+                : t('sign.placeHint')}
+        </span>
       </div>
       {signer && (
         <div className="sign-as">

@@ -1,4 +1,4 @@
-import { emptyRequestDraft, useStore, type ActiveSigner } from '../store'
+import { emptyRequestDraft, useStore, type ActiveSigner, type SignSpot } from '../store'
 import { t } from '../i18n'
 import { bakedCurrentBytes } from './currentDocument'
 import { downloadBlob } from './exportController'
@@ -151,8 +151,20 @@ export async function startSigning(mode: 'self' | 'request'): Promise<void> {
     }
     // Returning signers skip the adopt step (checked first, so it does not flash).
     const signer = await restoreSavedSigner()
-    useStore.getState().setSignFlow({ mode: 'self', step: signer ? 'place' : 'adopt' })
-    if (signer) await adoptSigner(signer)
+    if (signer) {
+      useStore.getState().setSignFlow({ mode: 'self', step: 'place' })
+      await adoptSigner(signer)
+      return
+    }
+    // With "Sign here" fields, show them first and adopt a signature at the
+    // first one, as DocuSign does. Without, adopt first, then place it.
+    const fields = await emptyFields()
+    if (fields.length) {
+      useStore.getState().setSignFlow({ mode: 'self', step: 'place' })
+      await enterPlacing(fields)
+    } else {
+      useStore.getState().setSignFlow({ mode: 'self', step: 'adopt' })
+    }
   } finally {
     starting = false
   }
@@ -171,23 +183,52 @@ export async function forgetSavedSigner(id: string): Promise<void> {
   forgetSignatureImage(id)
 }
 
-/** Shows the page overlay where signatures (or signers' fields) are placed. */
-export async function enterPlacing(): Promise<void> {
-  const flow = useStore.getState().signFlow
-  if (!flow) return
-  let fields: SigningContext['summary']['empty'] = []
+type EmptyFields = SigningContext['summary']['empty']
+
+/** The document's empty signature fields, when they can be filled (only in the file as opened). */
+async function emptyFields(): Promise<EmptyFields> {
   try {
     const context = await signingContext()
-    // Existing fields can only be filled in the file as opened.
-    if (context.direct) fields = context.summary.empty
+    return context.direct ? context.summary.empty : []
   } catch (error) {
     console.error(error)
+    return []
   }
+}
+
+/** Shows the page overlay where signatures (or signers' fields) are placed. */
+export async function enterPlacing(known?: EmptyFields): Promise<void> {
+  const flow = useStore.getState().signFlow
+  if (!flow) return
+  const fields = known ?? (await emptyFields())
   const state = useStore.getState()
   state.setSignFields(fields)
   state.setSignStep('place')
   lastField = null
-  if (flow.mode === 'self' && fields.length) goToNextField()
+  if (flow.mode === 'self' && openFields().length) goToNextField()
+}
+
+/**
+ * Puts a signature in a box or a "Sign here" field. Without a signature yet,
+ * the adopt step opens and the signature lands there once adopted. After a
+ * field, the view moves on to the next open one.
+ */
+export function placeSignature(spot: Omit<SignSpot, 'id'>): void {
+  const state = useStore.getState()
+  state.addSignSpot(spot)
+  if (!state.signer) {
+    state.setSignStep('adopt')
+    return
+  }
+  if (spot.field) {
+    lastField = spot.field
+    goToNextField()
+  }
+}
+
+/** The open field the guide points at: the first one in page order. */
+export function nextOpenField() {
+  return sortedOpenFields()[0] ?? null
 }
 
 /** Empty fields not yet covered by a placed signature. */
@@ -198,10 +239,14 @@ export function openFields() {
 
 let lastField: string | null = null
 
+function sortedOpenFields() {
+  return openFields().sort((a, b) => a.pageIndex - b.pageIndex || b.rect[3] - a.rect[3])
+}
+
 /** Scrolls to the next "Sign here" field, in page order, starting over after the last one. */
 export function goToNextField(): void {
   const state = useStore.getState()
-  const fields = openFields().sort((a, b) => a.pageIndex - b.pageIndex || b.rect[3] - a.rect[3])
+  const fields = sortedOpenFields()
   if (!fields.length) return
   const previous = fields.findIndex((field) => field.name === lastField)
   const next = fields[(previous + 1) % fields.length]
@@ -210,6 +255,16 @@ export function goToNextField(): void {
   if (!page) return
   state.setCurrentPage(page.id)
   state.requestScrollTo(page.id)
+  centerField(next.name)
+}
+
+/** Once its page is on screen, brings the field's tag (and the flag beside it) to the middle of the view. */
+function centerField(name: string, frames = 30): void {
+  requestAnimationFrame(() => {
+    const tag = document.querySelector(`.sign-tag[data-field="${CSS.escape(name)}"]`)
+    if (tag) tag.scrollIntoView({ block: 'center' })
+    else if (frames > 0) centerField(name, frames - 1)
+  })
 }
 
 export interface SignedResult {

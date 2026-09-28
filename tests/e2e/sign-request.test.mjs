@@ -110,7 +110,24 @@ describe('signing requests', () => {
     await page.click('button.zoom-label')
     await page.waitForTimeout(300)
 
+    // As in DocuSign, the fields come first: a focused view with "Sign here"
+    // tags and a Start flag, and the signature is adopted at the first tag.
     await page.click('.sign-request-sign')
+    await page.waitForSelector('.sign-tag')
+    check(!(await page.locator('.toolrail').isVisible()), 'the editing tools step aside while signing')
+    const tags = await page.locator('.sign-tag').allInnerTexts()
+    check(tags.length === 2 && tags.some((tag) => tag.includes('Grace Hopper')), `the sender's fields are tagged (${tags})`)
+    check((await page.locator('.sign-guide').innerText()) === 'Start', 'a Start flag points at the first field')
+    await page.locator('.sign-tag', { hasText: 'Grace Hopper' }).click()
+    await page.waitForSelector('.adopt-signature')
+    await page.click('.adopt-signature .modal-row .button:not(.button-primary)')
+    await page.waitForSelector('.adopt-signature', { state: 'detached' })
+    check(
+      (await page.locator('.sign-spot').count()) === 0 && (await page.locator('.sign-tag').count()) === 2,
+      'cancelling the signature leaves the field open',
+    )
+
+    await page.locator('.sign-tag', { hasText: 'Grace Hopper' }).click()
     await page.waitForSelector('.adopt-signature')
     await page.fill('input[name="signer-name"]', 'Grace Hopper')
     await page.fill('input[name="signer-email"]', 'Grace@Example.com')
@@ -127,14 +144,12 @@ describe('signing requests', () => {
     check((await page.locator('.adopt-code .cert-error').innerText()).includes('not right'), 'a wrong code is reported')
     await page.fill('input[name="signer-code"]', code)
     await page.click('.adopt-verify')
-    await page.waitForSelector('.sign-bar')
-
-    // Both fields show as "Sign here" tags; Grace fills hers.
-    await page.waitForSelector('.sign-tag')
-    const tags = await page.locator('.sign-tag').allInnerTexts()
-    check(tags.length === 2 && tags.some((tag) => tag.includes('Grace Hopper')), `the sender's fields are tagged (${tags})`)
-    await page.locator('.sign-tag', { hasText: 'Grace Hopper' }).click()
-    check((await page.locator('.sign-spot').count()) === 1 && (await page.locator('.sign-tag').count()) === 1, 'the tag is filled')
+    await page.waitForSelector('.sign-spot')
+    check(
+      (await page.locator('.sign-spot').count()) === 1 && (await page.locator('.sign-tag').count()) === 1,
+      'the adopted signature fills the tag',
+    )
+    check((await page.locator('.sign-guide').innerText()) === 'Sign', 'the flag moves on to the next field')
 
     await page.click('.sign-finish')
     await page.waitForSelector('.sign-review')

@@ -40,6 +40,8 @@ const TOOL_SHORTCUTS: Record<string, Tool> = {
 export default function App() {
   const hasDocument = useStore((state) => state.pages.length > 0)
   const formMode = useStore((state) => state.formMode)
+  // Signing is a focused view, as in DocuSign: the editing tools step aside.
+  const signing = useStore((state) => state.signFlow !== null)
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -55,6 +57,8 @@ export default function App() {
       }
       const state = useStore.getState()
       if (!state.pages.length) return
+      // Editing shortcuts would change the document under the placed signatures.
+      if (state.signFlow) return
 
       const canvas = activeCanvas()
       const editing = canvas?.getActiveObject() as { isEditing?: boolean } | undefined
@@ -161,7 +165,7 @@ export default function App() {
     <div className="app">
       <TopBar />
       {hasDocument ? (
-        <div className={`workspace ${formMode ? 'is-form-mode' : ''}`}>
+        <div className={`workspace ${formMode ? 'is-form-mode' : ''} ${signing ? 'is-signing' : ''}`}>
           <ToolRail />
           <div className="main">
             {formMode ? <FormsBar /> : <ToolOptions />}

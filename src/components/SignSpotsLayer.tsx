@@ -2,7 +2,7 @@ import { useRef, useState, type PointerEvent as ReactPointerEvent } from 'react'
 import { PenLine, X } from 'lucide-react'
 import { useStore, type SignSpot } from '../store'
 import { useTranslation } from '../i18n'
-import { viewRect } from '../lib/signController'
+import { nextOpenField, placeSignature, viewRect } from '../lib/signController'
 
 /** Default sizes in points, used when the user clicks instead of dragging. */
 const SIGNATURE_SIZE = { width: 210, height: 70 }
@@ -69,6 +69,9 @@ export function SignSpotsLayer({ pageIndex, zoom, width, height }: Props) {
     (field) => field.pageIndex === pageIndex && !allSpots.some((spot) => spot.field === field.name),
   )
   const requesting = mode === 'request'
+  // DocuSign's margin flag: points at the next field to sign, on its page.
+  const target = requesting ? null : nextOpenField()
+  const guide = target && target.pageIndex === pageIndex ? { name: target.name, box: viewRect(pageIndex, target.rect) } : null
   const size = requesting ? FIELD_SIZE : SIGNATURE_SIZE
   const signerIndex = (id?: string) => Math.max(0, draft.signers.findIndex((entry) => entry.id === id))
   const signerName = (id?: string) => draft.signers.find((entry) => entry.id === id)?.name.trim() || t('sign.signerN', { n: signerIndex(id) + 1 })
@@ -92,7 +95,11 @@ export function SignSpotsLayer({ pageIndex, zoom, width, height }: Props) {
   const place = (box: Box) => {
     const state = useStore.getState()
     const spot: Omit<SignSpot, 'id'> = { pageIndex, ...clampBox(box, width, height) }
-    if (requesting) spot.signer = state.requestDraft.activeSigner ?? state.requestDraft.signers[0]?.id
+    if (!requesting) {
+      placeSignature(spot)
+      return
+    }
+    spot.signer = state.requestDraft.activeSigner ?? state.requestDraft.signers[0]?.id
     state.addSignSpot(spot)
   }
 
@@ -174,9 +181,10 @@ export function SignSpotsLayer({ pageIndex, zoom, width, height }: Props) {
             key={field.name}
             type="button"
             className="sign-tag"
+            data-field={field.name}
             style={spotStyle(box)}
             onPointerDown={(event) => event.stopPropagation()}
-            onClick={() => useStore.getState().addSignSpot({ pageIndex, ...box, field: field.name })}
+            onClick={() => placeSignature({ pageIndex, ...box, field: field.name })}
           >
             <PenLine size={14} />
             <span className="sign-tag-text">
@@ -186,6 +194,18 @@ export function SignSpotsLayer({ pageIndex, zoom, width, height }: Props) {
           </button>
         )
       })}
+
+      {guide && (
+        <button
+          type="button"
+          className="sign-guide"
+          style={{ top: (guide.box.y + guide.box.height / 2) * zoom }}
+          onPointerDown={(event) => event.stopPropagation()}
+          onClick={() => placeSignature({ pageIndex, ...guide.box, field: guide.name })}
+        >
+          {allSpots.length ? t('sign.guideSign') : t('sign.guideStart')}
+        </button>
+      )}
 
       {spots.map((spot) => {
         const color = requesting ? SIGNER_COLORS[signerIndex(spot.signer) % SIGNER_COLORS.length] : undefined
@@ -247,12 +267,16 @@ export function SignSpotsLayer({ pageIndex, zoom, width, height }: Props) {
 function SignaturePreview({ image, name, box, zoom }: { image: string; name: string; box: { width: number; height: number }; zoom: number }) {
   const { t } = useTranslation()
   const wide = box.width / box.height >= 2.4
-  const fontSize = Math.max(4, Math.min(8, box.height / (wide ? 5.5 : 8))) * zoom
+  const label = t('digitalSign.appearance.signedBy')
+  // Shrink the text until its longest line fits beside (or under) the signature.
+  const textWidth = wide ? box.width * 0.45 - 10 : box.width - 8
+  const chars = Math.max(label.length, name.length * 1.15)
+  const fontSize = Math.max(4, Math.min(8, box.height / (wide ? 5.5 : 8), textWidth / (chars * 0.58))) * zoom
   return (
     <span className={`sign-preview ${wide ? 'is-wide' : ''}`}>
       <img src={image} alt="" draggable={false} />
       <span className="sign-preview-text" style={{ fontSize }}>
-        <span>{t('digitalSign.appearance.signedBy')}</span>
+        <span>{label}</span>
         <strong>{name}</strong>
       </span>
     </span>

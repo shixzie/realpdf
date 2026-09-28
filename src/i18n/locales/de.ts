@@ -197,6 +197,11 @@ export const de: Dictionary = {
     change: 'Ändern',
     next: 'Weiter',
     finish: 'Fertig',
+    fillTagsHint: 'Beginnen Sie bei der Markierung links. Beim ersten Feld erstellen Sie Ihre Unterschrift.',
+    guideStart: 'Start',
+    guideSign: 'Unterschreiben',
+    readyTitle: 'Bereit zum Abschließen?',
+    readyHint: 'Sie haben alle „Hier unterschreiben“-Felder ausgefüllt. Prüfen Sie das Dokument und wählen Sie dann Fertig.',
     placeFieldsTitle: 'Markieren Sie, wo jede Person unterschreibt',
     placeFieldsHint:
       'Wählen Sie einen Unterzeichner und klicken Sie auf die Seite, um sein „Hier unterschreiben“-Feld hinzuzufügen.',

@@ -1242,6 +1242,12 @@ button {
   pointer-events: none;
 }
 
+/* Signing is a focused view: the editing tools step aside. */
+.workspace.is-signing .toolrail,
+.workspace.is-signing .main > .options {
+  display: none;
+}
+
 .forms-bar .options-hint {
   display: inline-flex;
   align-items: center;
@@ -2030,6 +2036,14 @@ select.form-widget {
   color: var(--accent-ink);
 }
 
+.sign-bar.is-ready {
+  border-color: var(--success);
+}
+
+.sign-bar.is-ready > svg {
+  color: var(--success);
+}
+
 .sign-bar > svg {
   flex: none;
 }
@@ -2173,6 +2187,29 @@ select.form-widget {
   animation: none;
   cursor: default;
   pointer-events: none;
+}
+
+/* Margin flag pointing at the next field to sign, like DocuSign's Start / Sign tab. */
+.sign-guide {
+  position: absolute;
+  left: 0;
+  transform: translateY(-50%);
+  z-index: 1;
+  min-width: 64px;
+  padding: 6px 20px 6px 12px;
+  border: 0;
+  background: #b45309;
+  color: #fff;
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 700;
+  text-align: left;
+  cursor: pointer;
+  clip-path: polygon(0 0, calc(100% - 10px) 0, 100% 50%, calc(100% - 10px) 100%, 0 100%);
+}
+
+.sign-guide:hover {
+  background: #92400e;
 }
 
 @keyframes sign-tag-pulse {

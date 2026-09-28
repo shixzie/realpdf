@@ -156,9 +156,17 @@ function AdoptSignatureModal() {
 
   const close = () => {
     const state = useStore.getState()
-    // "Change" from the placing step returns there; otherwise the flow ends.
-    if (state.signer) state.setSignStep('place')
-    else state.setSignFlow(null)
+    // "Change" from the placing step returns there. Opened from a "Sign here"
+    // field, it goes back to the fields without that signature. Otherwise the
+    // flow ends.
+    if (state.signer) {
+      state.setSignStep('place')
+    } else if (state.signFields.length) {
+      for (const spot of state.signSpots) state.removeSignSpot(spot.id)
+      state.setSignStep('place')
+    } else {
+      state.setSignFlow(null)
+    }
   }
 
   const signatureName = chosen?.identity.info.name ?? name.trim()
