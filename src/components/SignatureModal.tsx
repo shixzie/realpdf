@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react'
-import { Check, Eraser, Image as ImageIcon, PenLine, Upload, X } from 'lucide-react'
+import { Check, Eraser, Image as ImageIcon, PenLine, ShieldCheck, Upload, X } from 'lucide-react'
 import { useStore } from '../store'
 import { commitCanvas, getCanvas, insertImageObject } from '../lib/canvasRegistry'
 import { loadImage } from '../lib/assets'
@@ -212,6 +212,17 @@ export function SignatureModal() {
             <ImageIcon size={15} /> {t('signature.upload')}
           </button>
         </div>
+
+        <button
+          type="button"
+          className="link-button signature-cert-link"
+          onClick={() => {
+            close()
+            useStore.getState().setDigitalSign('form')
+          }}
+        >
+          <ShieldCheck size={14} /> {t('signature.certLink')}
+        </button>
 
         {mode === 'draw' ? (
           <canvas

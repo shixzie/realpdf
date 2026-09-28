@@ -10,6 +10,7 @@ import {
   LetterText,
   Loader2,
   Presentation,
+  ShieldCheck,
   Wrench,
   type LucideIcon,
 } from 'lucide-react'
@@ -134,6 +135,24 @@ function ExportMenu({ onClose }: { onClose: () => void }) {
         <span className="export-menu-text">
           <span className="export-menu-label">{t('export.saveAsPdf')}</span>
           <span className="export-menu-hint">{t('export.saveAsPdfHint')}</span>
+        </span>
+      </button>
+      <button
+        type="button"
+        role="menuitem"
+        className="export-menu-item export-menu-item-sign"
+        disabled={exporting || Boolean(busy)}
+        onClick={() => {
+          onClose()
+          useStore.getState().setDigitalSign('form')
+        }}
+      >
+        <span className="export-menu-icon">
+          <ShieldCheck size={16} />
+        </span>
+        <span className="export-menu-text">
+          <span className="export-menu-label">{t('export.signCert')}</span>
+          <span className="export-menu-hint">{t('export.signCertHint')}</span>
         </span>
       </button>
       <MenuSection title={t('export.images')}>{IMAGE_ENTRIES.map((entry) => item(entry))}</MenuSection>

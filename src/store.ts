@@ -22,6 +22,18 @@ import { t } from './i18n'
 export type ToolsTab = 'merge' | 'split' | 'convert' | 'office'
 export type PendingAction = ToolsTab | 'forms'
 export type Theme = 'dark' | 'light'
+/** Certificate signing flow: the dialog, or picking where the signature goes. */
+export type DigitalSignStage = 'closed' | 'form' | 'placing'
+
+/** A box drawn for a visible signature, in page view coordinates (points at zoom 1). */
+export interface SignaturePlacementRequest {
+  pageIndex: number
+  x: number
+  y: number
+  width: number
+  height: number
+  nonce: number
+}
 
 function initialTheme(): Theme {
   if (typeof document !== 'undefined' && document.documentElement.dataset.theme === 'light') return 'light'
@@ -85,6 +97,8 @@ interface AppState {
   formWidgets: Record<string, FormWidget[]>
   formValues: Record<string, FormValue>
   formFlatten: boolean
+  digitalSign: DigitalSignStage
+  signPlacement: SignaturePlacementRequest | null
 
   load: (args: LoadArgs) => void
   close: () => void
@@ -126,6 +140,8 @@ interface AppState {
   exitFormMode: () => void
   setFormValue: (fieldName: string, value: FormValue) => void
   setFormFlatten: (flatten: boolean) => void
+  setDigitalSign: (stage: DigitalSignStage) => void
+  placeSignature: (placement: Omit<SignaturePlacementRequest, 'nonce'>) => void
   setLoading: (loading: boolean) => void
   setExporting: (exporting: boolean, progress?: number) => void
   setError: (message: string | null) => void
@@ -222,6 +238,8 @@ export const useStore = create<AppState>()((set, get) => ({
   formWidgets: {},
   formValues: {},
   formFlatten: true,
+  digitalSign: 'closed',
+  signPlacement: null,
 
   load: ({ bytes, fileName, pdf, pages }) =>
     set({
@@ -244,6 +262,8 @@ export const useStore = create<AppState>()((set, get) => ({
       formValues: {},
       hasForms: false,
       projectId: null,
+      digitalSign: 'closed',
+      signPlacement: null,
     }),
 
   close: () =>
@@ -264,6 +284,8 @@ export const useStore = create<AppState>()((set, get) => ({
       toolsOpen: false,
       projectId: null,
       selectionPage: null,
+      digitalSign: 'closed',
+      signPlacement: null,
     }),
 
   setZoom: (zoom) => set({ zoom: Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, zoom)) }),
@@ -554,6 +576,9 @@ export const useStore = create<AppState>()((set, get) => ({
   setToolsOpen: (open, tab) => set({ toolsOpen: open, toolsTab: tab ?? get().toolsTab }),
   setToolsTab: (tab) => set({ toolsTab: tab }),
   setHasForms: (hasForms) => set({ hasForms }),
+  setDigitalSign: (stage) => set({ digitalSign: stage, signPlacement: null }),
+  placeSignature: (placement) =>
+    set({ digitalSign: 'form', signPlacement: { ...placement, nonce: Date.now() + Math.random() } }),
 
   enterFormMode: async () => {
     const state = get()
