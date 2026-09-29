@@ -115,14 +115,21 @@ describe('editor', () => {
     await dragOnPage(page, { x: 150, y: 180 }, { x: 250, y: 230 }, 0)
     const drawn = await pixelAt(page, { x: 150, y: 205 })
     check(isDark(drawn), 'annotation drawn for undo/redo check')
-    await page.click('button[title^="Undo"]')
-    await page.waitForTimeout(450)
-    const afterUndo = await pixelAt(page, { x: 150, y: 205 })
-    check(!isDark(afterUndo), 'undo removes the annotation')
-    await page.click('button[title^="Redo"]')
-    await page.waitForTimeout(450)
-    const afterRedo = await pixelAt(page, { x: 150, y: 205 })
-    check(isDark(afterRedo), 'redo restores the annotation')
+    for (const [undoKey, redoKey] of [
+      ['Control+z', 'Control+Shift+z'],
+      ['Control+z', 'Control+y'],
+      ['Meta+z', 'Meta+Shift+z'],
+      ['Meta+z', 'Meta+y'],
+    ]) {
+      await page.keyboard.press(undoKey)
+      await page.waitForTimeout(450)
+      const afterUndo = await pixelAt(page, { x: 150, y: 205 })
+      check(!isDark(afterUndo), `${undoKey} removes the annotation`)
+      await page.keyboard.press(redoKey)
+      await page.waitForTimeout(450)
+      const afterRedo = await pixelAt(page, { x: 150, y: 205 })
+      check(isDark(afterRedo), `${redoKey} restores the annotation`)
+    }
 
     // ----------------------------------------------------------- signature
     await page.click('.tool[title^="Signature"]')
