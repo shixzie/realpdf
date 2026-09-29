@@ -25,6 +25,7 @@ const SECURITY_HEADERS: Record<string, string> = {
 function cacheControlFor(pathname: string): string | undefined {
   if (pathname.startsWith('/assets/')) return 'public, max-age=31536000, immutable'
   if (pathname.startsWith('/pdfjs-assets/')) return 'public, max-age=604800'
+  if (pathname.startsWith('/pdf-engine-assets/')) return 'public, max-age=604800'
   return undefined
 }
 

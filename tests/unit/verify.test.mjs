@@ -90,12 +90,14 @@ describe('signature verification', () => {
 
   it('verifies a signature, its signer and its chain', async () => {
     const { p12, identity } = await identityFor('Ada Lovelace')
+    const signedAt = new Date()
+    signedAt.setMilliseconds(0)
     const signed = await signPdf(await samplePdf(), {
       identity,
       placement: box,
       reason: 'Approval',
       location: 'London',
-      date: new Date('2026-09-28T12:00:00Z'),
+      date: signedAt,
     })
     const report = await verifyPdf(signed)
     expect(report.valid).toBe(true)
@@ -116,7 +118,7 @@ describe('signature verification', () => {
       problems: [],
     })
     expect(signature.signer).toMatchObject({ name: 'Ada Lovelace', email: 'ada@example.com', issuer: 'RealPDF Test CA', selfSigned: false })
-    expect(new Date(signature.signedAt).getTime()).toBe(Date.parse('2026-09-28T12:00:00Z'))
+    expect(new Date(signature.signedAt).getTime()).toBe(signedAt.getTime())
 
     // Trust anchors: the test CA is trusted; an unrelated root is not.
     expect((await verifyPdf(signed, { trustAnchors: [new Uint8Array(p12.caDer)] })).signatures[0].trusted).toBe(true)

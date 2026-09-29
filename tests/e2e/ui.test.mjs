@@ -41,7 +41,7 @@ describe('ui', () => {
     await page.waitForTimeout(200)
 
     // ------------------------------------------------- homepage tool cards
-    check((await page.locator('.home-tool').count()) === 6, 'homepage shows six tool cards')
+    check((await page.locator('.home-tool').count()) === 7, 'homepage shows seven tool cards')
     const officeCard = page.locator('.home-tool:has-text("Office → PDF")')
     await officeCard.click()
     await page.waitForSelector('.modal-wide')

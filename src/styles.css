@@ -2779,3 +2779,151 @@ select.form-widget {
     max-width: 110px;
   }
 }
+
+.tabs {
+  overflow-x: auto;
+  flex-shrink: 0;
+}
+
+.tab {
+  flex-shrink: 0;
+}
+
+.document-tool-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.document-tool-card {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-elevated);
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+}
+
+.document-tool-card:hover,
+.document-tool-card:focus-visible {
+  border-color: var(--accent);
+}
+
+.document-tool-card span {
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.tool-search {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.tool-search input,
+.advanced-field .text-input,
+.advanced-field .text-area {
+  width: 100%;
+  min-width: 0;
+}
+
+.tool-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  border: 0;
+  padding: 0;
+  margin: 0;
+  min-width: 0;
+}
+
+.advanced-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 13px;
+}
+
+.advanced-field input[type='file'] {
+  max-width: 100%;
+}
+
+.tool-source,
+.tool-result {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+
+.tool-result {
+  background: var(--bg-elevated);
+}
+
+.tool-notice {
+  padding: 12px;
+  border-left: 3px solid var(--accent);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.tool-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  align-self: flex-start;
+}
+
+.document-tool-panel h3,
+.tool-result p {
+  margin: 0;
+}
+
+@media (max-width: 520px) {
+  .tabs {
+    flex-wrap: wrap;
+  }
+
+  .tab {
+    padding: 8px;
+    font-size: 12px;
+  }
+
+  .document-tool-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.extra-tool-panel > h3 {
+  margin: 0;
+}
+
+.extra-tool-panel label:not(.check) {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 13px;
+  min-width: 0;
+}
+
+.extra-tool-panel .tool-row > label {
+  flex: 1 1 170px;
+}
+
+.extra-tool-panel .text-input {
+  min-width: 0;
+  width: 100%;
+}
+
+.extra-tool-panel .tool-result {
+  flex-shrink: 0;
+}

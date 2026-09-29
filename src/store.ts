@@ -22,7 +22,7 @@ import type { SignatureFieldInfo } from './lib/signing/pdfSign'
 import type { SigningIdentity } from './lib/signing/identity'
 import { t } from './i18n'
 
-export type ToolsTab = 'merge' | 'split' | 'convert' | 'office'
+export type ToolsTab = 'merge' | 'split' | 'convert' | 'office' | 'more'
 export type PendingAction = ToolsTab | 'forms'
 export type Theme = 'dark' | 'light'
 /**

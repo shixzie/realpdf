@@ -13,6 +13,7 @@ import {
   Presentation,
   Scissors,
   Trash2,
+  Wrench,
   X,
 } from 'lucide-react'
 import { useStore, type ToolsTab } from '../store'
@@ -38,6 +39,7 @@ import { imageFileToDataUrl } from '../lib/assets'
 import { bakedCurrentBytes } from '../lib/currentDocument'
 import { openPdfDocumentFromBytes } from '../lib/pdfjs'
 import { formatBytes, t as translate, useTranslation } from '../i18n'
+import { AdvancedToolsTab } from './AdvancedToolsTab'
 
 interface DraftSource {
   id: string
@@ -51,6 +53,7 @@ const TABS: Array<{ id: ToolsTab; labelKey: string; icon: typeof Combine }> = [
   { id: 'split', labelKey: 'fileTools.tabSplit', icon: Scissors },
   { id: 'convert', labelKey: 'fileTools.tabConvert', icon: FileDown },
   { id: 'office', labelKey: 'fileTools.tabOffice', icon: FileType2 },
+  { id: 'more', labelKey: 'advanced.title', icon: Wrench },
 ]
 
 const OFFICE_ACCEPT =
@@ -120,6 +123,7 @@ function Modal() {
           {tab === 'split' && <SplitTab />}
           {tab === 'convert' && <ConvertTab />}
           {tab === 'office' && <OfficeTab />}
+          {tab === 'more' && <AdvancedToolsTab />}
         </div>
       </div>
     </div>

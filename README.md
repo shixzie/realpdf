@@ -66,6 +66,14 @@ A real PDF editor that runs **entirely in your browser**. No uploads, no account
 - **Office → PDF** — open Word (`.docx`), Excel (`.xlsx`) and PowerPoint (`.pptx`) files and convert them into editable PDFs: paragraphs, headings, lists, tables, merged cells, multiple sheets/slides and inline images are rebuilt with pdf-lib (no server, no native engine)
 - **PDF → Office** — export the current document (with your edits baked in) as an editable Word (`.docx`), Excel (`.xlsx`) or PowerPoint (`.pptx`) file: positioned text runs, page breaks, one sheet per page and one slide per page
 
+The **More PDF tools** catalog adds compression, AES-256 password protection,
+unlocking, rotation, watermarks, page numbers, embedded-image extraction,
+overlays, visual comparison, local English OCR, web optimization, repair,
+redaction, rasterization, flattening, blank documents, saved-HTML conversion,
+cropping, page sizing, pages per sheet, page halving, metadata controls,
+bookmarks, text search, viewer preferences, and fillable-field creation.
+See [docs/pdf-tools.md](docs/pdf-tools.md) for usage and limits.
+
 Everything the tools produce uses your **current edited state** (annotations, page order, filled forms), not just the original file.
 
 ## Themes

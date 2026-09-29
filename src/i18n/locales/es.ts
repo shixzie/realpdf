@@ -1,6 +1,10 @@
+import { advancedToolsMessages } from '../advancedTools'
+import { extraToolsMessages } from '../extraTools'
 import type { Dictionary } from './en'
 
 export const es: Dictionary = {
+  advanced: advancedToolsMessages.es,
+  extraTools: extraToolsMessages.es,
   meta: {
     title: 'RealPDF — editor de PDF local',
     description:

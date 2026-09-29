@@ -61,12 +61,14 @@ export async function openPdfDocumentOnWorker(
 
 export function loadPdfDocument(
   bytes: Uint8Array,
-  onPassword?: (submit: (password: string) => void, wrong: boolean) => void,
+  onPassword?: (submit: (password: string) => void, wrong: boolean) => boolean | void,
 ): Promise<LoadedDocument> {
   const task = pdfjs.getDocument(documentOptions(bytes))
   if (onPassword) {
     task.onPassword = (submit: (password: string) => void, reason: number) => {
-      onPassword(submit, reason === pdfjs.PasswordResponses.INCORRECT_PASSWORD)
+      if (onPassword(submit, reason === pdfjs.PasswordResponses.INCORRECT_PASSWORD) === false) {
+        void task.destroy()
+      }
     }
   }
   return task.promise.then(async (pdf) => {

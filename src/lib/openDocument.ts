@@ -5,12 +5,26 @@ import { pdfHasFormFields } from './forms'
 import { isOfficeFileName, officeToPdf } from './officeToPdf'
 
 async function loadIntoEditor(bytes: Uint8Array, fileName: string): Promise<void> {
+  let enteredPassword = ''
   const loaded = await loadPdfDocument(bytes, (submit, wrong) => {
     const password = window.prompt(
       wrong ? t('toasts.incorrectPassword') : t('toasts.passwordProtected'),
     )
-    submit(password ?? '')
+    if (password === null) return false
+    enteredPassword = password
+    submit(password)
   })
+  try {
+    const { PDFDocument } = await import('pdf-lib')
+    const source = await PDFDocument.load(bytes, { ignoreEncryption: true, updateMetadata: false })
+    if (source.isEncrypted) {
+      const { unlockPdf } = await import('./localPdfEngine')
+      bytes = await unlockPdf(bytes, enteredPassword)
+    }
+  } catch (error) {
+    await loaded.pdf.loadingTask.destroy()
+    throw error
+  }
   useStore.getState().load({ bytes, fileName, pdf: loaded.pdf, pages: loaded.pages })
   useStore.getState().toastMessage('success', t('toasts.loaded', { fileName }))
 

@@ -54,6 +54,12 @@ const TOOL_CARDS: Array<{
     titleKey: 'empty.formsTitle',
     textKey: 'empty.formsText',
   },
+  {
+    action: { tab: 'more' },
+    icon: Wrench,
+    titleKey: 'advanced.title',
+    textKey: 'advanced.homeHint',
+  },
 ]
 
 export function EmptyState() {

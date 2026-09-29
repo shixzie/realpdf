@@ -1,3 +1,5 @@
+import { advancedToolsMessages } from '../advancedTools'
+import { extraToolsMessages } from '../extraTools'
 /**
  * English is the source dictionary: every other locale must implement this
  * exact shape (TypeScript enforces it). See docs/localization.md.
@@ -6,6 +8,8 @@
  * `Intl.PluralRules` when `t(key, { count })` is called.
  */
 export const en = {
+  advanced: advancedToolsMessages.en,
+  extraTools: extraToolsMessages.en,
   meta: {
     title: 'RealPDF — local PDF editor',
     description:
