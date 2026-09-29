@@ -20,6 +20,7 @@ import { restoreAssets } from './lib/assets'
 import type { MyRequest, RequestHeader } from './lib/signRequests'
 import type { SignatureFieldInfo } from './lib/signing/pdfSign'
 import type { SigningIdentity } from './lib/signing/identity'
+import type { AdvancedToolId } from './lib/documentToolCatalog'
 import { t } from './i18n'
 
 export type ToolsTab = 'merge' | 'split' | 'convert' | 'office' | 'more'
@@ -152,6 +153,7 @@ interface AppState {
   libraryBusy: boolean
   toolsOpen: boolean
   toolsTab: ToolsTab
+  toolsInitialTool: AdvancedToolId | null
   hasForms: boolean
   formMode: boolean
   formLoading: boolean
@@ -199,7 +201,7 @@ interface AppState {
   clearLibrary: () => Promise<void>
   toggleTheme: () => void
   setPendingAction: (action: PendingAction | null) => void
-  setToolsOpen: (open: boolean, tab?: ToolsTab) => void
+  setToolsOpen: (open: boolean, tab?: ToolsTab, initialTool?: AdvancedToolId) => void
   setToolsTab: (tab: ToolsTab) => void
   setHasForms: (hasForms: boolean) => void
   enterFormMode: () => Promise<void>
@@ -305,6 +307,7 @@ export const useStore = create<AppState>()((set, get) => ({
   libraryBusy: false,
   toolsOpen: false,
   toolsTab: 'merge',
+  toolsInitialTool: null,
   hasForms: false,
   formMode: false,
   formLoading: false,
@@ -362,6 +365,7 @@ export const useStore = create<AppState>()((set, get) => ({
       formValues: {},
       hasForms: false,
       toolsOpen: false,
+      toolsInitialTool: null,
       projectId: null,
       selectionPage: null,
       signFlow: null,
@@ -656,8 +660,8 @@ export const useStore = create<AppState>()((set, get) => ({
 
   setPendingAction: (pendingAction) => set({ pendingAction }),
 
-  setToolsOpen: (open, tab) => set({ toolsOpen: open, toolsTab: tab ?? get().toolsTab }),
-  setToolsTab: (tab) => set({ toolsTab: tab }),
+  setToolsOpen: (open, tab, initialTool) => set({ toolsOpen: open, toolsTab: tab ?? get().toolsTab, toolsInitialTool: open ? (initialTool ?? null) : null }),
+  setToolsTab: (tab) => set({ toolsTab: tab, toolsInitialTool: null }),
   setHasForms: (hasForms) => set({ hasForms }),
   // Closing the flow drops the placed spots and the unlocked key.
   setSignFlow: (flow) => set(flow ? { signFlow: flow } : { signFlow: null, signSpots: [], signFields: [], signer: null }),

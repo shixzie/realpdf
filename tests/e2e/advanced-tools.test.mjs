@@ -8,7 +8,7 @@ import { OUT_DIR, SAMPLE_PDF } from '../helpers/fixtures.mjs'
 async function chooseTool(page, title) {
   await openFileTools(page, 'More PDF tools')
   if (await page.locator('.tool-back').count()) await page.locator('.tool-back').click()
-  await page.getByRole('button', { name: title, exact: false }).filter({ has: page.locator('strong') }).click()
+  await page.locator('.document-tool-card').filter({ has: page.getByText(title, { exact: true }) }).click()
 }
 
 async function createResult(page, name) {

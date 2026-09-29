@@ -1,3 +1,4 @@
+import { homeToolsMessages } from '../homeTools'
 import { advancedToolsMessages } from '../advancedTools'
 import { extraToolsMessages } from '../extraTools'
 /**
@@ -8,6 +9,7 @@ import { extraToolsMessages } from '../extraTools'
  * `Intl.PluralRules` when `t(key, { count })` is called.
  */
 export const en = {
+  homeTools: homeToolsMessages.en,
   advanced: advancedToolsMessages.en,
   extraTools: extraToolsMessages.en,
   meta: {

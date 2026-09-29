@@ -6,9 +6,7 @@ import { bakedCurrentBytes } from '../lib/currentDocument'
 import { downloadBlob } from '../lib/exportController'
 import { addBookmarks, changePageSize, createFillableFields, cropPages, editMetadata, halvePages, pagesPerSheet, removeMetadata, searchPdfText, setViewerPreferences, type FormFieldSpec } from '../lib/extraDocumentTools'
 import { useTranslation } from '../i18n'
-
-export type ExtraToolId = 'crop' | 'pageSize' | 'metadata' | 'removeMetadata' | 'sheet' | 'halve' | 'bookmarks' | 'search' | 'preferences' | 'fields'
-export const EXTRA_TOOLS = (['crop', 'pageSize', 'metadata', 'removeMetadata', 'sheet', 'halve', 'bookmarks', 'search', 'preferences', 'fields'] as ExtraToolId[]).map((id) => ({ id, titleKey: `extraTools.${id}`, hintKey: `extraTools.${id}Hint` }))
+import type { ExtraToolId } from '../lib/documentToolCatalog'
 
 function download(bytes: Uint8Array, fileName: string | null, suffix: string): void {
   const base = (fileName ?? 'document.pdf').replace(/\.pdf$/i, '')
@@ -58,7 +56,7 @@ export function ExtraToolsPanel({ tool }: { tool: ExtraToolId }) {
     name: field.name,
     options: field.type === 'text' ? { value: field.value } : { checked: field.checked },
   })
-  if (!fileName) return <div className="tool-section"><p className="tool-hint">{t('extraTools.noDocument')}</p><button type="button" className="button" onClick={() => inputRef.current?.click()}><FileUp size={15} /> {t('extraTools.open')}</button><input ref={inputRef} hidden type="file" accept="application/pdf,.pdf" onChange={(event: ChangeEvent<HTMLInputElement>) => { const file = event.target.files?.[0]; event.target.value = ''; if (file) void openDocumentFile(file) }} /></div>
+  if (!fileName) return <div className="tool-section"><h3>{t(`extraTools.${tool}`)}</h3><p className="tool-hint">{t(`extraTools.${tool}Hint`)}</p><p className="tool-hint">{t('extraTools.noDocument')}</p><button type="button" className="button" onClick={() => inputRef.current?.click()}><FileUp size={15} /> {t('extraTools.open')}</button><input ref={inputRef} hidden type="file" accept="application/pdf,.pdf" onChange={(event: ChangeEvent<HTMLInputElement>) => { const file = event.target.files?.[0]; event.target.value = ''; if (file) void openDocumentFile(file) }} /></div>
   const number = (value: string) => Number(value) || 0
   const fieldInput = (key: keyof typeof field, label: string) => <label>{label}<input className="text-input" value={field[key] as string} onChange={(event) => setField((current) => ({ ...current, [key]: event.target.value }))} /></label>
   const action = (fn: () => Promise<Uint8Array>, suffix: string) => <button className="button" type="button" disabled={busy} onClick={() => void run(fn, suffix)}>{busy ? t('extraTools.busy') : t('extraTools.run')}</button>

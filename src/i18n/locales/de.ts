@@ -1,8 +1,10 @@
+import { homeToolsMessages } from '../homeTools'
 import { advancedToolsMessages } from '../advancedTools'
 import { extraToolsMessages } from '../extraTools'
 import type { Dictionary } from './en'
 
 export const de: Dictionary = {
+  homeTools: homeToolsMessages.de,
   advanced: advancedToolsMessages.de,
   extraTools: extraToolsMessages.de,
   meta: {

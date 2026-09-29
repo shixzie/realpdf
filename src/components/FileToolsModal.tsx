@@ -92,6 +92,7 @@ export function FileToolsModal() {
 function Modal() {
   const { t } = useTranslation()
   const tab = useStore((state) => state.toolsTab)
+  const initialTool = useStore((state) => state.toolsInitialTool)
   const setToolsTab = useStore((state) => state.setToolsTab)
   const close = () => useStore.getState().setToolsOpen(false)
   return (
@@ -123,7 +124,7 @@ function Modal() {
           {tab === 'split' && <SplitTab />}
           {tab === 'convert' && <ConvertTab />}
           {tab === 'office' && <OfficeTab />}
-          {tab === 'more' && <AdvancedToolsTab />}
+          {tab === 'more' && <AdvancedToolsTab initialTool={initialTool} />}
         </div>
       </div>
     </div>

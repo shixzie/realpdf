@@ -1,66 +1,16 @@
 import { useEffect, useRef } from 'react'
 import {
-  ClipboardList,
-  Combine,
-  FileDown,
   FileText,
-  FileType2,
   FolderOpen,
   Library,
-  PenLine,
-  Scissors,
   Send,
-  Wrench,
 } from 'lucide-react'
-import { useStore, type PendingAction, type ToolsTab } from '../store'
+import { useStore, type PendingAction } from '../store'
 import { openDocumentFile } from '../lib/openDocument'
 import { useTranslation } from '../i18n'
 import { SocialLinks } from './SocialLinks'
 import { MyRequestsList } from './RequestSignaturesModal'
-
-const TOOL_CARDS: Array<{
-  action: PendingAction | { tab: ToolsTab }
-  icon: typeof Combine
-  titleKey: string
-  textKey: string
-}> = [
-  {
-    action: { tab: 'merge' },
-    icon: Combine,
-    titleKey: 'empty.mergeTitle',
-    textKey: 'empty.mergeText',
-  },
-  {
-    action: 'split',
-    icon: Scissors,
-    titleKey: 'empty.splitTitle',
-    textKey: 'empty.splitText',
-  },
-  {
-    action: { tab: 'convert' },
-    icon: FileDown,
-    titleKey: 'empty.convertTitle',
-    textKey: 'empty.convertText',
-  },
-  {
-    action: { tab: 'office' },
-    icon: FileType2,
-    titleKey: 'empty.officeTitle',
-    textKey: 'empty.officeText',
-  },
-  {
-    action: 'forms',
-    icon: ClipboardList,
-    titleKey: 'empty.formsTitle',
-    textKey: 'empty.formsText',
-  },
-  {
-    action: { tab: 'more' },
-    icon: Wrench,
-    titleKey: 'advanced.title',
-    textKey: 'advanced.homeHint',
-  },
-]
+import { HomeTools } from './HomeTools'
 
 export function EmptyState() {
   const { t } = useTranslation()
@@ -156,43 +106,7 @@ export function EmptyState() {
           <MyRequestsList empty={<p className="home-section-empty">{t('empty.requestsEmpty')}</p>} />
         </section>
 
-        <section className="home-section home-tools-section" aria-labelledby="home-tools-title">
-          <div className="home-section-head">
-            <h2 id="home-tools-title">
-              <Wrench size={15} /> {t('empty.tools')}
-            </h2>
-          </div>
-          <div className="home-tools">
-            {TOOL_CARDS.map((card) => {
-              const Icon = card.icon
-              return (
-                <button
-                  key={card.titleKey}
-                  type="button"
-                  className="home-tool"
-                  onClick={() => {
-                    if (typeof card.action === 'string') {
-                      pickFile(card.action)
-                    } else {
-                      const state = useStore.getState()
-                      state.setPendingAction(null)
-                      state.setToolsOpen(true, card.action.tab)
-                    }
-                  }}
-                >
-                  <Icon size={18} />
-                  <strong>{t(card.titleKey)}</strong>
-                  <span>{t(card.textKey)}</span>
-                </button>
-              )
-            })}
-            <button type="button" className="home-tool home-tool-accent" onClick={() => pickFile(null)}>
-              <PenLine size={18} />
-              <strong>{t('empty.annotateTitle')}</strong>
-              <span>{t('empty.annotateText')}</span>
-            </button>
-          </div>
-        </section>
+        <HomeTools onPickFile={pickFile} />
 
         <SocialLinks />
       </div>

@@ -41,7 +41,16 @@ describe('ui', () => {
     await page.waitForTimeout(200)
 
     // ------------------------------------------------- homepage tool cards
-    check((await page.locator('.home-tool').count()) === 7, 'homepage shows seven tool cards')
+    check((await page.locator('.home-tool').count()) === 33, 'homepage shows all 33 tool cards')
+    const compressCard = page.locator('.home-tool:has-text("Compress PDF")')
+    await compressCard.click()
+    await page.waitForSelector('.modal-wide')
+    check(
+      (await page.locator('.document-tool-panel h3').innerText()).includes('Compress PDF'),
+      'Compress card opens the Compress panel directly',
+    )
+    await page.click('.modal-head .icon-button')
+    await page.waitForTimeout(200)
     const officeCard = page.locator('.home-tool:has-text("Office → PDF")')
     await officeCard.click()
     await page.waitForSelector('.modal-wide')
@@ -58,6 +67,8 @@ describe('ui', () => {
       (await page.locator('.tab.is-active').innerText()).includes('Merge'),
       'Merge card opens the tools modal on the Merge tab',
     )
+    await page.locator('.tabs').getByRole('button', { name: 'More PDF tools', exact: true }).click()
+    check((await page.locator('.document-tool-grid').count()) === 1, 'normal navigation opens the full catalog after the Compress shortcut')
     await page.click('.modal-head .icon-button')
     await page.waitForTimeout(200)
 
@@ -184,5 +195,44 @@ describe('ui', () => {
     )
 
     check(pageErrors.length === 0, `no browser errors (${pageErrors.slice(0, 2).join(' | ')})`)
+  })
+
+  it('discovers tools with search, categories, direct actions and reduced motion', async () => {
+    const { page } = app
+    await gotoHome(page)
+    const search = page.locator('.home-tool-search input')
+    await page.getByRole('button', { name: 'Security', exact: true }).click()
+    check(await page.locator('[data-home-tool="protect"]').count() === 1, 'security category includes protection')
+    check(await page.locator('[data-home-tool="merge"]').count() === 0, 'security category excludes page tools')
+    await page.getByRole('button', { name: 'All tools', exact: true }).click()
+    await search.fill('WATERMARK')
+    check(await page.locator('.home-tool').count() === 1, 'search finds a tool regardless of case')
+    await page.locator('[data-home-tool="watermark"]').click()
+    await page.getByRole('heading', { name: 'Add watermark', exact: true }).waitFor()
+    check(await page.getByRole('button', { name: 'Choose PDF', exact: true }).isVisible(), 'a direct tool asks for a file when none is open')
+    await page.locator('.modal-head .icon-button').click()
+    await search.fill('no-matching-tool')
+    check(await page.getByText('No tools found', { exact: true }).isVisible(), 'unmatched search has a clear empty state')
+    await page.getByRole('button', { name: 'Show all tools', exact: true }).click()
+    check(await page.locator('.home-tool').count() === 33, 'reset restores the complete catalog')
+    await search.fill('comprimir')
+    check(await page.locator('.home-tool').count() === 0, 'English search has no Spanish title match')
+    await page.locator('select.select-language').selectOption('es')
+    check(await page.locator('[data-home-tool="compress"]').count() === 1, 'changing locale updates active search results')
+    await page.locator('select.select-language').selectOption('en')
+    await search.fill('')
+    await page.emulateMedia({ reducedMotion: 'reduce' })
+    const motion = await page.locator('[data-home-tool="compress"]').evaluate(element => ({ animation: getComputedStyle(element).animationName, transition: getComputedStyle(element).transitionDuration }))
+    check(motion.animation === 'none' && motion.transition === '0s', 'reduced motion disables catalog animations and transitions')
+    await page.setViewportSize({ width: 390, height: 844 })
+    check(await page.evaluate(() => document.documentElement.scrollWidth === innerWidth), 'mobile home has no horizontal overflow')
+    await page.setViewportSize({ width: 1500, height: 1000 })
+    await page.emulateMedia({ reducedMotion: 'no-preference' })
+    await page.locator('[data-home-tool="fields"]').click()
+    const chooser = page.waitForEvent('filechooser')
+    await page.getByRole('button', { name: 'Open PDF', exact: true }).click()
+    await (await chooser).setFiles(SAMPLE_PDF)
+    await page.getByLabel('Field name').waitFor()
+    check(await page.getByRole('heading', { name: 'Fillable fields', exact: true }).isVisible(), 'extra tool shortcut stays selected after choosing a file')
   })
 })

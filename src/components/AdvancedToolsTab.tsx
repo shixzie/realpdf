@@ -2,19 +2,17 @@ import { useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 import { ArrowLeft, Download, FileUp, Loader2, Search } from 'lucide-react'
 import { useStore } from '../store'
 import { formatBytes, useTranslation } from '../i18n'
-import { DOCUMENT_TOOLS, type DocumentToolId } from '../lib/documentToolCatalog'
+import { DOCUMENT_TOOLS, EXTRA_TOOLS, type AdvancedToolId, type DocumentToolId, type ExtraToolId } from '../lib/documentToolCatalog'
 import { bakedCurrentBytes } from '../lib/currentDocument'
 import { downloadBlob } from '../lib/exportController'
 import { openDocumentFile, openPdfBytes } from '../lib/openDocument'
 import { parsePageRanges } from '../lib/pdfOps'
 import { createZip } from '../lib/zip'
-import { EXTRA_TOOLS, ExtraToolsPanel, type ExtraToolId } from './ExtraToolsPanel'
+import { ExtraToolsPanel } from './ExtraToolsPanel'
 
-type ToolId = DocumentToolId | ExtraToolId
-
-export function AdvancedToolsTab() {
+export function AdvancedToolsTab({ initialTool }: { initialTool?: AdvancedToolId | null }) {
   const { t } = useTranslation()
-  const [selected, setSelected] = useState<ToolId | null>(null)
+  const [selected, setSelected] = useState<AdvancedToolId | null>(initialTool ?? null)
   const [search, setSearch] = useState('')
   const panelRef = useRef<HTMLDivElement>(null)
   useLayoutEffect(() => {

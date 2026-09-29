@@ -1,6 +1,6 @@
 # Local PDF tools
 
-Open **Export → All document tools → More PDF tools** in the editor. The home screen also has a **More PDF tools** card. Search the catalog by tool name or description.
+The home screen lists all tools with search and category filters. Select a tool to open it directly, then choose a file when needed. Compress PDF has a highlighted card in the first row. In the editor, open **Export → All document tools → More PDF tools**.
 
 These tools process documents on the device. Current-document tools include edits, page order, and form values. Unlock and repair accept a separate file. Results download as new files. Opening a result replaces the current editor document after confirmation.
 
