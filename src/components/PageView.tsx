@@ -583,10 +583,7 @@ export function PageView({ pageIndex }: PageViewProps) {
     })
   }, [page?.id, page?.sourceIndex, page?.transform, page?.annotations, bytes])
 
-  // Render the PDF page bitmap, from the preview copy when one exists. It
-  // renders offscreen and replaces the visible bitmap in one draw, so a zoom
-  // step stretches the previous page until the sharp one lands instead of
-  // clearing the canvas to white.
+  // Render the PDF page bitmap, from the preview copy when one exists.
   const sourceIndex = page?.sourceIndex ?? null
   useEffect(() => {
     const element = baseRef.current

@@ -173,7 +173,6 @@ export default function App() {
     window.addEventListener('dragenter', onDragEnter)
     window.addEventListener('dragleave', onDragLeave)
     window.addEventListener('dragend', onDragDone)
-    // Capture, because page handlers stop a dropped image from bubbling.
     window.addEventListener('drop', onDragDone, true)
     window.addEventListener('dragover', onDragOver)
     window.addEventListener('drop', onDrop)

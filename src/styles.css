@@ -34,7 +34,6 @@
   --kofi-ink: #323842;
   --viewer-glow: rgba(14, 165, 233, 0.06);
   --grid-dot: rgba(255, 255, 255, 0.06);
-  /* Frosted menus and toasts; denser in dark so white pages behind them do not show through as grey. */
   --glass: color-mix(in srgb, var(--bg-panel) 94%, transparent);
   --font: 'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
   --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
@@ -47,7 +46,7 @@
   --dur-slow: 340ms;
 }
 
-/* A damped spring (damping ratio 0.75, 2.8% overshoot) where linear() easing exists. */
+/* A damped spring (damping ratio 0.75, 2.8% overshoot) sampled for linear(). */
 @supports (transition-timing-function: linear(0, 1)) {
   :root {
     --ease-spring: linear(0, 0.0457, 0.1542, 0.292, 0.4359, 0.5715, 0.6906, 0.7894, 0.8676, 0.9265, 0.9687, 0.9972, 1.0148, 1.0243, 1.028, 1.028, 1.0256, 1.0219, 1.0179, 1.0139, 1.0103, 1.0072, 1.0047, 1.0028, 1.0014, 1.0004, 0.9998, 0.9994, 1);
@@ -123,8 +122,6 @@ a,
   background: color-mix(in srgb, var(--accent) 32%, transparent);
 }
 
-/* Zero specificity, so components refine the ring; components that declare
-   their own transitions list outline-offset too. */
 :where(button, a, input, select, textarea, summary, [tabindex]) {
   outline-offset: 4px;
   transition: outline-offset var(--dur-fast) var(--ease-out);
@@ -173,8 +170,6 @@ a,
   }
 }
 
-/* Per-element travel for rise-in and start scale for pop-in. They do not
-   inherit, so a nested entrance never picks up its container's value. */
 @property --rise {
   syntax: '<length>';
   inherits: false;
@@ -208,7 +203,6 @@ a,
   }
 }
 
-/* useActiveIndicator writes the active child's box on the container, and this span draws it. */
 .active-indicator {
   position: absolute;
   top: 0;
@@ -341,7 +335,6 @@ a,
 
 /* ---------- Buttons ---------- */
 
-/* Backgrounds are set as background-color so the primary gradient survives hover. */
 .button {
   display: inline-flex;
   align-items: center;
@@ -371,7 +364,6 @@ a,
   border-color: var(--border-hover);
 }
 
-/* A quick press; the release springs back through the base transition. */
 .button:active:not(:disabled) {
   transform: scale(0.97);
   transition-duration: 80ms;
@@ -707,7 +699,6 @@ a,
   white-space: nowrap;
 }
 
-/* ToolOptions keys the bar by tool, so its contents slide in on every switch. */
 .options > * {
   animation: options-in var(--dur-base) var(--ease-out) backwards;
 }
@@ -752,7 +743,6 @@ a,
   gap: 5px;
 }
 
-/* The grey hairline keeps black and white swatches visible on both themes' panels. */
 .swatch {
   width: 20px;
   height: 20px;
@@ -851,7 +841,6 @@ a,
   position: relative;
 }
 
-/* Opacity only, because tests and fabric map pointers from page bounding boxes. */
 .viewer-inner {
   position: relative;
   width: 100%;
@@ -872,7 +861,6 @@ a,
   overflow: hidden;
 }
 
-/* Pages develop in once their first bitmap lands, including virtualised remounts. */
 .page-base {
   position: absolute;
   inset: 0;
@@ -1016,7 +1004,6 @@ a,
   }
 }
 
-/* The white frame stays, so a page still reads as a page while it renders. */
 .thumb-canvas {
   display: block;
   background: #fff;
@@ -1068,7 +1055,6 @@ a,
   animation: pop-in var(--dur-base) var(--ease-spring) backwards;
 }
 
-/* visibility, not display: hidden buttons stay unclickable on touch yet can fade. */
 .thumb-delete,
 .thumb-download {
   position: absolute;
@@ -1141,7 +1127,6 @@ a,
   isolation: isolate;
 }
 
-/* Fixed below the 54px top bar, so the grid stays put while the home scrolls. */
 .empty::before {
   content: '';
   position: fixed;
@@ -1163,7 +1148,6 @@ a,
   gap: 16px;
 }
 
-/* The stagger follows DOM order, which puts the hero first and reads centre-out in the wide grid. */
 .home > * {
   --rise: 14px;
   animation: rise-in 520ms var(--ease-out) backwards;
@@ -1327,7 +1311,6 @@ a,
     hint-shimmer 1.4s linear infinite;
 }
 
-/* One full 200% tile per loop, so the repeat is seamless. */
 @keyframes hint-shimmer {
   from {
     background-position: 200% 0;
@@ -1492,7 +1475,6 @@ a,
   font-size: 12.5px;
 }
 
-/* Centred with auto margins, not a transform, so the animations own transform. */
 .toast {
   position: fixed;
   bottom: 22px;
@@ -1528,7 +1510,6 @@ a,
   }
 }
 
-/* The timed fade at the end of the toast's life; dismissing still unmounts at once. */
 @keyframes toast-out {
   to {
     opacity: 0;
@@ -1645,7 +1626,6 @@ a,
   isolation: isolate;
 }
 
-/* A bar along the active tab's bottom edge; tabs wrap on narrow screens, so y moves too. */
 .tabs > .active-indicator {
   height: 2px;
   border-radius: 2px;
@@ -2663,7 +2643,6 @@ select.form-widget {
   border: 1px solid var(--border);
 }
 
-/* The frame clips, so the page zooms inside it on hover. */
 .recent-thumb {
   display: block;
   overflow: hidden;
@@ -3224,7 +3203,6 @@ select.form-widget {
   animation: guide-nudge 1.6s var(--ease-in-out) infinite;
 }
 
-/* Keeps the -50% centring translate while nudging towards the field. */
 @keyframes guide-nudge {
   50% {
     transform: translate(4px, -50%);
@@ -3908,8 +3886,6 @@ select.form-widget {
 
 /* ---------- Theme reveal ---------- */
 
-/* Colours switch at once in the DOM. The only theme motion is this reveal of
-   the new frame from the toggle, and the page stays clickable meanwhile. */
 ::view-transition {
   pointer-events: none;
 }
@@ -3933,7 +3909,6 @@ select.form-widget {
   }
 }
 
-/* One reduced-motion policy for the whole app; spinners still spin. */
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

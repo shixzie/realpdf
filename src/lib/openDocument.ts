@@ -86,9 +86,8 @@ export function isSupportedFileName(name: string): boolean {
 const DOCUMENT_TYPES = new Set(['application/pdf', ...Object.values(OFFICE_MIME)])
 
 /**
- * Whether a dragged file may be a document this app opens. Mid-drag, browsers
- * expose only the MIME type, and leave it empty for extensions the system does
- * not know, so an empty type counts too.
+ * Mid-drag, browsers expose only the MIME type, and leave it empty for
+ * extensions the system does not know, so an empty type counts too.
  */
 export function mayBeDocumentType(type: string): boolean {
   return type === '' || DOCUMENT_TYPES.has(type)

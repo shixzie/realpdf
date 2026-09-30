@@ -44,7 +44,6 @@ export function ExportOverlay() {
   )
 }
 
-/** Shown while a document is dragged over the window; it is the drop target, so a drop anywhere opens it. */
 export function DropOverlay() {
   const { t } = useTranslation()
   return (

@@ -112,7 +112,6 @@ export interface ToastMessage {
   message: string
 }
 
-/** How long a toast stays up; its CSS exit fade is timed from the same value. */
 export const TOAST_MS = 4200
 
 interface LoadArgs {

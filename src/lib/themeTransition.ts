@@ -2,11 +2,6 @@ import { flushSync } from 'react-dom'
 import { useStore } from '../store'
 import { prefersReducedMotion } from './motion'
 
-/**
- * Toggles the theme. Where View Transitions exist, the new theme is revealed
- * in a circle that grows from `origin` (the toggle) while the DOM itself
- * switches at once; flushSync puts the swapped toggle icon in the new frame.
- */
 export function toggleThemeFrom(origin: HTMLElement): void {
   const toggle = () => useStore.getState().toggleTheme()
   if (typeof document.startViewTransition !== 'function' || prefersReducedMotion()) {
