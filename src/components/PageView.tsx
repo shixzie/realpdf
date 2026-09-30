@@ -76,7 +76,7 @@ export function PageView({ pageIndex }: PageViewProps) {
   const draftingRef = useRef(false)
   const draftRef = useRef<Draft | null>(null)
   const commitTimerRef = useRef<number | null>(null)
-  const loadTokenRef = useRef(0)
+  const loadRef = useRef<AbortController | null>(null)
   const textRunsRef = useRef<TextRun[] | null>(null)
   const hoverRectRef = useRef<FabricObject | null>(null)
   const textEditTokenRef = useRef(0)
@@ -90,6 +90,22 @@ export function PageView({ pageIndex }: PageViewProps) {
 
   const latest = useRef({ tool, settings, pageId: page?.id ?? '' })
   latest.current = { tool, settings, pageId: page?.id ?? '' }
+
+  // Resolves true when this is still the page's current load. Aborting a
+  // superseded or unmounted load stops fabric before loadFromJSON clears and
+  // refills a canvas that a newer load owns or that has been disposed.
+  const loadAnnotations = (canvas: Canvas, json: ReturnType<typeof hydrateAnnotations>) => {
+    loadRef.current?.abort()
+    const load = new AbortController()
+    loadRef.current = load
+    return canvas.loadFromJSON(json, undefined, { signal: load.signal }).then(
+      () => loadRef.current === load && canvasRef.current === canvas,
+      (error: unknown) => {
+        if (!load.signal.aborted) console.error(error)
+        return false
+      },
+    )
+  }
 
   const commitNow = useCallback(() => {
     if (commitTimerRef.current != null) {
@@ -418,10 +434,8 @@ export function PageView({ pageIndex }: PageViewProps) {
 
     suppressRef.current = true
     readyRef.current = false
-    const token = loadTokenRef.current + 1
-    loadTokenRef.current = token
-    void canvas.loadFromJSON(hydrateAnnotations(page.annotations)).then(() => {
-      if (loadTokenRef.current !== token || canvasRef.current !== canvas) return
+    void loadAnnotations(canvas, hydrateAnnotations(page.annotations)).then((current) => {
+      if (!current) return
       suppressRef.current = false
       readyRef.current = true
       canvas.setDimensions({ width: initialSize.width, height: initialSize.height })
@@ -438,6 +452,8 @@ export function PageView({ pageIndex }: PageViewProps) {
     return () => {
       unregisterFlush()
       commitNow()
+      loadRef.current?.abort()
+      loadRef.current = null
       unregisterCanvas(page.id, canvas)
       canvasRef.current = null
       hoverRectRef.current = null
@@ -470,13 +486,11 @@ export function PageView({ pageIndex }: PageViewProps) {
       window.clearTimeout(commitTimerRef.current)
       commitTimerRef.current = null
     }
-    const token = loadTokenRef.current + 1
-    loadTokenRef.current = token
     suppressRef.current = true
     readyRef.current = false
     canvas.discardActiveObject()
-    void canvas.loadFromJSON(hydrateAnnotations(page.annotations)).then(() => {
-      if (loadTokenRef.current !== token || canvasRef.current !== canvas) return
+    void loadAnnotations(canvas, hydrateAnnotations(page.annotations)).then((current) => {
+      if (!current) return
       suppressRef.current = false
       readyRef.current = true
       loadedExternalRef.current = page.externalRev
