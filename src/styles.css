@@ -20,8 +20,8 @@
   --warning: #fbbf24;
   --radius: 9px;
   --radius-sm: 7px;
-  --topbar-height: 54px;
   --border-hover: color-mix(in srgb, var(--border-strong) 70%, var(--text-muted));
+  --shadow-accent: 0 12px 28px -14px color-mix(in srgb, var(--accent) 45%, transparent);
   --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.35);
   --shadow-md: 0 1px 2px rgba(0, 0, 0, 0.3), 0 6px 16px -4px rgba(0, 0, 0, 0.4), 0 16px 32px -12px rgba(0, 0, 0, 0.45);
   --shadow-lg: 0 2px 6px rgba(0, 0, 0, 0.3), 0 16px 32px -8px rgba(0, 0, 0, 0.5), 0 32px 72px -16px rgba(0, 0, 0, 0.6);
@@ -45,6 +45,8 @@
   --dur-fast: 180ms;
   --dur-base: 260ms;
   --dur-slow: 340ms;
+  --dur-spring: 390ms;
+  --dur-press: 80ms;
   --focus-transition: outline-offset var(--dur-fast) var(--ease-out);
 }
 
@@ -172,36 +174,22 @@ a,
   }
 }
 
-@property --rise {
-  syntax: '<length>';
+@property --enter {
+  syntax: '<transform-list>';
   inherits: false;
-  initial-value: 6px;
+  initial-value: translateY(6px);
 }
 
-@property --pop-from {
-  syntax: '<number>';
-  inherits: false;
-  initial-value: 0.6;
-}
-
-@keyframes rise-in {
+@keyframes enter {
   from {
     opacity: 0;
-    transform: translateY(var(--rise, 6px));
+    transform: var(--enter);
   }
 }
 
-@keyframes pop-in {
-  from {
-    opacity: 0;
-    transform: scale(var(--pop-from, 0.6));
-  }
-}
-
-@keyframes modal-in {
-  from {
-    opacity: 0;
-    transform: translateY(12px) scale(0.97);
+@keyframes sweep {
+  to {
+    transform: translateX(100%);
   }
 }
 
@@ -242,7 +230,7 @@ a,
   align-items: center;
   gap: 14px;
   padding: 0 14px;
-  height: var(--topbar-height);
+  height: 54px;
   flex: none;
   background: var(--bg-elevated);
   border-bottom: 1px solid var(--border);
@@ -368,7 +356,7 @@ a,
 
 .button:active:not(:disabled) {
   transform: scale(0.97);
-  transition-duration: 80ms;
+  transition-duration: var(--dur-press);
 }
 
 .button:disabled {
@@ -382,19 +370,17 @@ a,
   border-color: var(--accent);
   color: var(--on-accent);
   font-weight: 650;
+  --glow: 0 6px 16px -6px;
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.22),
-    0 1px 2px rgba(0, 0, 0, 0.2),
-    0 6px 16px -6px color-mix(in srgb, var(--accent) 60%, transparent);
+    var(--shadow-sm),
+    var(--glow) color-mix(in srgb, var(--accent) 60%, transparent);
 }
 
 .button-primary:hover:not(:disabled) {
   background-color: var(--accent-hover);
   border-color: var(--accent-hover);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.22),
-    0 1px 2px rgba(0, 0, 0, 0.2),
-    0 10px 24px -8px color-mix(in srgb, var(--accent) 60%, transparent);
+  --glow: 0 10px 24px -8px;
 }
 
 .button-ghost {
@@ -458,18 +444,12 @@ a,
 .icon-button:active:not(:disabled),
 .tool:active {
   transform: scale(0.92);
-  transition-duration: 80ms;
+  transition-duration: var(--dur-press);
 }
 
 .theme-toggle > svg {
-  animation: icon-swap var(--dur-slow) var(--ease-spring) backwards;
-}
-
-@keyframes icon-swap {
-  from {
-    opacity: 0;
-    transform: rotate(-90deg) scale(0.5);
-  }
+  --enter: rotate(-90deg) scale(0.5);
+  animation: enter var(--dur-slow) var(--ease-spring) backwards;
 }
 
 /* ---------- Save / export control ---------- */
@@ -495,6 +475,14 @@ a,
   transform: rotate(180deg);
 }
 
+.export-menu,
+.toast {
+  background: var(--glass);
+  backdrop-filter: blur(14px) saturate(1.4);
+  border: 1px solid var(--border-strong);
+  box-shadow: var(--shadow-lg), var(--highlight);
+}
+
 .export-menu {
   position: absolute;
   top: calc(100% + 8px);
@@ -505,20 +493,10 @@ a,
   flex-direction: column;
   gap: 2px;
   padding: 6px;
-  background: var(--glass);
-  backdrop-filter: blur(14px) saturate(1.4);
-  border: 1px solid var(--border-strong);
   border-radius: 14px;
-  box-shadow: var(--shadow-lg), var(--highlight);
   transform-origin: top right;
-  animation: menu-in var(--dur-fast) var(--ease-out) backwards;
-}
-
-@keyframes menu-in {
-  from {
-    opacity: 0;
-    transform: translateY(-6px) scale(0.96);
-  }
+  --enter: translateY(-6px) scale(0.96);
+  animation: enter var(--dur-fast) var(--ease-out) backwards;
 }
 
 .export-menu-section {
@@ -679,7 +657,7 @@ a,
 }
 
 .tool.is-active > svg {
-  animation: tool-pop calc(var(--dur-base) * 1.5) var(--ease-spring);
+  animation: tool-pop var(--dur-spring) var(--ease-spring);
 }
 
 @keyframes tool-pop {
@@ -702,14 +680,8 @@ a,
 }
 
 .options > * {
-  animation: options-in var(--dur-base) var(--ease-out) backwards;
-}
-
-@keyframes options-in {
-  from {
-    opacity: 0;
-    transform: translateX(-6px);
-  }
+  --enter: translateX(-6px);
+  animation: enter var(--dur-base) var(--ease-out) backwards;
 }
 
 .options-title {
@@ -867,11 +839,16 @@ a,
   position: absolute;
   inset: 0;
   display: block;
+}
+
+.page-base,
+.thumb-canvas {
   opacity: 0;
   transition: opacity var(--dur-slow) var(--ease-out);
 }
 
-.page-base[data-painted] {
+.page-base[data-painted],
+.thumb-canvas[data-blank='false'] {
   opacity: 1;
 }
 
@@ -1009,12 +986,6 @@ a,
 .thumb-canvas {
   display: block;
   background: #fff;
-  opacity: 0;
-  transition: opacity var(--dur-slow) var(--ease-out);
-}
-
-.thumb-canvas[data-blank='false'] {
-  opacity: 1;
 }
 
 .thumb-canvas[data-blank='true'] {
@@ -1054,7 +1025,8 @@ a,
   align-items: center;
   justify-content: center;
   padding: 0 4px;
-  animation: pop-in var(--dur-base) var(--ease-spring) backwards;
+  --enter: scale(0.6);
+  animation: enter var(--dur-base) var(--ease-spring) backwards;
 }
 
 .thumb-delete,
@@ -1067,17 +1039,16 @@ a,
   border: none;
   background: rgba(15, 23, 42, 0.82);
   color: #e2e8f0;
-  display: flex;
+  display: none;
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  visibility: hidden;
   opacity: 0;
   transform: translateY(4px);
   transition:
     opacity var(--dur-fast) var(--ease-out),
     transform var(--dur-fast) var(--ease-out),
-    visibility 0s linear var(--dur-fast),
+    display var(--dur-fast) allow-discrete,
     background-color var(--dur-micro) var(--ease-out);
 }
 
@@ -1091,14 +1062,17 @@ a,
 
 .thumb:hover .thumb-delete,
 .thumb:hover .thumb-download {
-  visibility: visible;
+  display: flex;
   opacity: 1;
   transform: none;
-  transition:
-    opacity var(--dur-fast) var(--ease-out),
-    transform var(--dur-fast) var(--ease-out),
-    visibility 0s,
-    background-color var(--dur-micro) var(--ease-out);
+}
+
+@starting-style {
+  .thumb:hover .thumb-delete,
+  .thumb:hover .thumb-download {
+    opacity: 0;
+    transform: translateY(4px);
+  }
 }
 
 .thumb:hover .thumb-download {
@@ -1125,19 +1099,9 @@ a,
   display: flex;
   padding: 32px;
   overflow: auto;
-  position: relative;
-  isolation: isolate;
-}
-
-.empty::before {
-  content: '';
-  position: fixed;
-  inset: var(--topbar-height) 0 0;
-  z-index: -1;
-  pointer-events: none;
-  background-image: radial-gradient(circle at 1px 1px, var(--grid-dot) 1px, transparent 0);
-  background-size: 22px 22px;
-  mask-image: radial-gradient(ellipse 70% 60% at 50% 0%, #000 30%, transparent 75%);
+  background:
+    radial-gradient(ellipse 70% 60% at 50% 0%, transparent 30%, var(--bg) 75%) border-box,
+    radial-gradient(circle at 1px 1px, var(--grid-dot) 1px, transparent 0) 0 0 / 22px 22px;
 }
 
 /* Auto margins centre the column while it fits and fall back to the top when
@@ -1151,8 +1115,8 @@ a,
 }
 
 .home > * {
-  --rise: 14px;
-  animation: rise-in 520ms var(--ease-out) backwards;
+  --enter: translateY(14px);
+  animation: enter 520ms var(--ease-out) backwards;
 }
 
 .home > :nth-child(2) {
@@ -1207,13 +1171,17 @@ a,
   }
 }
 
-.empty-card {
+.empty-card,
+.home-section {
   background: var(--bg-panel);
   border: 1px solid var(--border);
   border-radius: 16px;
+  box-shadow: var(--shadow-md), var(--highlight);
+}
+
+.empty-card {
   padding: 36px 36px 30px;
   text-align: center;
-  box-shadow: var(--shadow-md), var(--highlight);
 }
 
 .empty-logo {
@@ -1228,8 +1196,8 @@ a,
   align-items: center;
   justify-content: center;
   margin: 0 auto 18px;
-  --pop-from: 0.8;
-  animation: pop-in var(--dur-slow) var(--ease-spring) 80ms backwards;
+  --enter: scale(0.8);
+  animation: enter var(--dur-slow) var(--ease-spring) 80ms backwards;
 }
 
 .empty-card h1 {
@@ -1257,8 +1225,8 @@ a,
 .empty-card > p,
 .empty-card > .button,
 .empty-card > .empty-hint {
-  --rise: 8px;
-  animation: rise-in var(--dur-slow) var(--ease-out) backwards;
+  --enter: translateY(8px);
+  animation: enter var(--dur-slow) var(--ease-out) backwards;
 }
 
 .empty-card > h1 {
@@ -1293,13 +1261,7 @@ a,
 
 @media (hover: hover) {
   .empty-card .button-primary:hover::after {
-    animation: cta-sweep 700ms var(--ease-in-out);
-  }
-}
-
-@keyframes cta-sweep {
-  to {
-    transform: translateX(100%);
+    animation: sweep 700ms var(--ease-in-out);
   }
 }
 
@@ -1309,7 +1271,7 @@ a,
   -webkit-background-clip: text;
   background-clip: text;
   animation:
-    rise-in var(--dur-slow) var(--ease-out) backwards,
+    enter var(--dur-slow) var(--ease-out) backwards,
     hint-shimmer 1.4s linear infinite;
 }
 
@@ -1356,27 +1318,37 @@ a,
 
 /* ---------- Modals, toasts ---------- */
 
-.modal-backdrop {
+.modal-backdrop,
+.drop-overlay {
   position: fixed;
   inset: 0;
-  background: var(--backdrop);
-  backdrop-filter: blur(6px);
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 50;
   padding: 24px;
+}
+
+.modal-backdrop {
+  z-index: 50;
+  background: var(--backdrop);
+  backdrop-filter: blur(6px);
   animation: fade-in var(--dur-base) var(--ease-out);
 }
 
-.modal {
+.modal,
+.export-card,
+.drop-card {
   background: var(--bg-panel);
   border: 1px solid var(--border-strong);
-  border-radius: 16px;
   box-shadow: var(--shadow-lg), var(--highlight);
+  --enter: translateY(12px) scale(0.97);
+  animation: enter var(--dur-slow) var(--ease-emphasized) backwards;
+}
+
+.modal {
+  border-radius: 16px;
   padding: 18px;
   width: min(700px, 100%);
-  animation: modal-in var(--dur-slow) var(--ease-emphasized) backwards;
 }
 
 .modal-head {
@@ -1422,12 +1394,8 @@ a,
   display: flex;
   align-items: center;
   gap: 16px;
-  background: var(--bg-panel);
-  border: 1px solid var(--border-strong);
   border-radius: 12px;
   padding: 20px 26px;
-  box-shadow: var(--shadow-lg), var(--highlight);
-  animation: modal-in var(--dur-slow) var(--ease-emphasized) backwards;
 }
 
 .export-card svg {
@@ -1458,13 +1426,7 @@ a,
   inset: 0;
   background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.45), transparent);
   transform: translateX(-100%);
-  animation: progress-shimmer 1.4s linear infinite;
-}
-
-@keyframes progress-shimmer {
-  to {
-    transform: translateX(100%);
-  }
+  animation: sweep 1.4s linear infinite;
 }
 
 .export-card strong {
@@ -1488,28 +1450,19 @@ a,
   display: flex;
   align-items: center;
   gap: 10px;
-  background: var(--glass);
-  backdrop-filter: blur(14px) saturate(1.4);
-  border: 1px solid var(--border-strong);
   border-radius: 10px;
   padding: 10px 12px 10px 14px;
-  box-shadow: var(--shadow-lg), var(--highlight);
   z-index: 60;
+  --enter: translateY(18px) scale(0.94);
   animation:
-    toast-in calc(var(--dur-base) * 1.5) var(--ease-spring) backwards,
-    toast-out 200ms var(--ease-in-out) calc(var(--toast-ms) - 200ms) forwards;
+    enter var(--dur-spring) var(--ease-spring) backwards,
+    toast-out var(--dur-fast) var(--ease-in-out) calc(var(--toast-ms) - var(--dur-fast)) forwards;
 }
 
 .toast > svg:first-child {
   flex: none;
-  animation: pop-in var(--dur-base) var(--ease-spring) 90ms backwards;
-}
-
-@keyframes toast-in {
-  from {
-    opacity: 0;
-    transform: translateY(18px) scale(0.94);
-  }
+  --enter: scale(0.6);
+  animation: enter var(--dur-base) var(--ease-spring) 90ms backwards;
 }
 
 @keyframes toast-out {
@@ -1551,54 +1504,26 @@ a,
 
 /* ---------- Scrollbars ---------- */
 
-.viewer::-webkit-scrollbar,
-.sidebar-list::-webkit-scrollbar,
-.toolrail::-webkit-scrollbar,
-.options::-webkit-scrollbar,
-.tools-body::-webkit-scrollbar,
-.empty::-webkit-scrollbar,
-.adopt-signature::-webkit-scrollbar,
-.sign-review::-webkit-scrollbar {
+:is(.viewer, .sidebar-list, .toolrail, .options, .tools-body, .empty, .adopt-signature, .sign-review)::-webkit-scrollbar {
   width: 11px;
   height: 11px;
 }
 
-.viewer::-webkit-scrollbar-thumb,
-.sidebar-list::-webkit-scrollbar-thumb,
-.toolrail::-webkit-scrollbar-thumb,
-.options::-webkit-scrollbar-thumb,
-.tools-body::-webkit-scrollbar-thumb,
-.empty::-webkit-scrollbar-thumb,
-.adopt-signature::-webkit-scrollbar-thumb,
-.sign-review::-webkit-scrollbar-thumb {
+:is(.viewer, .sidebar-list, .toolrail, .options, .tools-body, .empty, .adopt-signature, .sign-review)::-webkit-scrollbar-thumb {
   background: var(--scrollbar);
   border-radius: 6px;
   border: 3px solid transparent;
   background-clip: content-box;
 }
 
-.viewer::-webkit-scrollbar-thumb:hover,
-.sidebar-list::-webkit-scrollbar-thumb:hover,
-.toolrail::-webkit-scrollbar-thumb:hover,
-.options::-webkit-scrollbar-thumb:hover,
-.tools-body::-webkit-scrollbar-thumb:hover,
-.empty::-webkit-scrollbar-thumb:hover,
-.adopt-signature::-webkit-scrollbar-thumb:hover,
-.sign-review::-webkit-scrollbar-thumb:hover {
+:is(.viewer, .sidebar-list, .toolrail, .options, .tools-body, .empty, .adopt-signature, .sign-review)::-webkit-scrollbar-thumb:hover {
   background: var(--scrollbar-hover);
   background-clip: content-box;
 }
 
 /* Firefox only, because Chromium drops ::-webkit-scrollbar styling once these are set. */
 @supports not selector(::-webkit-scrollbar) {
-  .viewer,
-  .sidebar-list,
-  .toolrail,
-  .options,
-  .tools-body,
-  .empty,
-  .adopt-signature,
-  .sign-review {
+  :is(.viewer, .sidebar-list, .toolrail, .options, .tools-body, .empty, .adopt-signature, .sign-review) {
     scrollbar-width: thin;
     scrollbar-color: var(--scrollbar) transparent;
   }
@@ -1664,7 +1589,7 @@ a,
 }
 
 .tools-body > * {
-  animation: rise-in var(--dur-base) var(--ease-out) backwards;
+  animation: enter var(--dur-base) var(--ease-out) backwards;
 }
 
 .tool-section {
@@ -1983,10 +1908,6 @@ select.form-widget {
 
 .home-section {
   padding: 18px 20px 20px;
-  background: var(--bg-panel);
-  border: 1px solid var(--border);
-  border-radius: 16px;
-  box-shadow: var(--shadow-md), var(--highlight);
 }
 
 .home-section-head {
@@ -2159,8 +2080,12 @@ select.form-widget {
   color: var(--text);
   cursor: pointer;
   text-align: left;
-  animation: home-tool-enter 400ms var(--ease-out) backwards;
-  animation-delay: var(--tool-delay, 0ms);
+  --enter: translateY(12px) scale(0.985);
+  animation: enter 400ms var(--ease-out) var(--stagger, 0ms) backwards;
+}
+
+.home-tool,
+.recent-card {
   transition:
     border-color var(--dur-fast) var(--ease-out),
     background-color var(--dur-fast) var(--ease-out),
@@ -2233,10 +2158,11 @@ select.form-widget {
 }
 
 @media (hover: hover) {
-  .home-tool:hover {
+  .home-tool:hover,
+  .recent-card:hover {
     border-color: var(--accent);
     background: var(--bg-hover);
-    box-shadow: 0 12px 28px -14px color-mix(in srgb, var(--accent) 45%, transparent);
+    box-shadow: var(--shadow-accent);
     transform: translateY(-3px);
   }
   .home-tool:hover .home-tool-icon {
@@ -2249,7 +2175,8 @@ select.form-widget {
   }
 }
 
-.home-tool:active {
+.home-tool:active,
+.recent-card:active {
   transform: translateY(0) scale(0.99);
 }
 
@@ -2269,17 +2196,6 @@ select.form-widget {
 .home-tools-empty p {
   color: var(--text-muted);
   font-size: 13px;
-}
-
-@keyframes home-tool-enter {
-  from {
-    opacity: 0;
-    transform: translateY(12px) scale(0.985);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-  }
 }
 
 .social-links {
@@ -2335,7 +2251,7 @@ select.form-widget {
 }
 
 .segmented > .active-indicator {
-  border-radius: 7px;
+  border-radius: var(--radius-sm);
   background: var(--bg-elevated);
   box-shadow: var(--shadow-sm), var(--highlight);
 }
@@ -2350,14 +2266,11 @@ select.form-widget {
   font-size: 12.5px;
   font-weight: 600;
   padding: 6px 12px;
-  border-radius: 7px;
+  border-radius: var(--radius-sm);
   cursor: pointer;
 }
 
-.segmented button:hover {
-  color: var(--text);
-}
-
+.segmented button:hover,
 .segmented button.is-active {
   color: var(--text);
 }
@@ -2479,35 +2392,7 @@ select.form-widget {
   border-radius: var(--radius);
   background: var(--bg-elevated);
   transition: border-color var(--dur-micro) var(--ease-out);
-  animation: rise-in var(--dur-base) var(--ease-out) backwards;
-}
-
-.library-item:nth-child(2) {
-  animation-delay: 30ms;
-}
-
-.library-item:nth-child(3) {
-  animation-delay: 60ms;
-}
-
-.library-item:nth-child(4) {
-  animation-delay: 90ms;
-}
-
-.library-item:nth-child(5) {
-  animation-delay: 120ms;
-}
-
-.library-item:nth-child(6) {
-  animation-delay: 150ms;
-}
-
-.library-item:nth-child(7) {
-  animation-delay: 180ms;
-}
-
-.library-item:nth-child(n + 8) {
-  animation-delay: 210ms;
+  animation: enter var(--dur-base) var(--ease-out) var(--stagger, 0ms) backwards;
 }
 
 .library-item:hover {
@@ -2613,28 +2498,12 @@ select.form-widget {
   background: var(--bg-elevated);
   cursor: pointer;
   text-align: left;
-  transition:
-    border-color var(--dur-fast) var(--ease-out),
-    background-color var(--dur-fast) var(--ease-out),
-    box-shadow var(--dur-base) var(--ease-out),
-    transform var(--dur-base) var(--ease-out),
-    var(--focus-transition);
 }
 
 @media (hover: hover) {
-  .recent-card:hover {
-    border-color: var(--accent);
-    background: var(--bg-hover);
-    box-shadow: 0 12px 28px -14px color-mix(in srgb, var(--accent) 45%, transparent);
-    transform: translateY(-3px);
-  }
   .recent-card:hover .recent-thumb img {
     transform: scale(1.04);
   }
-}
-
-.recent-card:active {
-  transform: translateY(0) scale(0.99);
 }
 
 .recent-thumb,
@@ -2984,8 +2853,12 @@ select.form-widget {
   border-radius: var(--radius);
   background: var(--accent-soft);
   color: var(--accent-ink);
-  --rise: -8px;
-  animation: rise-in var(--dur-base) var(--ease-out) backwards;
+}
+
+.sign-request-bar,
+.sign-bar {
+  --enter: translateY(-8px);
+  animation: enter var(--dur-base) var(--ease-out) backwards;
 }
 
 .sign-request-bar.is-done {
@@ -3028,8 +2901,6 @@ select.form-widget {
   border-radius: var(--radius);
   background: var(--accent-soft);
   color: var(--accent-ink);
-  --rise: -8px;
-  animation: rise-in var(--dur-base) var(--ease-out) backwards;
 }
 
 .sign-bar.is-ready {
@@ -3237,8 +3108,8 @@ select.form-widget {
 
 .sign-spot {
   cursor: move;
-  --pop-from: 0.9;
-  animation: pop-in 220ms var(--ease-spring) backwards;
+  --enter: scale(0.9);
+  animation: enter var(--dur-base) var(--ease-spring) backwards;
 }
 
 .sign-spot.is-fixed {
@@ -3705,7 +3576,7 @@ select.form-widget {
 
 @media (hover: hover) {
   .document-tool-card:hover {
-    box-shadow: 0 10px 24px -14px color-mix(in srgb, var(--accent) 45%, transparent);
+    box-shadow: var(--shadow-accent);
     transform: translateY(-2px);
   }
 }
@@ -3828,13 +3699,7 @@ select.form-widget {
 /* ---------- Drop to open ---------- */
 
 .drop-overlay {
-  position: fixed;
-  inset: 0;
   z-index: 70;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 24px;
   background: color-mix(in srgb, var(--bg) 55%, transparent);
   backdrop-filter: blur(4px);
   animation: fade-in var(--dur-fast) var(--ease-out);
@@ -3857,11 +3722,7 @@ select.form-widget {
   max-width: 420px;
   padding: 28px 36px;
   text-align: center;
-  background: var(--bg-panel);
-  border: 1px solid var(--border-strong);
   border-radius: 16px;
-  box-shadow: var(--shadow-lg), var(--highlight);
-  animation: modal-in var(--dur-slow) var(--ease-emphasized) backwards;
 }
 
 .drop-card svg {
@@ -3912,15 +3773,10 @@ select.form-widget {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  *,
+  *:not(.spin),
   *::before,
   *::after {
     animation: none !important;
     transition: none !important;
-    scroll-behavior: auto !important;
-  }
-
-  .spin {
-    animation: spin 0.9s linear infinite !important;
   }
 }

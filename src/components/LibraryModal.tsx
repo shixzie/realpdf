@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, type CSSProperties } from 'react'
 import { BookOpen, Download, FolderOpen, Loader2, Pencil, Trash2, X } from 'lucide-react'
 import { useStore } from '../store'
 import { storageEstimate } from '../lib/library'
@@ -65,8 +65,8 @@ export function LibraryModal() {
 
         {entries.length > 0 && (
           <ul className="library-list">
-            {entries.map((entry) => (
-              <li key={entry.id} className="library-item">
+            {entries.map((entry, index) => (
+              <li key={entry.id} className="library-item" style={{ '--stagger': `${Math.min(index, 7) * 30}ms` } as CSSProperties}>
                 <div className="library-thumb">
                   {entry.thumbnail ? (
                     <img src={entry.thumbnail} alt="" />
