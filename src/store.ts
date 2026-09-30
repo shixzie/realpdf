@@ -646,7 +646,12 @@ export const useStore = create<AppState>()((set, get) => ({
 
   setTheme: (theme) => {
     if (typeof document !== 'undefined') {
-      document.documentElement.dataset.theme = theme
+      const root = document.documentElement
+      // Transitions stay off until the new colours have been styled once.
+      root.dataset.themeSwitching = ''
+      root.dataset.theme = theme
+      void document.body.offsetWidth
+      delete root.dataset.themeSwitching
       const meta = document.querySelector('meta[name="theme-color"]')
       if (meta) meta.setAttribute('content', theme === 'light' ? '#f4efe4' : '#0b0f14')
     }

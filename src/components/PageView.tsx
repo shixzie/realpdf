@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent } from 'react'
-import { Canvas, Line, type FabricObject, type TPointerEventInfo } from 'fabric'
+import { Canvas, Line, util, type FabricObject, type TPointerEventInfo } from 'fabric'
 import { useStore } from '../store'
 import { hydrateAnnotations, serializeCanvas } from '../lib/serialize'
 import {
@@ -91,27 +91,22 @@ export function PageView({ pageIndex }: PageViewProps) {
   const latest = useRef({ tool, settings, pageId: page?.id ?? '' })
   latest.current = { tool, settings, pageId: page?.id ?? '' }
 
-  // Aborting a superseded or unmounted load stops fabric before
-  // loadFromJSON clears and refills a canvas that a newer load owns or
-  // that has been disposed. loadFromJSON also switches renderOnAddRemove
-  // off and restores it only on success, from whatever value it found, so
-  // an overlapped load would leave it off; the current load turns it back on.
-  const loadAnnotations = (canvas: Canvas, json: ReturnType<typeof hydrateAnnotations>) => {
+  // Objects load off-canvas, and only the load that is still current swaps
+  // them in, so a superseded or unmounted load never touches the canvas.
+  const loadAnnotations = async (canvas: Canvas, json: ReturnType<typeof hydrateAnnotations>) => {
     loadRef.current?.abort()
     const load = new AbortController()
     loadRef.current = load
-    const settle = (loaded: boolean) => {
-      const current = loadRef.current === load && canvasRef.current === canvas
-      if (current) canvas.renderOnAddRemove = true
-      return loaded && current
+    try {
+      const objects = await util.enlivenObjects<FabricObject>(json.objects as any[], { signal: load.signal })
+      if (loadRef.current !== load) return false
+      canvas.clear()
+      canvas.add(...objects)
+      return true
+    } catch (error) {
+      if (!load.signal.aborted) console.error(error)
+      return false
     }
-    return canvas.loadFromJSON(json, undefined, { signal: load.signal }).then(
-      () => settle(true),
-      (error: unknown) => {
-        if (!load.signal.aborted) console.error(error)
-        return settle(false)
-      },
-    )
   }
 
   const commitNow = useCallback(() => {
@@ -597,7 +592,9 @@ export function PageView({ pageIndex }: PageViewProps) {
     }
     let cancelled = false
     let task: { cancel: () => void; promise: Promise<void> } | null = null
-    const scratch = document.createElement('canvas')
+    // A painted page keeps its bitmap on screen while the next one renders offscreen.
+    const scratch = element.dataset.painted ? document.createElement('canvas') : null
+    const target = scratch ?? element
     const preview = previewPageRef.current === page.id ? previewRef.current : null
     const previewDoc = preview?.pdf ?? null
     const dpr = Math.min(window.devicePixelRatio || 1, 2)
@@ -606,15 +603,17 @@ export function PageView({ pageIndex }: PageViewProps) {
         const pdfPage = previewDoc ? await previewDoc.getPage(1) : await pdf.getPage(sourceIndex + 1)
         if (cancelled) return
         const viewport = pdfPage.getViewport({ scale: zoom * dpr })
-        scratch.width = Math.max(1, Math.floor(viewport.width))
-        scratch.height = Math.max(1, Math.floor(viewport.height))
-        const renderTask = pdfPage.render({ canvas: scratch, viewport })
+        target.width = Math.max(1, Math.floor(viewport.width))
+        target.height = Math.max(1, Math.floor(viewport.height))
+        const renderTask = pdfPage.render({ canvas: target, viewport })
         task = renderTask as unknown as { cancel: () => void; promise: Promise<void> }
         await renderTask.promise
         if (cancelled) return
-        element.width = scratch.width
-        element.height = scratch.height
-        element.getContext('2d')?.drawImage(scratch, 0, 0)
+        if (scratch) {
+          element.width = scratch.width
+          element.height = scratch.height
+          element.getContext('2d')?.drawImage(scratch, 0, 0)
+        }
         element.dataset.painted = 'true'
         // Only drop the covers once the patched bitmap is actually painted.
         applyTextEditPreviewBackgrounds(canvasRef.current, preview ? preview.removedIds : null)
@@ -622,8 +621,10 @@ export function PageView({ pageIndex }: PageViewProps) {
         if ((error as Error)?.name !== 'RenderingCancelledException') console.error(error)
       } finally {
         // iOS Safari caps total canvas memory; rapid zoom steps would pile these up.
-        scratch.width = 0
-        scratch.height = 0
+        if (scratch) {
+          scratch.width = 0
+          scratch.height = 0
+        }
       }
     })()
     return () => {

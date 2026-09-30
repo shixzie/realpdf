@@ -14,6 +14,8 @@ export const OFFICE_MIME: Record<OfficeKind, string> = {
   pptx: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
 }
 
+export const OFFICE_ACCEPT = [...OFFICE_EXTENSIONS.map((kind) => `.${kind}`), ...Object.values(OFFICE_MIME)].join(',')
+
 export function officeKindFromName(name: string): OfficeKind | null {
   const extension = name.split('.').pop()?.toLowerCase() ?? ''
   return OFFICE_EXTENSIONS.includes(extension as OfficeKind) ? (extension as OfficeKind) : null

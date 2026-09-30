@@ -125,7 +125,7 @@ export function HomeTools({ onPickFile }: { onPickFile: (pending: PendingAction 
   const { t } = useTranslation()
   const [query, setQuery] = useState('')
   const [category, setCategory] = useState<ToolCategory | null>(null)
-  const filtersRef = useActiveIndicator<HTMLDivElement>(category)
+  const filtersRef = useActiveIndicator(category)
   const normalizedQuery = query.trim().toLocaleLowerCase()
   const visibleTools = TOOLS.filter((tool) => {
     if (category && tool.category !== category) return false
@@ -170,7 +170,7 @@ export function HomeTools({ onPickFile }: { onPickFile: (pending: PendingAction 
           {visibleTools.map((tool, index) => {
             const Icon = tool.icon
             return (
-              <button key={`${category ?? 'all'}-${tool.id}`} type="button" className={`home-tool${tool.featured ? ' home-tool-featured' : ''}`} data-home-tool={tool.id} style={{ '--tool-delay': `${Math.min(index, 6) * 28}ms` } as CSSProperties} onClick={() => pick(tool)}>
+              <button key={`${category ?? 'all'}-${tool.id}`} type="button" className={`home-tool${tool.featured ? ' home-tool-featured' : ''}`} data-home-tool={tool.id} style={{ '--stagger': `${Math.min(index, 6) * 28}ms` } as CSSProperties} onClick={() => pick(tool)}>
                 <span className="home-tool-icon" aria-hidden="true"><Icon size={18} /></span>
                 <span className="home-tool-copy"><strong>{t(tool.titleKey)}</strong><span>{t(tool.descriptionKey)}</span></span>
                 <ArrowUpRight className="home-tool-arrow" size={16} aria-hidden="true" />
