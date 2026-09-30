@@ -162,7 +162,7 @@ export function ToolOptions() {
   }
 
   return (
-    <div className="options">
+    <div className="options" key={panelTool}>
       <span className="options-title">{t(TOOL_LABEL_KEY[panelTool])}</span>
 
       {(COLOR_TOOLS.includes(panelTool) || showTextStyle) && (

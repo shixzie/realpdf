@@ -33,6 +33,7 @@
   --kofi: #fcbf47;
   --kofi-ink: #323842;
   --viewer-glow: rgba(14, 165, 233, 0.06);
+  --grid-dot: rgba(255, 255, 255, 0.06);
   --font: 'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
   --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
   --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
@@ -82,6 +83,7 @@
   --scrollbar: #dccfb6;
   --scrollbar-hover: #c8b795;
   --viewer-glow: rgba(217, 119, 6, 0.08);
+  --grid-dot: rgba(87, 63, 24, 0.09);
 }
 
 * {
@@ -168,7 +170,20 @@ a,
   }
 }
 
-/* --rise is the travel: a few pixels for panels, more for page entrances. */
+/* Per-element travel for rise-in and start scale for pop-in. They do not
+   inherit, so a nested entrance never picks up its container's value. */
+@property --rise {
+  syntax: '<length>';
+  inherits: false;
+  initial-value: 6px;
+}
+
+@property --pop-from {
+  syntax: '<number>';
+  inherits: false;
+  initial-value: 0.6;
+}
+
 @keyframes rise-in {
   from {
     opacity: 0;
@@ -261,8 +276,14 @@ a,
   cursor: pointer;
 }
 
-.brand-home:hover {
-  opacity: 0.8;
+.brand-home svg {
+  transition: transform var(--dur-base) var(--ease-spring);
+}
+
+@media (hover: hover) {
+  .brand-home:hover svg {
+    transform: rotate(-8deg) scale(1.08);
+  }
 }
 
 .topbar-group {
@@ -317,11 +338,12 @@ a,
 
 /* ---------- Buttons ---------- */
 
+/* Backgrounds are set as background-color so the primary gradient survives hover. */
 .button {
   display: inline-flex;
   align-items: center;
   gap: 7px;
-  background: var(--bg-panel);
+  background-color: var(--bg-panel);
   color: var(--text);
   border: 1px solid var(--border-strong);
   border-radius: var(--radius-sm);
@@ -329,17 +351,27 @@ a,
   font-size: 13px;
   font-weight: 550;
   cursor: pointer;
-  transition: background 0.12s ease, border-color 0.12s ease, transform 0.06s ease;
+  box-shadow: var(--shadow-sm), var(--highlight);
+  transition:
+    background-color var(--dur-micro) var(--ease-out),
+    border-color var(--dur-micro) var(--ease-out),
+    color var(--dur-micro) var(--ease-out),
+    box-shadow var(--dur-fast) var(--ease-out),
+    transform var(--dur-fast) var(--ease-spring),
+    opacity var(--dur-fast),
+    outline-offset var(--dur-fast) var(--ease-out);
   white-space: nowrap;
 }
 
 .button:hover:not(:disabled) {
-  background: var(--bg-hover);
-  border-color: #3b4c61;
+  background-color: var(--bg-hover);
+  border-color: var(--border-hover);
 }
 
+/* A quick press; the release springs back through the base transition. */
 .button:active:not(:disabled) {
-  transform: translateY(1px);
+  transform: scale(0.97);
+  transition-duration: 80ms;
 }
 
 .button:disabled {
@@ -348,26 +380,36 @@ a,
 }
 
 .button-primary {
-  background: var(--accent);
+  background-color: var(--accent);
+  background-image: linear-gradient(180deg, rgba(255, 255, 255, 0.14), rgba(255, 255, 255, 0) 55%);
   border-color: var(--accent);
   color: var(--on-accent);
   font-weight: 650;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.22),
+    0 1px 2px rgba(0, 0, 0, 0.2),
+    0 6px 16px -6px color-mix(in srgb, var(--accent) 60%, transparent);
 }
 
 .button-primary:hover:not(:disabled) {
-  background: var(--accent-hover);
+  background-color: var(--accent-hover);
   border-color: var(--accent-hover);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.22),
+    0 1px 2px rgba(0, 0, 0, 0.2),
+    0 10px 24px -8px color-mix(in srgb, var(--accent) 60%, transparent);
 }
 
 .button-ghost {
-  background: transparent;
+  background-color: transparent;
   border-color: var(--border);
   color: var(--text-muted);
+  box-shadow: none;
 }
 
 .button-ghost:hover:not(:disabled) {
   color: var(--text);
-  background: var(--bg-hover);
+  background-color: var(--bg-hover);
 }
 
 .button-lg {
@@ -398,6 +440,39 @@ a,
 .icon-button:disabled {
   opacity: 0.35;
   cursor: default;
+}
+
+.icon-button,
+.zoom-label,
+.tool,
+.tab,
+.segmented button,
+.home-tool-filter,
+.link-button,
+.social-link {
+  transition:
+    color var(--dur-micro) var(--ease-out),
+    background-color var(--dur-micro) var(--ease-out),
+    border-color var(--dur-micro) var(--ease-out),
+    transform var(--dur-fast) var(--ease-spring),
+    outline-offset var(--dur-fast) var(--ease-out);
+}
+
+.icon-button:active:not(:disabled),
+.tool:active {
+  transform: scale(0.92);
+  transition-duration: 80ms;
+}
+
+.theme-toggle > svg {
+  animation: icon-swap var(--dur-slow) var(--ease-spring) backwards;
+}
+
+@keyframes icon-swap {
+  from {
+    opacity: 0;
+    transform: rotate(-90deg) scale(0.5);
+  }
 }
 
 /* ---------- Save / export control ---------- */
@@ -629,6 +704,18 @@ a,
   white-space: nowrap;
 }
 
+/* ToolOptions keys the bar by tool, so its contents slide in on every switch. */
+.options > * {
+  animation: options-in var(--dur-base) var(--ease-out) backwards;
+}
+
+@keyframes options-in {
+  from {
+    opacity: 0;
+    transform: translateX(-6px);
+  }
+}
+
 .options-title {
   font-weight: 650;
   font-size: 12.5px;
@@ -662,19 +749,32 @@ a,
   gap: 5px;
 }
 
+/* The grey hairline keeps black and white swatches visible on both themes' panels. */
 .swatch {
   width: 20px;
   height: 20px;
   border-radius: 50%;
   border: 2px solid transparent;
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.18);
+  box-shadow: inset 0 0 0 1px rgba(128, 128, 128, 0.35);
   cursor: pointer;
   padding: 0;
+  transition:
+    transform var(--dur-fast) var(--ease-spring),
+    box-shadow var(--dur-fast) var(--ease-out),
+    outline-offset var(--dur-fast) var(--ease-out);
+}
+
+@media (hover: hover) {
+  .swatch:hover {
+    transform: scale(1.14);
+  }
 }
 
 .swatch.is-active {
-  border-color: var(--accent);
-  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.35);
+  box-shadow:
+    inset 0 0 0 1px rgba(128, 128, 128, 0.45),
+    0 0 0 2px var(--bg-panel),
+    0 0 0 4px var(--accent);
 }
 
 .swatch-custom {
@@ -842,6 +942,12 @@ a,
   cursor: pointer;
   display: flex;
   justify-content: center;
+  transition:
+    background-color var(--dur-micro) var(--ease-out),
+    border-color var(--dur-micro) var(--ease-out),
+    box-shadow var(--dur-fast) var(--ease-out),
+    opacity var(--dur-fast) var(--ease-out),
+    transform var(--dur-fast) var(--ease-out);
 }
 
 .thumb:hover {
@@ -852,9 +958,14 @@ a,
   background: transparent;
 }
 
+.thumb.is-dragging {
+  opacity: 0.45;
+  transform: scale(0.96);
+}
+
 .thumb.is-drop {
   border-color: var(--accent);
-  border-style: dashed;
+  box-shadow: 0 0 0 4px var(--accent-soft);
 }
 
 .thumb-grip {
@@ -863,7 +974,7 @@ a,
   left: 2px;
   color: var(--text-dim);
   opacity: 0;
-  transition: opacity 0.12s ease;
+  transition: opacity var(--dur-micro) var(--ease-out);
 }
 
 .thumb:hover .thumb-grip {
@@ -881,11 +992,28 @@ a,
   display: flex;
   align-items: center;
   justify-content: center;
+  transition:
+    transform var(--dur-fast) var(--ease-out),
+    box-shadow var(--dur-fast) var(--ease-out);
 }
 
+@media (hover: hover) {
+  .thumb:hover .thumb-frame {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-md);
+  }
+}
+
+/* The white frame stays, so a page still reads as a page while it renders. */
 .thumb-canvas {
   display: block;
   background: #fff;
+  opacity: 0;
+  transition: opacity var(--dur-slow) var(--ease-out);
+}
+
+.thumb-canvas[data-blank='false'] {
+  opacity: 1;
 }
 
 .thumb-canvas[data-blank='true'] {
@@ -925,8 +1053,10 @@ a,
   align-items: center;
   justify-content: center;
   padding: 0 4px;
+  animation: pop-in var(--dur-base) var(--ease-spring) backwards;
 }
 
+/* visibility, not display: hidden buttons stay unclickable on touch yet can fade. */
 .thumb-delete,
 .thumb-download {
   position: absolute;
@@ -937,10 +1067,18 @@ a,
   border: none;
   background: rgba(15, 23, 42, 0.82);
   color: #e2e8f0;
-  display: none;
+  display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
+  visibility: hidden;
+  opacity: 0;
+  transform: translateY(4px);
+  transition:
+    opacity var(--dur-fast) var(--ease-out),
+    transform var(--dur-fast) var(--ease-out),
+    visibility 0s linear var(--dur-fast),
+    background-color var(--dur-micro) var(--ease-out);
 }
 
 .thumb-delete {
@@ -953,7 +1091,18 @@ a,
 
 .thumb:hover .thumb-delete,
 .thumb:hover .thumb-download {
-  display: flex;
+  visibility: visible;
+  opacity: 1;
+  transform: none;
+  transition:
+    opacity var(--dur-fast) var(--ease-out),
+    transform var(--dur-fast) var(--ease-out),
+    visibility 0s,
+    background-color var(--dur-micro) var(--ease-out);
+}
+
+.thumb:hover .thumb-download {
+  transition-delay: 30ms, 30ms, 0s, 0s;
 }
 
 .thumb-delete:hover {
@@ -976,6 +1125,20 @@ a,
   display: flex;
   padding: 32px;
   overflow: auto;
+  position: relative;
+  isolation: isolate;
+}
+
+/* Fixed below the 54px top bar, so the grid stays put while the home scrolls. */
+.empty::before {
+  content: '';
+  position: fixed;
+  inset: 54px 0 0;
+  z-index: -1;
+  pointer-events: none;
+  background-image: radial-gradient(circle at 1px 1px, var(--grid-dot) 1px, transparent 0);
+  background-size: 22px 22px;
+  mask-image: radial-gradient(ellipse 70% 60% at 50% 0%, #000 30%, transparent 75%);
 }
 
 /* Auto margins centre the column while it fits and fall back to the top when
@@ -986,6 +1149,28 @@ a,
   display: flex;
   flex-direction: column;
   gap: 16px;
+}
+
+/* The stagger follows DOM order, which puts the hero first and reads centre-out in the wide grid. */
+.home > * {
+  --rise: 14px;
+  animation: rise-in 520ms var(--ease-out) backwards;
+}
+
+.home > :nth-child(2) {
+  animation-delay: 60ms;
+}
+
+.home > :nth-child(3) {
+  animation-delay: 120ms;
+}
+
+.home > :nth-child(4) {
+  animation-delay: 180ms;
+}
+
+.home > :nth-child(5) {
+  animation-delay: 240ms;
 }
 
 /* Wide screens place signing requests beside the call to action and tools below. */
@@ -1038,12 +1223,15 @@ a,
   height: 58px;
   border-radius: 15px;
   background: var(--accent-soft);
-  border: 1px solid rgba(14, 165, 233, 0.4);
+  border: 1px solid color-mix(in srgb, var(--accent) 40%, transparent);
+  box-shadow: 0 0 36px 6px color-mix(in srgb, var(--accent) 25%, transparent);
   color: var(--accent);
   display: flex;
   align-items: center;
   justify-content: center;
   margin: 0 auto 18px;
+  --pop-from: 0.8;
+  animation: pop-in var(--dur-slow) var(--ease-spring) 80ms backwards;
 }
 
 .empty-card h1 {
@@ -1065,6 +1253,73 @@ a,
   margin-top: 14px;
   color: var(--text-dim);
   font-size: 12.5px;
+}
+
+.empty-card > h1,
+.empty-card > p,
+.empty-card > .button,
+.empty-card > .empty-hint {
+  --rise: 8px;
+  animation: rise-in var(--dur-slow) var(--ease-out) backwards;
+}
+
+.empty-card > h1 {
+  animation-delay: 120ms;
+}
+
+.empty-card > p {
+  animation-delay: 160ms;
+}
+
+.empty-card > .button {
+  animation-delay: 200ms;
+}
+
+.empty-card > .empty-hint {
+  animation-delay: 240ms;
+}
+
+.empty-card .button-primary {
+  position: relative;
+  overflow: hidden;
+}
+
+.empty-card .button-primary::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(105deg, transparent 30%, rgba(255, 255, 255, 0.32) 50%, transparent 70%);
+  transform: translateX(-100%);
+  pointer-events: none;
+}
+
+@media (hover: hover) {
+  .empty-card .button-primary:hover::after {
+    animation: cta-sweep 700ms var(--ease-in-out);
+  }
+}
+
+@keyframes cta-sweep {
+  to {
+    transform: translateX(100%);
+  }
+}
+
+.empty-hint.is-loading {
+  color: transparent;
+  background: linear-gradient(90deg, var(--text-dim) 30%, var(--text) 50%, var(--text-dim) 70%) 0 0 / 200% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  animation:
+    rise-in var(--dur-slow) var(--ease-out) backwards,
+    hint-shimmer 1.4s linear infinite;
+}
+
+/* One full 200% tile per loop, so the repeat is seamless. */
+@keyframes hint-shimmer {
+  from {
+    background-position: 200% 0;
+  }
 }
 
 .empty-features {
@@ -1429,6 +1684,11 @@ a,
   border-radius: var(--radius);
   padding: 12px 14px;
   background: var(--bg-elevated);
+  transition: border-color var(--dur-micro) var(--ease-out);
+}
+
+.tool-block:hover {
+  border-color: var(--border-strong);
 }
 
 .tool-block h3 {
@@ -1630,14 +1890,14 @@ select.form-widget {
 /* ---------- Warm/light theme helpers & new UI ---------- */
 
 .button-kofi {
-  background: var(--kofi);
+  background-color: var(--kofi);
   border-color: var(--kofi);
   color: var(--kofi-ink);
   font-weight: 650;
 }
 
 .button-kofi:hover:not(:disabled) {
-  background: #ffd166;
+  background-color: #ffd166;
   border-color: #ffd166;
   color: var(--kofi-ink);
 }
@@ -1645,6 +1905,27 @@ select.form-widget {
 .button-kofi svg {
   color: #c2410c;
   fill: #c2410c;
+}
+
+@media (hover: hover) {
+  .button-kofi:hover svg {
+    animation: heartbeat 700ms var(--ease-in-out);
+  }
+}
+
+@keyframes heartbeat {
+  18% {
+    transform: scale(1.22);
+  }
+  36% {
+    transform: scale(1);
+  }
+  54% {
+    transform: scale(1.12);
+  }
+  72% {
+    transform: scale(1);
+  }
 }
 
 .support-modal {
@@ -1813,7 +2094,6 @@ select.form-widget {
   font-size: 12px;
   font-weight: 550;
   cursor: pointer;
-  transition: color 160ms ease, background 160ms ease, border-color 160ms ease;
 }
 
 .home-tool-filter:hover {
@@ -1885,9 +2165,14 @@ select.form-widget {
   color: var(--text);
   cursor: pointer;
   text-align: left;
-  animation: home-tool-enter 400ms cubic-bezier(0.16, 1, 0.3, 1) backwards;
+  animation: home-tool-enter 400ms var(--ease-out) backwards;
   animation-delay: var(--tool-delay, 0ms);
-  transition: border-color 180ms ease, background 180ms ease, box-shadow 220ms ease, transform 220ms cubic-bezier(0.16, 1, 0.3, 1);
+  transition:
+    border-color var(--dur-fast) var(--ease-out),
+    background-color var(--dur-fast) var(--ease-out),
+    box-shadow var(--dur-base) var(--ease-out),
+    transform var(--dur-base) var(--ease-out),
+    outline-offset var(--dur-fast) var(--ease-out);
 }
 
 .home-tool-featured {
@@ -1905,7 +2190,9 @@ select.form-widget {
   border-radius: 10px;
   background: var(--bg-panel);
   color: var(--accent-ink);
-  transition: transform 220ms cubic-bezier(0.16, 1, 0.3, 1), border-color 180ms ease;
+  transition:
+    transform var(--dur-base) var(--ease-out),
+    border-color var(--dur-fast) var(--ease-out);
 }
 
 .home-tool-copy {
@@ -1936,7 +2223,9 @@ select.form-widget {
   color: var(--accent-ink);
   opacity: 0;
   transform: translate(-3px, 3px);
-  transition: opacity 180ms ease, transform 220ms cubic-bezier(0.16, 1, 0.3, 1);
+  transition:
+    opacity var(--dur-fast) var(--ease-out),
+    transform var(--dur-base) var(--ease-out);
 }
 
 .home-tool:focus-visible {
@@ -1953,7 +2242,7 @@ select.form-widget {
   .home-tool:hover {
     border-color: var(--accent);
     background: var(--bg-hover);
-    box-shadow: 0 8px 18px rgba(0, 0, 0, 0.1);
+    box-shadow: 0 12px 28px -14px color-mix(in srgb, var(--accent) 45%, transparent);
     transform: translateY(-3px);
   }
   .home-tool:hover .home-tool-icon {
@@ -2025,7 +2314,6 @@ select.form-widget {
   font-size: 12.5px;
   font-weight: 600;
   text-decoration: none;
-  transition: border-color 0.12s ease, background 0.12s ease, color 0.12s ease;
 }
 
 .social-link:hover {
@@ -2196,6 +2484,36 @@ select.form-widget {
   border: 1px solid var(--border);
   border-radius: var(--radius);
   background: var(--bg-elevated);
+  transition: border-color var(--dur-micro) var(--ease-out);
+  animation: rise-in var(--dur-base) var(--ease-out) backwards;
+}
+
+.library-item:nth-child(2) {
+  animation-delay: 30ms;
+}
+
+.library-item:nth-child(3) {
+  animation-delay: 60ms;
+}
+
+.library-item:nth-child(4) {
+  animation-delay: 90ms;
+}
+
+.library-item:nth-child(5) {
+  animation-delay: 120ms;
+}
+
+.library-item:nth-child(6) {
+  animation-delay: 150ms;
+}
+
+.library-item:nth-child(7) {
+  animation-delay: 180ms;
+}
+
+.library-item:nth-child(n + 8) {
+  animation-delay: 210ms;
 }
 
 .library-item:hover {
@@ -2253,7 +2571,7 @@ select.form-widget {
 .library-title svg {
   color: var(--text-dim);
   opacity: 0;
-  transition: opacity 0.12s ease;
+  transition: opacity var(--dur-micro) var(--ease-out);
 }
 
 .library-title:hover svg {
@@ -2301,22 +2619,53 @@ select.form-widget {
   background: var(--bg-elevated);
   cursor: pointer;
   text-align: left;
+  transition:
+    border-color var(--dur-fast) var(--ease-out),
+    background-color var(--dur-fast) var(--ease-out),
+    box-shadow var(--dur-base) var(--ease-out),
+    transform var(--dur-base) var(--ease-out),
+    outline-offset var(--dur-fast) var(--ease-out);
 }
 
-.recent-card:hover {
-  border-color: var(--accent);
-  background: var(--bg-hover);
+@media (hover: hover) {
+  .recent-card:hover {
+    border-color: var(--accent);
+    background: var(--bg-hover);
+    box-shadow: 0 12px 28px -14px color-mix(in srgb, var(--accent) 45%, transparent);
+    transform: translateY(-3px);
+  }
+  .recent-card:hover .recent-thumb img {
+    transform: scale(1.04);
+  }
 }
 
-.recent-card img,
+.recent-card:active {
+  transform: translateY(0) scale(0.99);
+}
+
+.recent-thumb,
 .recent-placeholder {
   width: 100%;
   height: 86px;
+  border-radius: 4px;
+  border: 1px solid var(--border);
+}
+
+/* The frame clips, so the page zooms inside it on hover. */
+.recent-thumb {
+  display: block;
+  overflow: hidden;
+  background: #fff;
+}
+
+.recent-thumb img {
+  display: block;
+  width: 100%;
+  height: 100%;
   object-fit: cover;
   object-position: top center;
-  border-radius: 4px;
-  background: #fff;
-  border: 1px solid var(--border);
+  transform-origin: top center;
+  transition: transform var(--dur-slow) var(--ease-out);
 }
 
 .recent-placeholder {
@@ -2474,6 +2823,11 @@ select.form-widget {
   border: 1px solid var(--border-strong);
   border-radius: var(--radius);
   color: var(--accent-ink);
+  transition: border-color var(--dur-micro) var(--ease-out);
+}
+
+.saved-cert:hover {
+  border-color: var(--border-hover);
 }
 
 .saved-cert > div {
@@ -2594,6 +2948,11 @@ select.form-widget {
   padding: 8px 8px 8px 12px;
   border: 1px solid var(--border-strong);
   border-radius: var(--radius);
+  transition: border-color var(--dur-micro) var(--ease-out);
+}
+
+.my-request:hover {
+  border-color: var(--border-hover);
 }
 
 .my-request > div {
@@ -2632,6 +2991,8 @@ select.form-widget {
   border-radius: var(--radius);
   background: var(--accent-soft);
   color: var(--accent-ink);
+  --rise: -8px;
+  animation: rise-in var(--dur-base) var(--ease-out) backwards;
 }
 
 .sign-request-bar.is-done {
@@ -2674,6 +3035,8 @@ select.form-widget {
   border-radius: var(--radius);
   background: var(--accent-soft);
   color: var(--accent-ink);
+  --rise: -8px;
+  animation: rise-in var(--dur-base) var(--ease-out) backwards;
 }
 
 .sign-bar.is-ready {
@@ -2846,6 +3209,14 @@ select.form-widget {
   text-align: left;
   cursor: pointer;
   clip-path: polygon(0 0, calc(100% - 10px) 0, 100% 50%, calc(100% - 10px) 100%, 0 100%);
+  animation: guide-nudge 1.6s var(--ease-in-out) infinite;
+}
+
+/* Keeps the -50% centring translate while nudging towards the field. */
+@keyframes guide-nudge {
+  50% {
+    transform: translate(4px, -50%);
+  }
 }
 
 .sign-guide:hover {
@@ -2874,6 +3245,8 @@ select.form-widget {
 
 .sign-spot {
   cursor: move;
+  --pop-from: 0.9;
+  animation: pop-in 220ms var(--ease-spring) backwards;
 }
 
 .sign-spot.is-fixed {
@@ -3080,6 +3453,18 @@ select.form-widget {
   overflow: hidden;
   text-overflow: ellipsis;
   cursor: pointer;
+  transition:
+    border-color var(--dur-micro) var(--ease-out),
+    box-shadow var(--dur-fast) var(--ease-out),
+    transform var(--dur-fast) var(--ease-out),
+    outline-offset var(--dur-fast) var(--ease-out);
+}
+
+@media (hover: hover) {
+  .adopt-font:hover {
+    border-color: var(--accent);
+    transform: translateY(-1px);
+  }
 }
 
 .adopt-font.is-active {
@@ -3314,11 +3699,23 @@ select.form-widget {
   color: var(--text);
   text-align: left;
   cursor: pointer;
+  transition:
+    border-color var(--dur-micro) var(--ease-out),
+    box-shadow var(--dur-fast) var(--ease-out),
+    transform var(--dur-fast) var(--ease-out),
+    outline-offset var(--dur-fast) var(--ease-out);
 }
 
 .document-tool-card:hover,
 .document-tool-card:focus-visible {
   border-color: var(--accent);
+}
+
+@media (hover: hover) {
+  .document-tool-card:hover {
+    box-shadow: 0 10px 24px -14px color-mix(in srgb, var(--accent) 45%, transparent);
+    transform: translateY(-2px);
+  }
 }
 
 .document-tool-card span {

@@ -107,7 +107,7 @@ export function PageSidebar() {
           return (
             <div
               key={page.id}
-              className={`thumb ${active ? 'is-active' : ''} ${overIndex === index && dragIndex !== null && dragIndex !== index ? 'is-drop' : ''}`}
+              className={`thumb ${active ? 'is-active' : ''} ${dragIndex === index ? 'is-dragging' : ''} ${overIndex === index && dragIndex !== null && dragIndex !== index ? 'is-drop' : ''}`}
               draggable
               onDragStart={(event) => {
                 setDragIndex(index)

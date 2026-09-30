@@ -196,7 +196,7 @@ export function TopBar() {
 
       <button
         type="button"
-        className="icon-button"
+        className="icon-button theme-toggle"
         title={theme === 'dark' ? t('topbar.switchToLight') : t('topbar.switchToDark')}
         aria-label={t('topbar.toggleTheme')}
         onClick={() => useStore.getState().toggleTheme()}

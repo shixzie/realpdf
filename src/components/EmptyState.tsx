@@ -41,7 +41,7 @@ export function EmptyState() {
           </button>
           <span className="empty-hint">{t('empty.dragHint')}</span>
           {loading && (
-            <span className="empty-hint">
+            <span className="empty-hint is-loading">
               {window.location.pathname.startsWith('/sign/') ? t('signRequest.opening') : t('empty.opening')}
             </span>
           )}
@@ -81,7 +81,9 @@ export function EmptyState() {
                   title={t('empty.restore', { title: entry.title })}
                 >
                   {entry.thumbnail ? (
-                    <img src={entry.thumbnail} alt="" />
+                    <span className="recent-thumb">
+                      <img src={entry.thumbnail} alt="" />
+                    </span>
                   ) : (
                     <div className="recent-placeholder">
                       <FileText size={16} />
