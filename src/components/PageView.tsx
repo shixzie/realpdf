@@ -576,20 +576,24 @@ export function PageView({ pageIndex }: PageViewProps) {
     })
   }, [page?.id, page?.sourceIndex, page?.transform, page?.annotations, bytes])
 
-  // Render the PDF page bitmap, from the preview copy when one exists.
+  // Render the PDF page bitmap, from the preview copy when one exists. It
+  // renders offscreen and replaces the visible bitmap in one draw, so a zoom
+  // step stretches the previous page until the sharp one lands instead of
+  // clearing the canvas to white.
   const sourceIndex = page?.sourceIndex ?? null
   useEffect(() => {
     const element = baseRef.current
     if (!element || !page) return
-    let cancelled = false
-    let task: { cancel: () => void; promise: Promise<void> } | null = null
+    element.style.width = `${page.width * zoom}px`
+    element.style.height = `${page.height * zoom}px`
     if (sourceIndex == null || !pdf) {
       element.width = 1
       element.height = 1
-      element.style.width = `${page.width * zoom}px`
-      element.style.height = `${page.height * zoom}px`
       return
     }
+    let cancelled = false
+    let task: { cancel: () => void; promise: Promise<void> } | null = null
+    const scratch = document.createElement('canvas')
     const preview = previewPageRef.current === page.id ? previewRef.current : null
     const previewDoc = preview?.pdf ?? null
     const dpr = Math.min(window.devicePixelRatio || 1, 2)
@@ -598,17 +602,24 @@ export function PageView({ pageIndex }: PageViewProps) {
         const pdfPage = previewDoc ? await previewDoc.getPage(1) : await pdf.getPage(sourceIndex + 1)
         if (cancelled) return
         const viewport = pdfPage.getViewport({ scale: zoom * dpr })
-        element.width = Math.max(1, Math.floor(viewport.width))
-        element.height = Math.max(1, Math.floor(viewport.height))
-        element.style.width = `${page.width * zoom}px`
-        element.style.height = `${page.height * zoom}px`
-        const renderTask = pdfPage.render({ canvas: element, viewport })
+        scratch.width = Math.max(1, Math.floor(viewport.width))
+        scratch.height = Math.max(1, Math.floor(viewport.height))
+        const renderTask = pdfPage.render({ canvas: scratch, viewport })
         task = renderTask as unknown as { cancel: () => void; promise: Promise<void> }
         await renderTask.promise
+        if (cancelled) return
+        element.width = scratch.width
+        element.height = scratch.height
+        element.getContext('2d')?.drawImage(scratch, 0, 0)
+        element.dataset.painted = 'true'
         // Only drop the covers once the patched bitmap is actually painted.
-        if (!cancelled) applyTextEditPreviewBackgrounds(canvasRef.current, preview ? preview.removedIds : null)
+        applyTextEditPreviewBackgrounds(canvasRef.current, preview ? preview.removedIds : null)
       } catch (error) {
         if ((error as Error)?.name !== 'RenderingCancelledException') console.error(error)
+      } finally {
+        // iOS Safari caps total canvas memory; rapid zoom steps would pile these up.
+        scratch.width = 0
+        scratch.height = 0
       }
     })()
     return () => {

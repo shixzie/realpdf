@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useStore } from '../store'
 import { PageView } from './PageView'
+import { prefersReducedMotion } from '../lib/motion'
 
 const PAGE_GAP = 28
 const WINDOW_PAD = 700
@@ -125,7 +126,7 @@ export function Viewer() {
     if (index < 0) return
     const offset = layoutRef.current.offsets[index]
     if (offset == null) return
-    element.scrollTo({ top: Math.max(0, offset - PAGE_GAP), behavior: 'smooth' })
+    element.scrollTo({ top: Math.max(0, offset - PAGE_GAP), behavior: prefersReducedMotion() ? 'auto' : 'smooth' })
   }, [scrollRequest])
 
   if (!pages.length) return null
