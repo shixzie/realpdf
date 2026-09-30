@@ -136,10 +136,6 @@ const OID = {
   signingTime: '1.2.840.113549.1.9.5',
 }
 
-function asn1OfBytes(bytes) {
-  return forge.asn1.fromDer(forge.util.createBuffer(Buffer.from(bytes).toString('binary')))
-}
-
 function derBytes(node) {
   return Buffer.from(forge.asn1.toDer(node).getBytes(), 'binary')
 }
@@ -158,8 +154,9 @@ export function verifyPdfSignatures(pdfBytes) {
     const [a, b, c, d] = match.slice(1).map(Number)
     const result = { byteRange: [a, b, c, d], coversFile: c + d === bytes.length && a === 0 }
     try {
-      const hex = text.slice(b + 1, c - 1).replace(/(00)+$/, '')
-      const cms = asn1OfBytes(Buffer.from(hex.length % 2 ? `${hex}0` : hex, 'hex'))
+      // /Contents is zero-padded; parse the first DER value and ignore the rest.
+      const contents = Buffer.from(text.slice(b + 1, c - 1), 'hex').toString('binary')
+      const cms = forge.asn1.fromDer(forge.util.createBuffer(contents), { parseAllBytes: false })
       const signedData = cms.value[1].value[0]
       const parts = signedData.value
       const certificates = parts.find((node) => node.tagClass === forge.asn1.Class.CONTEXT_SPECIFIC && node.type === 0)
