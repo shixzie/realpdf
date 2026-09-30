@@ -190,6 +190,31 @@ a,
   }
 }
 
+/* useActiveIndicator writes the active child's box on the container, and this span draws it. */
+.active-indicator {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: -1;
+  width: var(--indicator-w, 0);
+  height: var(--indicator-h, 0);
+  transform: translate3d(var(--indicator-x, 0), var(--indicator-y, 0), 0);
+  opacity: 0;
+  pointer-events: none;
+}
+
+[data-indicator] > .active-indicator {
+  opacity: 1;
+}
+
+[data-indicator='ready'] > .active-indicator {
+  transition:
+    transform calc(var(--dur-base) * 1.5) var(--ease-spring),
+    width calc(var(--dur-base) * 1.5) var(--ease-spring),
+    height calc(var(--dur-base) * 1.5) var(--ease-spring),
+    opacity var(--dur-fast) var(--ease-out);
+}
+
 .app {
   height: 100%;
   display: flex;
@@ -548,6 +573,14 @@ a,
   gap: 4px;
   padding: 10px 0;
   overflow-y: auto;
+  position: relative;
+  isolation: isolate;
+}
+
+.toolrail > .active-indicator {
+  border-radius: var(--radius-sm);
+  background: var(--accent-soft);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 45%, transparent);
 }
 
 .tool {
@@ -569,9 +602,18 @@ a,
 }
 
 .tool.is-active {
-  background: var(--accent-soft);
-  border-color: rgba(14, 165, 233, 0.45);
+  background: transparent;
   color: var(--accent-ink);
+}
+
+.tool.is-active > svg {
+  animation: tool-pop calc(var(--dur-base) * 1.5) var(--ease-spring);
+}
+
+@keyframes tool-pop {
+  50% {
+    transform: scale(1.14);
+  }
 }
 
 .options {
@@ -782,6 +824,14 @@ a,
   display: flex;
   flex-direction: column;
   gap: 12px;
+  position: relative;
+  isolation: isolate;
+}
+
+.sidebar-list > .active-indicator {
+  border-radius: var(--radius-sm);
+  background: var(--accent-soft);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 50%, transparent);
 }
 
 .thumb {
@@ -799,8 +849,7 @@ a,
 }
 
 .thumb.is-active {
-  border-color: rgba(14, 165, 233, 0.5);
-  background: var(--accent-soft);
+  background: transparent;
 }
 
 .thumb.is-drop {
@@ -1325,6 +1374,16 @@ a,
   gap: 6px;
   border-bottom: 1px solid var(--border);
   margin-bottom: 14px;
+  position: relative;
+  isolation: isolate;
+}
+
+/* A bar along the active tab's bottom edge; tabs wrap on narrow screens, so y moves too. */
+.tabs > .active-indicator {
+  height: 2px;
+  border-radius: 2px;
+  background: var(--accent);
+  transform: translate3d(var(--indicator-x, 0), calc(var(--indicator-y, 0px) + var(--indicator-h, 0px) - 2px), 0);
 }
 
 .tab {
@@ -1347,7 +1406,6 @@ a,
 
 .tab.is-active {
   color: var(--accent-ink);
-  border-bottom-color: var(--accent);
 }
 
 .tools-body {
@@ -1737,6 +1795,13 @@ select.form-widget {
   display: flex;
   flex-wrap: wrap;
   gap: 5px;
+  position: relative;
+  isolation: isolate;
+}
+
+.home-tool-filters > .active-indicator {
+  border-radius: 999px;
+  background: var(--accent-soft);
 }
 
 .home-tool-filter {
@@ -1758,8 +1823,7 @@ select.form-widget {
 
 .home-tool-filter[aria-pressed='true'] {
   color: var(--accent-ink);
-  border-color: var(--accent-soft);
-  background: var(--accent-soft);
+  background: transparent;
 }
 
 .home-tool-search {
@@ -1984,6 +2048,14 @@ select.form-widget {
   background: var(--bg-hover);
   border: 1px solid var(--border);
   margin-bottom: 12px;
+  position: relative;
+  isolation: isolate;
+}
+
+.segmented > .active-indicator {
+  border-radius: 7px;
+  background: var(--bg-elevated);
+  box-shadow: var(--shadow-sm), var(--highlight);
 }
 
 .segmented button {
@@ -2005,9 +2077,7 @@ select.form-widget {
 }
 
 .segmented button.is-active {
-  background: var(--bg-elevated);
   color: var(--text);
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.18);
 }
 
 /* ---------- Signature upload ---------- */

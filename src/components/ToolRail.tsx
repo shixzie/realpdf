@@ -20,6 +20,7 @@ import type { Tool } from '../types'
 import { commitCanvas, getCanvas, insertImageObject } from '../lib/canvasRegistry'
 import { imageFileToDataUrl } from '../lib/assets'
 import { useTranslation } from '../i18n'
+import { useActiveIndicator } from '../lib/useActiveIndicator'
 
 interface ToolDef {
   id: Tool
@@ -50,6 +51,7 @@ export function ToolRail() {
   const setTool = useStore((state) => state.setTool)
   const imagePickNonce = useStore((state) => state.imagePickNonce)
   const inputRef = useRef<HTMLInputElement>(null)
+  const railRef = useActiveIndicator<HTMLDivElement>(tool)
 
   useEffect(() => {
     if (!imagePickNonce) return
@@ -86,7 +88,8 @@ export function ToolRail() {
   }
 
   return (
-    <div className="toolrail">
+    <div className="toolrail" ref={railRef}>
+      <span className="active-indicator" aria-hidden="true" />
       {TOOL_DEFS.map((definition) => {
         const Icon = definition.icon
         const active = tool === definition.id

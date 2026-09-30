@@ -40,6 +40,7 @@ import {
   type SignatureFont,
 } from '../lib/signatureImage'
 import type { PendingEnrollment, SavedIdentityMeta, SigningIdentity } from '../lib/signing'
+import { useActiveIndicator } from '../lib/useActiveIndicator'
 
 /** The Sign flow's dialogs: adopt a signature, review before signing, and done. */
 export function SignFlowModals() {
@@ -90,6 +91,7 @@ function AdoptSignatureModal() {
   const [password, setPassword] = useState('')
   const [remember, setRemember] = useState(true)
   const [style, setStyle] = useState<Style>('type')
+  const styleRef = useActiveIndicator<HTMLDivElement>(style)
   const [font, setFont] = useState<SignatureFont>(SIGNATURE_FONTS[0])
   const [uploadSrc, setUploadSrc] = useState<string | null>(null)
   const [uploadPreview, setUploadPreview] = useState<string | null>(null)
@@ -510,7 +512,8 @@ function AdoptSignatureModal() {
               <span>{t('sign.keepCurrent')}</span>
             </p>
           )}
-          <div className="segmented" role="tablist">
+          <div className="segmented" role="tablist" ref={styleRef}>
+            <span className="active-indicator" aria-hidden="true" />
             {(
               [
                 ['type', Keyboard, t('sign.styleType')],

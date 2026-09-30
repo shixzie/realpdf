@@ -39,6 +39,7 @@ import { imageFileToDataUrl } from '../lib/assets'
 import { bakedCurrentBytes } from '../lib/currentDocument'
 import { openPdfDocumentFromBytes } from '../lib/pdfjs'
 import { formatBytes, t as translate, useTranslation } from '../i18n'
+import { useActiveIndicator } from '../lib/useActiveIndicator'
 import { AdvancedToolsTab } from './AdvancedToolsTab'
 
 interface DraftSource {
@@ -94,6 +95,7 @@ function Modal() {
   const tab = useStore((state) => state.toolsTab)
   const initialTool = useStore((state) => state.toolsInitialTool)
   const setToolsTab = useStore((state) => state.setToolsTab)
+  const tabsRef = useActiveIndicator<HTMLDivElement>(tab)
   const close = () => useStore.getState().setToolsOpen(false)
   return (
     <div className="modal-backdrop" role="dialog" aria-modal="true">
@@ -104,7 +106,8 @@ function Modal() {
             <X size={17} />
           </button>
         </div>
-        <div className="tabs">
+        <div className="tabs" ref={tabsRef}>
+          <span className="active-indicator" aria-hidden="true" />
           {TABS.map((entry) => {
             const Icon = entry.icon
             return (
