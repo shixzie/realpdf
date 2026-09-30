@@ -3737,6 +3737,12 @@ select.form-widget {
 
 /* ---------- Theme reveal ---------- */
 
+:root[data-theme-switching] *,
+:root[data-theme-switching] *::before,
+:root[data-theme-switching] *::after {
+  transition: none !important;
+}
+
 ::view-transition {
   pointer-events: none;
 }
