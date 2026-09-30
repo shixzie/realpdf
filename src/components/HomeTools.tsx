@@ -125,7 +125,7 @@ export function HomeTools({ onPickFile }: { onPickFile: (pending: PendingAction 
   const { t } = useTranslation()
   const [query, setQuery] = useState('')
   const [category, setCategory] = useState<ToolCategory | null>(null)
-  const filtersRef = useActiveIndicator<HTMLDivElement>(category)
+  const filtersRef = useActiveIndicator(category)
   const normalizedQuery = query.trim().toLocaleLowerCase()
   const visibleTools = TOOLS.filter((tool) => {
     if (category && tool.category !== category) return false

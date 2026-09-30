@@ -51,7 +51,7 @@ export function ToolRail() {
   const setTool = useStore((state) => state.setTool)
   const imagePickNonce = useStore((state) => state.imagePickNonce)
   const inputRef = useRef<HTMLInputElement>(null)
-  const railRef = useActiveIndicator<HTMLDivElement>(tool)
+  const railRef = useActiveIndicator(tool)
 
   useEffect(() => {
     if (!imagePickNonce) return

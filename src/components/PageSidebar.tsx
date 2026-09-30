@@ -71,7 +71,7 @@ export function PageSidebar() {
   const [dragIndex, setDragIndex] = useState<number | null>(null)
   const [overIndex, setOverIndex] = useState<number | null>(null)
   const [downloadingId, setDownloadingId] = useState<string | null>(null)
-  const listRef = useActiveIndicator<HTMLDivElement>(currentPageId)
+  const listRef = useActiveIndicator(currentPageId)
 
   const downloadPage = (pageId: string) => {
     if (downloadingId) return

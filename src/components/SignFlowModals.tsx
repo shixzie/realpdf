@@ -91,7 +91,7 @@ function AdoptSignatureModal() {
   const [password, setPassword] = useState('')
   const [remember, setRemember] = useState(true)
   const [style, setStyle] = useState<Style>('type')
-  const styleRef = useActiveIndicator<HTMLDivElement>(style)
+  const styleRef = useActiveIndicator(style)
   const [font, setFont] = useState<SignatureFont>(SIGNATURE_FONTS[0])
   const [uploadSrc, setUploadSrc] = useState<string | null>(null)
   const [uploadPreview, setUploadPreview] = useState<string | null>(null)

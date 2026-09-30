@@ -89,7 +89,7 @@ function Modal() {
   const tab = useStore((state) => state.toolsTab)
   const initialTool = useStore((state) => state.toolsInitialTool)
   const setToolsTab = useStore((state) => state.setToolsTab)
-  const tabsRef = useActiveIndicator<HTMLDivElement>(tab)
+  const tabsRef = useActiveIndicator(tab)
   const close = () => useStore.getState().setToolsOpen(false)
   return (
     <div className="modal-backdrop" role="dialog" aria-modal="true">

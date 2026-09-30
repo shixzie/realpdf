@@ -18,7 +18,7 @@ export function SignatureModal() {
   const drawingRef = useRef(false)
   const lastRef = useRef<{ x: number; y: number } | null>(null)
   const [mode, setMode] = useState<'draw' | 'upload'>('draw')
-  const modeRef = useActiveIndicator<HTMLDivElement>(mode)
+  const modeRef = useActiveIndicator(mode)
   const [color, setColor] = useState('#111827')
   const [width, setWidth] = useState(2.6)
   const [uploadSrc, setUploadSrc] = useState<string | null>(null)

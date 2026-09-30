@@ -210,11 +210,14 @@ a,
 }
 
 [data-indicator='ready'] > .active-indicator {
-  transition:
-    transform calc(var(--dur-base) * 1.5) var(--ease-spring),
-    width calc(var(--dur-base) * 1.5) var(--ease-spring),
-    height calc(var(--dur-base) * 1.5) var(--ease-spring),
-    opacity var(--dur-fast) var(--ease-out);
+  transition-property: transform, width, height;
+  transition-duration: var(--dur-spring);
+  transition-timing-function: var(--ease-spring);
+}
+
+:has(> .active-indicator) {
+  position: relative;
+  isolation: isolate;
 }
 
 .app {
@@ -623,11 +626,10 @@ a,
   gap: 4px;
   padding: 10px 0;
   overflow-y: auto;
-  position: relative;
-  isolation: isolate;
 }
 
-.toolrail > .active-indicator {
+.toolrail > .active-indicator,
+.sidebar-list > .active-indicator {
   border-radius: var(--radius-sm);
   background: var(--accent-soft);
   box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 45%, transparent);
@@ -903,14 +905,6 @@ a,
   display: flex;
   flex-direction: column;
   gap: 12px;
-  position: relative;
-  isolation: isolate;
-}
-
-.sidebar-list > .active-indicator {
-  border-radius: var(--radius-sm);
-  background: var(--accent-soft);
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 50%, transparent);
 }
 
 .thumb {
@@ -1549,15 +1543,13 @@ a,
   gap: 6px;
   border-bottom: 1px solid var(--border);
   margin-bottom: 14px;
-  position: relative;
-  isolation: isolate;
 }
 
 .tabs > .active-indicator {
   height: 2px;
   border-radius: 2px;
   background: var(--accent);
-  transform: translate3d(var(--indicator-x, 0), calc(var(--indicator-y, 0px) + var(--indicator-h, 0px) - 2px), 0);
+  top: calc(var(--indicator-h, 0px) - 2px);
 }
 
 .tab {
@@ -1991,8 +1983,6 @@ select.form-widget {
   display: flex;
   flex-wrap: wrap;
   gap: 5px;
-  position: relative;
-  isolation: isolate;
 }
 
 .home-tool-filters > .active-indicator {
@@ -2246,8 +2236,6 @@ select.form-widget {
   background: var(--bg-hover);
   border: 1px solid var(--border);
   margin-bottom: 12px;
-  position: relative;
-  isolation: isolate;
 }
 
 .segmented > .active-indicator {
