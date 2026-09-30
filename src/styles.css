@@ -160,6 +160,36 @@ a,
   box-shadow: 0 0 0 3px var(--accent-soft);
 }
 
+/* ---------- Motion ---------- */
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+}
+
+/* --rise is the travel: a few pixels for panels, more for page entrances. */
+@keyframes rise-in {
+  from {
+    opacity: 0;
+    transform: translateY(var(--rise, 6px));
+  }
+}
+
+@keyframes pop-in {
+  from {
+    opacity: 0;
+    transform: scale(var(--pop-from, 0.6));
+  }
+}
+
+@keyframes modal-in {
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(0.97);
+  }
+}
+
 .app {
   height: 100%;
   display: flex;
@@ -358,6 +388,16 @@ a,
   margin-left: 1px;
 }
 
+.export-trigger > svg:last-child,
+.sign-trigger > svg:last-child {
+  transition: transform var(--dur-base) var(--ease-out);
+}
+
+.export-trigger[aria-expanded='true'] > svg:last-child,
+.sign-trigger[aria-expanded='true'] > svg:last-child {
+  transform: rotate(180deg);
+}
+
 .export-menu {
   position: absolute;
   top: calc(100% + 8px);
@@ -368,10 +408,20 @@ a,
   flex-direction: column;
   gap: 2px;
   padding: 6px;
-  background: var(--bg-panel);
+  background: color-mix(in srgb, var(--bg-panel) 88%, transparent);
+  backdrop-filter: blur(14px) saturate(1.4);
   border: 1px solid var(--border-strong);
-  border-radius: 12px;
+  border-radius: 14px;
   box-shadow: var(--shadow-lg), var(--highlight);
+  transform-origin: top right;
+  animation: menu-in var(--dur-fast) var(--ease-out) backwards;
+}
+
+@keyframes menu-in {
+  from {
+    opacity: 0;
+    transform: translateY(-6px) scale(0.96);
+  }
 }
 
 .export-menu-section {
@@ -401,10 +451,19 @@ a,
   color: var(--text);
   text-align: left;
   cursor: pointer;
+  transition:
+    color var(--dur-micro) var(--ease-out),
+    background-color var(--dur-micro) var(--ease-out),
+    box-shadow var(--dur-micro) var(--ease-out),
+    outline-offset var(--dur-fast) var(--ease-out);
 }
 
 .export-menu-item:hover:not(:disabled) {
   background: var(--bg-hover);
+}
+
+.export-menu-item:hover:not(:disabled) .export-menu-icon {
+  color: var(--accent-ink);
 }
 
 .export-menu-item:disabled {
@@ -425,6 +484,7 @@ a,
   display: flex;
   flex: none;
   color: var(--text-muted);
+  transition: color var(--dur-micro) var(--ease-out);
 }
 
 .export-menu-item-pdf .export-menu-icon {
@@ -999,21 +1059,23 @@ a,
   position: fixed;
   inset: 0;
   background: var(--backdrop);
-  backdrop-filter: blur(3px);
+  backdrop-filter: blur(6px);
   display: flex;
   align-items: center;
   justify-content: center;
   z-index: 50;
   padding: 24px;
+  animation: fade-in var(--dur-base) var(--ease-out);
 }
 
 .modal {
   background: var(--bg-panel);
   border: 1px solid var(--border-strong);
-  border-radius: 14px;
+  border-radius: 16px;
   box-shadow: var(--shadow-lg), var(--highlight);
   padding: 18px;
   width: min(700px, 100%);
+  animation: modal-in var(--dur-slow) var(--ease-emphasized) backwards;
 }
 
 .modal-head {
@@ -1064,10 +1126,44 @@ a,
   border-radius: 12px;
   padding: 20px 26px;
   box-shadow: var(--shadow-lg), var(--highlight);
+  animation: modal-in var(--dur-slow) var(--ease-emphasized) backwards;
 }
 
 .export-card svg {
   color: var(--accent);
+}
+
+.export-progress {
+  height: 3px;
+  margin-top: 10px;
+  border-radius: 999px;
+  background: var(--bg-hover);
+  overflow: hidden;
+}
+
+.export-progress-bar {
+  position: relative;
+  height: 100%;
+  overflow: hidden;
+  border-radius: inherit;
+  background: var(--accent);
+  transform-origin: left;
+  transition: transform var(--dur-base) var(--ease-out);
+}
+
+.export-progress-bar::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.45), transparent);
+  transform: translateX(-100%);
+  animation: progress-shimmer 1.4s linear infinite;
+}
+
+@keyframes progress-shimmer {
+  to {
+    transform: translateX(100%);
+  }
 }
 
 .export-card strong {
@@ -1080,21 +1176,48 @@ a,
   font-size: 12.5px;
 }
 
+/* Centred with auto margins, not a transform, so the animations own transform. */
 .toast {
   position: fixed;
   bottom: 22px;
-  left: 50%;
-  transform: translateX(-50%);
+  left: 0;
+  right: 0;
+  margin-inline: auto;
+  width: max-content;
+  max-width: min(560px, calc(100vw - 40px));
   display: flex;
   align-items: center;
   gap: 10px;
-  background: var(--bg-panel);
+  background: color-mix(in srgb, var(--bg-panel) 88%, transparent);
+  backdrop-filter: blur(14px) saturate(1.4);
   border: 1px solid var(--border-strong);
   border-radius: 10px;
   padding: 10px 12px 10px 14px;
   box-shadow: var(--shadow-lg), var(--highlight);
   z-index: 60;
-  max-width: min(560px, calc(100vw - 40px));
+  animation:
+    toast-in calc(var(--dur-base) * 1.5) var(--ease-spring) backwards,
+    toast-out 200ms var(--ease-in-out) calc(var(--toast-ms) - 200ms) forwards;
+}
+
+.toast > svg:first-child {
+  flex: none;
+  animation: pop-in var(--dur-base) var(--ease-spring) 90ms backwards;
+}
+
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(18px) scale(0.94);
+  }
+}
+
+/* The timed fade at the end of the toast's life; dismissing still unmounts at once. */
+@keyframes toast-out {
+  to {
+    opacity: 0;
+    transform: translateY(10px) scale(0.97);
+  }
 }
 
 .toast span {
@@ -1231,6 +1354,10 @@ a,
   max-height: min(62vh, 680px);
   overflow-y: auto;
   padding-right: 4px;
+}
+
+.tools-body > * {
+  animation: rise-in var(--dur-base) var(--ease-out) backwards;
 }
 
 .tool-section {

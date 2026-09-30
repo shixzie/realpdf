@@ -1,5 +1,6 @@
+import type { CSSProperties } from 'react'
 import { AlertTriangle, CheckCircle2, Info, Loader2, X } from 'lucide-react'
-import { useStore } from '../store'
+import { TOAST_MS, useStore } from '../store'
 import { useTranslation } from '../i18n'
 
 export function Toast() {
@@ -7,7 +8,12 @@ export function Toast() {
   if (!toast) return null
   const Icon = toast.kind === 'error' ? AlertTriangle : toast.kind === 'success' ? CheckCircle2 : Info
   return (
-    <div className={`toast toast-${toast.kind}`} role="status">
+    <div
+      key={toast.id}
+      className={`toast toast-${toast.kind}`}
+      role="status"
+      style={{ '--toast-ms': `${TOAST_MS}ms` } as CSSProperties}
+    >
       <Icon size={16} />
       <span>{toast.message}</span>
       <button type="button" className="icon-button" onClick={() => useStore.getState().clearToast()}>
@@ -29,6 +35,9 @@ export function ExportOverlay() {
         <div>
           <strong>{t('overlays.building')}</strong>
           <span>{t('overlays.progress', { percent: Math.round(progress * 100) })}</span>
+          <div className="export-progress" aria-hidden="true">
+            <div className="export-progress-bar" style={{ transform: `scaleX(${progress})` }} />
+          </div>
         </div>
       </div>
     </div>
