@@ -20,6 +20,7 @@
   --warning: #fbbf24;
   --radius: 9px;
   --radius-sm: 7px;
+  --topbar-height: 54px;
   --border-hover: color-mix(in srgb, var(--border-strong) 70%, var(--text-muted));
   --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.35);
   --shadow-md: 0 1px 2px rgba(0, 0, 0, 0.3), 0 6px 16px -4px rgba(0, 0, 0, 0.4), 0 16px 32px -12px rgba(0, 0, 0, 0.45);
@@ -44,6 +45,7 @@
   --dur-fast: 180ms;
   --dur-base: 260ms;
   --dur-slow: 340ms;
+  --focus-transition: outline-offset var(--dur-fast) var(--ease-out);
 }
 
 /* A damped spring (damping ratio 0.75, 2.8% overshoot) sampled for linear(). */
@@ -124,7 +126,7 @@ a,
 
 :where(button, a, input, select, textarea, summary, [tabindex]) {
   outline-offset: 4px;
-  transition: outline-offset var(--dur-fast) var(--ease-out);
+  transition: var(--focus-transition);
 }
 
 :where(button, a, input, select, textarea, summary, [tabindex]):focus-visible {
@@ -240,7 +242,7 @@ a,
   align-items: center;
   gap: 14px;
   padding: 0 14px;
-  height: 54px;
+  height: var(--topbar-height);
   flex: none;
   background: var(--bg-elevated);
   border-bottom: 1px solid var(--border);
@@ -355,7 +357,7 @@ a,
     box-shadow var(--dur-fast) var(--ease-out),
     transform var(--dur-fast) var(--ease-spring),
     opacity var(--dur-fast),
-    outline-offset var(--dur-fast) var(--ease-out);
+    var(--focus-transition);
   white-space: nowrap;
 }
 
@@ -450,7 +452,7 @@ a,
     background-color var(--dur-micro) var(--ease-out),
     border-color var(--dur-micro) var(--ease-out),
     transform var(--dur-fast) var(--ease-spring),
-    outline-offset var(--dur-fast) var(--ease-out);
+    var(--focus-transition);
 }
 
 .icon-button:active:not(:disabled),
@@ -550,7 +552,7 @@ a,
     color var(--dur-micro) var(--ease-out),
     background-color var(--dur-micro) var(--ease-out),
     box-shadow var(--dur-micro) var(--ease-out),
-    outline-offset var(--dur-fast) var(--ease-out);
+    var(--focus-transition);
 }
 
 .export-menu-item:hover:not(:disabled) {
@@ -754,7 +756,7 @@ a,
   transition:
     transform var(--dur-fast) var(--ease-spring),
     box-shadow var(--dur-fast) var(--ease-out),
-    outline-offset var(--dur-fast) var(--ease-out);
+    var(--focus-transition);
 }
 
 @media (hover: hover) {
@@ -1130,7 +1132,7 @@ a,
 .empty::before {
   content: '';
   position: fixed;
-  inset: 54px 0 0;
+  inset: var(--topbar-height) 0 0;
   z-index: -1;
   pointer-events: none;
   background-image: radial-gradient(circle at 1px 1px, var(--grid-dot) 1px, transparent 0);
@@ -2164,7 +2166,7 @@ select.form-widget {
     background-color var(--dur-fast) var(--ease-out),
     box-shadow var(--dur-base) var(--ease-out),
     transform var(--dur-base) var(--ease-out),
-    outline-offset var(--dur-fast) var(--ease-out);
+    var(--focus-transition);
 }
 
 .home-tool-featured {
@@ -2616,7 +2618,7 @@ select.form-widget {
     background-color var(--dur-fast) var(--ease-out),
     box-shadow var(--dur-base) var(--ease-out),
     transform var(--dur-base) var(--ease-out),
-    outline-offset var(--dur-fast) var(--ease-out);
+    var(--focus-transition);
 }
 
 @media (hover: hover) {
@@ -3187,7 +3189,7 @@ select.form-widget {
 .sign-guide {
   position: absolute;
   left: 0;
-  transform: translateY(-50%);
+  translate: 0 -50%;
   z-index: 1;
   min-width: 64px;
   padding: 6px 20px 6px 12px;
@@ -3205,7 +3207,7 @@ select.form-widget {
 
 @keyframes guide-nudge {
   50% {
-    transform: translate(4px, -50%);
+    transform: translateX(4px);
   }
 }
 
@@ -3447,7 +3449,7 @@ select.form-widget {
     border-color var(--dur-micro) var(--ease-out),
     box-shadow var(--dur-fast) var(--ease-out),
     transform var(--dur-fast) var(--ease-out),
-    outline-offset var(--dur-fast) var(--ease-out);
+    var(--focus-transition);
 }
 
 @media (hover: hover) {
@@ -3693,7 +3695,7 @@ select.form-widget {
     border-color var(--dur-micro) var(--ease-out),
     box-shadow var(--dur-fast) var(--ease-out),
     transform var(--dur-fast) var(--ease-out),
-    outline-offset var(--dur-fast) var(--ease-out);
+    var(--focus-transition);
 }
 
 .document-tool-card:hover,
