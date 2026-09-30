@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect } from 'react'
 import { useStore } from './store'
 import { TopBar } from './components/TopBar'
 import { ToolRail } from './components/ToolRail'
@@ -15,7 +15,7 @@ import { LibraryModal } from './components/LibraryModal'
 import { FormsBar } from './components/FormsBar'
 import { EmptyState } from './components/EmptyState'
 import { DropOverlay, ExportOverlay, Toast } from './components/Overlays'
-import { isSupportedFileName, mayBeDocumentType, openDocumentFile } from './lib/openDocument'
+import { isSupportedFileName, openDocumentFile } from './lib/openDocument'
 import { runExport } from './lib/exportController'
 import { parseRequestLocation } from './lib/signRequests'
 import { openRequestFromLink } from './lib/signRequestController'
@@ -42,7 +42,6 @@ export default function App() {
   const formMode = useStore((state) => state.formMode)
   // Signing is a focused view, as in DocuSign: the editing tools step aside.
   const signing = useStore((state) => state.signFlow !== null)
-  const [draggingDocument, setDraggingDocument] = useState(false)
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -143,22 +142,6 @@ export default function App() {
   }, [])
 
   useEffect(() => {
-    // Enter and leave fire for every element crossed, so a depth count tells
-    // when a drag has left the window.
-    let depth = 0
-    const onDragEnter = (event: DragEvent) => {
-      depth += 1
-      const items = Array.from(event.dataTransfer?.items ?? [])
-      setDraggingDocument(items.some((item) => item.kind === 'file' && mayBeDocumentType(item.type)))
-    }
-    const onDragLeave = () => {
-      depth = Math.max(0, depth - 1)
-      if (depth === 0) setDraggingDocument(false)
-    }
-    const onDragDone = () => {
-      depth = 0
-      setDraggingDocument(false)
-    }
     const onDragOver = (event: DragEvent) => {
       if (Array.from(event.dataTransfer?.types ?? []).includes('Files')) event.preventDefault()
     }
@@ -170,17 +153,9 @@ export default function App() {
       event.preventDefault()
       void openDocumentFile(document)
     }
-    window.addEventListener('dragenter', onDragEnter)
-    window.addEventListener('dragleave', onDragLeave)
-    window.addEventListener('dragend', onDragDone)
-    window.addEventListener('drop', onDragDone, true)
     window.addEventListener('dragover', onDragOver)
     window.addEventListener('drop', onDrop)
     return () => {
-      window.removeEventListener('dragenter', onDragEnter)
-      window.removeEventListener('dragleave', onDragLeave)
-      window.removeEventListener('dragend', onDragDone)
-      window.removeEventListener('drop', onDragDone, true)
       window.removeEventListener('dragover', onDragOver)
       window.removeEventListener('drop', onDrop)
     }
@@ -210,7 +185,7 @@ export default function App() {
       <LibraryModal />
       <ExportOverlay />
       <Toast />
-      {draggingDocument && <DropOverlay />}
+      <DropOverlay />
     </div>
   )
 }
