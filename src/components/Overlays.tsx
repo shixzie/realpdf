@@ -1,5 +1,5 @@
 import type { CSSProperties } from 'react'
-import { AlertTriangle, CheckCircle2, Info, Loader2, X } from 'lucide-react'
+import { AlertTriangle, CheckCircle2, FileDown, Info, Loader2, X } from 'lucide-react'
 import { TOAST_MS, useStore } from '../store'
 import { useTranslation } from '../i18n'
 
@@ -39,6 +39,20 @@ export function ExportOverlay() {
             <div className="export-progress-bar" style={{ transform: `scaleX(${progress})` }} />
           </div>
         </div>
+      </div>
+    </div>
+  )
+}
+
+/** Shown while a document is dragged over the window; it is the drop target, so a drop anywhere opens it. */
+export function DropOverlay() {
+  const { t } = useTranslation()
+  return (
+    <div className="drop-overlay" aria-hidden="true">
+      <div className="drop-card">
+        <FileDown size={30} />
+        <strong>{t('drop.title')}</strong>
+        <span>{t('drop.hint')}</span>
       </div>
     </div>
   )

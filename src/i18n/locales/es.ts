@@ -137,6 +137,10 @@ export const es: Dictionary = {
     building: 'Creando tu PDF',
     progress: '{percent}% — todo ocurre en este dispositivo.',
   },
+  drop: {
+    title: 'Suelta para abrir',
+    hint: 'PDF, Word, Excel o PowerPoint. El archivo no sale de este dispositivo.',
+  },
   sidebar: {
     pages: 'Páginas',
     blank: 'En blanco',

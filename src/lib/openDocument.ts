@@ -2,7 +2,7 @@ import { useStore } from '../store'
 import { t } from '../i18n'
 import { loadPdfDocument } from './pdfjs'
 import { pdfHasFormFields } from './forms'
-import { isOfficeFileName, officeToPdf } from './officeToPdf'
+import { isOfficeFileName, OFFICE_MIME, officeToPdf } from './officeToPdf'
 
 async function loadIntoEditor(bytes: Uint8Array, fileName: string): Promise<void> {
   let enteredPassword = ''
@@ -81,6 +81,17 @@ function isPdfFile(file: File): boolean {
 
 export function isSupportedFileName(name: string): boolean {
   return /\.pdf$/i.test(name) || isOfficeFileName(name)
+}
+
+const DOCUMENT_TYPES = new Set(['application/pdf', ...Object.values(OFFICE_MIME)])
+
+/**
+ * Whether a dragged file may be a document this app opens. Mid-drag, browsers
+ * expose only the MIME type, and leave it empty for extensions the system does
+ * not know, so an empty type counts too.
+ */
+export function mayBeDocumentType(type: string): boolean {
+  return type === '' || DOCUMENT_TYPES.has(type)
 }
 
 /** Opens whatever the app supports: a PDF directly, Office files converted to PDF. */

@@ -3842,6 +3842,67 @@ select.form-widget {
   flex-shrink: 0;
 }
 
+/* ---------- Drop to open ---------- */
+
+.drop-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 70;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: color-mix(in srgb, var(--bg) 55%, transparent);
+  backdrop-filter: blur(4px);
+  animation: fade-in var(--dur-fast) var(--ease-out);
+}
+
+.drop-overlay::before {
+  content: '';
+  position: absolute;
+  inset: 12px;
+  border: 2px dashed color-mix(in srgb, var(--accent) 65%, transparent);
+  border-radius: 18px;
+  pointer-events: none;
+}
+
+.drop-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  max-width: 420px;
+  padding: 28px 36px;
+  text-align: center;
+  background: var(--bg-panel);
+  border: 1px solid var(--border-strong);
+  border-radius: 16px;
+  box-shadow: var(--shadow-lg), var(--highlight);
+  animation: modal-in var(--dur-slow) var(--ease-emphasized) backwards;
+}
+
+.drop-card svg {
+  margin-bottom: 6px;
+  color: var(--accent);
+  animation: drop-float 1.6s var(--ease-in-out) infinite;
+}
+
+.drop-card strong {
+  font-size: 16px;
+}
+
+.drop-card span {
+  color: var(--text-muted);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+@keyframes drop-float {
+  50% {
+    transform: translateY(-6px);
+  }
+}
+
 /* ---------- Theme reveal ---------- */
 
 /* Colours switch at once in the DOM. The only theme motion is this reveal of

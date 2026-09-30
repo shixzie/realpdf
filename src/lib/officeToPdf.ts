@@ -8,6 +8,12 @@ export type OfficeKind = 'docx' | 'xlsx' | 'pptx'
 
 export const OFFICE_EXTENSIONS: readonly OfficeKind[] = ['docx', 'xlsx', 'pptx']
 
+export const OFFICE_MIME: Record<OfficeKind, string> = {
+  docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  pptx: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+}
+
 export function officeKindFromName(name: string): OfficeKind | null {
   const extension = name.split('.').pop()?.toLowerCase() ?? ''
   return OFFICE_EXTENSIONS.includes(extension as OfficeKind) ? (extension as OfficeKind) : null

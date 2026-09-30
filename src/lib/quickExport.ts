@@ -5,16 +5,11 @@ import { bakedCurrentBytes } from './currentDocument'
 import { openPdfDocumentFromBytes } from './pdfjs'
 import { pdfToText, renderPdfPageToBlob, renderPdfToImages, type ImageFormat } from './pdfOps'
 import { pdfToDocx, pdfToPptx, pdfToXlsx } from './pdfToOffice'
+import { OFFICE_MIME } from './officeToPdf'
 import { createZip } from './zip'
 
 export type ExportFormatId = 'png' | 'jpg' | 'txt' | 'docx' | 'xlsx' | 'pptx'
 export type ExportScope = 'current' | 'all'
-
-const OFFICE_MIME: Record<'docx' | 'xlsx' | 'pptx', string> = {
-  docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-  xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-  pptx: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
-}
 
 export interface QuickExportOptions {
   /** Images only: export just the visible page or every page as a ZIP. */

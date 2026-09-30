@@ -19,7 +19,7 @@ import {
 import { useStore, type ToolsTab } from '../store'
 import { openPdfBytes } from '../lib/openDocument'
 import { downloadBlob } from '../lib/exportController'
-import { officeToPdf } from '../lib/officeToPdf'
+import { OFFICE_MIME, officeToPdf } from '../lib/officeToPdf'
 import { pdfToDocx, pdfToPptx, pdfToXlsx } from '../lib/pdfToOffice'
 import {
   extractPages,
@@ -59,12 +59,6 @@ const TABS: Array<{ id: ToolsTab; labelKey: string; icon: typeof Combine }> = [
 
 const OFFICE_ACCEPT =
   '.docx,.xlsx,.pptx,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.openxmlformats-officedocument.presentationml.presentation'
-
-const OFFICE_MIME: Record<'docx' | 'xlsx' | 'pptx', string> = {
-  docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-  xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-  pptx: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
-}
 
 function baseName(name: string | null): string {
   return (name ?? 'document.pdf').replace(/\.pdf$/i, '')

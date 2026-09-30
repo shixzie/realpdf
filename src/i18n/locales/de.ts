@@ -139,6 +139,10 @@ export const de: Dictionary = {
     building: 'Ihr PDF wird erstellt',
     progress: '{percent} % — alles geschieht auf diesem Gerät.',
   },
+  drop: {
+    title: 'Zum Öffnen ablegen',
+    hint: 'PDF, Word, Excel oder PowerPoint. Die Datei bleibt auf diesem Gerät.',
+  },
   sidebar: {
     pages: 'Seiten',
     blank: 'Leer',
