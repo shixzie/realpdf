@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent } from 'react'
-import { Canvas, Line, type FabricObject, type TPointerEventInfo } from 'fabric'
+import { Canvas, Line, util, type FabricObject, type TPointerEventInfo } from 'fabric'
 import { useStore } from '../store'
 import { hydrateAnnotations, serializeCanvas } from '../lib/serialize'
 import {
@@ -91,27 +91,22 @@ export function PageView({ pageIndex }: PageViewProps) {
   const latest = useRef({ tool, settings, pageId: page?.id ?? '' })
   latest.current = { tool, settings, pageId: page?.id ?? '' }
 
-  // Aborting a superseded or unmounted load stops fabric before
-  // loadFromJSON clears and refills a canvas that a newer load owns or
-  // that has been disposed. loadFromJSON also switches renderOnAddRemove
-  // off and restores it only on success, from whatever value it found, so
-  // an overlapped load would leave it off; the current load turns it back on.
-  const loadAnnotations = (canvas: Canvas, json: ReturnType<typeof hydrateAnnotations>) => {
+  // Objects load off-canvas, and only the load that is still current swaps
+  // them in, so a superseded or unmounted load never touches the canvas.
+  const loadAnnotations = async (canvas: Canvas, json: ReturnType<typeof hydrateAnnotations>) => {
     loadRef.current?.abort()
     const load = new AbortController()
     loadRef.current = load
-    const settle = (loaded: boolean) => {
-      const current = loadRef.current === load && canvasRef.current === canvas
-      if (current) canvas.renderOnAddRemove = true
-      return loaded && current
+    try {
+      const objects = await util.enlivenObjects<FabricObject>(json.objects as any[], { signal: load.signal })
+      if (loadRef.current !== load) return false
+      canvas.clear()
+      canvas.add(...objects)
+      return true
+    } catch (error) {
+      if (!load.signal.aborted) console.error(error)
+      return false
     }
-    return canvas.loadFromJSON(json, undefined, { signal: load.signal }).then(
-      () => settle(true),
-      (error: unknown) => {
-        if (!load.signal.aborted) console.error(error)
-        return settle(false)
-      },
-    )
   }
 
   const commitNow = useCallback(() => {
