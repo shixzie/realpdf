@@ -19,7 +19,7 @@ import {
 import { useStore, type ToolsTab } from '../store'
 import { openPdfBytes } from '../lib/openDocument'
 import { downloadBlob } from '../lib/exportController'
-import { officeToPdf } from '../lib/officeToPdf'
+import { OFFICE_MIME, officeToPdf } from '../lib/officeToPdf'
 import { pdfToDocx, pdfToPptx, pdfToXlsx } from '../lib/pdfToOffice'
 import {
   extractPages,
@@ -39,6 +39,7 @@ import { imageFileToDataUrl } from '../lib/assets'
 import { bakedCurrentBytes } from '../lib/currentDocument'
 import { openPdfDocumentFromBytes } from '../lib/pdfjs'
 import { formatBytes, t as translate, useTranslation } from '../i18n'
+import { useActiveIndicator } from '../lib/useActiveIndicator'
 import { AdvancedToolsTab } from './AdvancedToolsTab'
 
 interface DraftSource {
@@ -58,12 +59,6 @@ const TABS: Array<{ id: ToolsTab; labelKey: string; icon: typeof Combine }> = [
 
 const OFFICE_ACCEPT =
   '.docx,.xlsx,.pptx,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.openxmlformats-officedocument.presentationml.presentation'
-
-const OFFICE_MIME: Record<'docx' | 'xlsx' | 'pptx', string> = {
-  docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-  xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-  pptx: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
-}
 
 function baseName(name: string | null): string {
   return (name ?? 'document.pdf').replace(/\.pdf$/i, '')
@@ -94,6 +89,7 @@ function Modal() {
   const tab = useStore((state) => state.toolsTab)
   const initialTool = useStore((state) => state.toolsInitialTool)
   const setToolsTab = useStore((state) => state.setToolsTab)
+  const tabsRef = useActiveIndicator<HTMLDivElement>(tab)
   const close = () => useStore.getState().setToolsOpen(false)
   return (
     <div className="modal-backdrop" role="dialog" aria-modal="true">
@@ -104,7 +100,8 @@ function Modal() {
             <X size={17} />
           </button>
         </div>
-        <div className="tabs">
+        <div className="tabs" ref={tabsRef}>
+          <span className="active-indicator" aria-hidden="true" />
           {TABS.map((entry) => {
             const Icon = entry.icon
             return (

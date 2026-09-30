@@ -19,6 +19,12 @@
   // `npx wrangler preview`. Assets, compatibility settings, migrations and
   // placement stay at the top level; the block only needs to exist.
   "previews": {},
+  // Gives every version and every branch Preview its own public
+  // *.workers.dev URL, which Workers Builds links on pull requests. Only
+  // `wrangler deploy` applies this setting, so it takes effect on the next
+  // production deploy. Version URLs run with production bindings; put them
+  // behind Cloudflare Access if that is not acceptable.
+  "preview_urls": true,
   // Workers Logs and Workers Traces, queried in the Cloudflare dashboard
   // under Workers & Pages > realpdf > Logs / Traces.
   "observability": {

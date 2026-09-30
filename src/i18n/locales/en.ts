@@ -142,6 +142,10 @@ export const en = {
     building: 'Building your PDF',
     progress: '{percent}% — everything happens on this device.',
   },
+  drop: {
+    title: 'Drop to open',
+    hint: 'PDF, Word, Excel or PowerPoint. It stays on this device.',
+  },
   sidebar: {
     pages: 'Pages',
     blank: 'Blank',

@@ -30,6 +30,7 @@ import {
 import { useStore, type PendingAction, type ToolsTab } from '../store'
 import { DOCUMENT_TOOLS, EXTRA_TOOLS, type AdvancedToolId, type DocumentToolId, type ExtraToolId, type ToolCategory } from '../lib/documentToolCatalog'
 import { useTranslation } from '../i18n'
+import { useActiveIndicator } from '../lib/useActiveIndicator'
 
 type HomeToolAction =
   | { kind: 'file'; pending: PendingAction | null }
@@ -124,6 +125,7 @@ export function HomeTools({ onPickFile }: { onPickFile: (pending: PendingAction 
   const { t } = useTranslation()
   const [query, setQuery] = useState('')
   const [category, setCategory] = useState<ToolCategory | null>(null)
+  const filtersRef = useActiveIndicator<HTMLDivElement>(category)
   const normalizedQuery = query.trim().toLocaleLowerCase()
   const visibleTools = TOOLS.filter((tool) => {
     if (category && tool.category !== category) return false
@@ -151,7 +153,8 @@ export function HomeTools({ onPickFile }: { onPickFile: (pending: PendingAction 
         <span className="home-tools-count">{t('homeTools.count', { count: TOOLS.length })}</span>
       </div>
       <div className="home-tools-toolbar">
-        <div className="home-tool-filters" role="group" aria-label={t('homeTools.categories')}>
+        <div className="home-tool-filters" role="group" aria-label={t('homeTools.categories')} ref={filtersRef}>
+          <span className="active-indicator" aria-hidden="true" />
           <button type="button" className={`home-tool-filter ${category === null ? 'is-active' : ''}`} aria-pressed={category === null} onClick={() => setCategory(null)}>{t('homeTools.category.all')}</button>
           {CATEGORIES.map((item) => (
             <button key={item} type="button" className={`home-tool-filter ${category === item ? 'is-active' : ''}`} aria-pressed={category === item} onClick={() => setCategory(item)}>{t(`homeTools.category.${item}`)}</button>

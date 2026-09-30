@@ -4,6 +4,7 @@ import { useStore } from '../store'
 import { useTranslation } from '../i18n'
 import { quickExport } from '../lib/quickExport'
 import type { PageState } from '../types'
+import { useActiveIndicator } from '../lib/useActiveIndicator'
 
 function Thumbnail({ page }: { page: PageState }) {
   const { t } = useTranslation()
@@ -70,6 +71,7 @@ export function PageSidebar() {
   const [dragIndex, setDragIndex] = useState<number | null>(null)
   const [overIndex, setOverIndex] = useState<number | null>(null)
   const [downloadingId, setDownloadingId] = useState<string | null>(null)
+  const listRef = useActiveIndicator<HTMLDivElement>(currentPageId)
 
   const downloadPage = (pageId: string) => {
     if (downloadingId) return
@@ -97,14 +99,15 @@ export function PageSidebar() {
           <Plus size={16} />
         </button>
       </div>
-      <div className="sidebar-list">
+      <div className="sidebar-list" ref={listRef}>
+        <span className="active-indicator" aria-hidden="true" />
         {pages.map((page, index) => {
           const active = page.id === currentPageId
           const count = page.annotations.objects.length
           return (
             <div
               key={page.id}
-              className={`thumb ${active ? 'is-active' : ''} ${overIndex === index && dragIndex !== null && dragIndex !== index ? 'is-drop' : ''}`}
+              className={`thumb ${active ? 'is-active' : ''} ${dragIndex === index ? 'is-dragging' : ''} ${overIndex === index && dragIndex !== null && dragIndex !== index ? 'is-drop' : ''}`}
               draggable
               onDragStart={(event) => {
                 setDragIndex(index)

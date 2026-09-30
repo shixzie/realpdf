@@ -138,6 +138,10 @@ export const fr: Dictionary = {
     building: 'Création de votre PDF',
     progress: '{percent} % — tout se passe sur cet appareil.',
   },
+  drop: {
+    title: 'Déposez pour ouvrir',
+    hint: 'PDF, Word, Excel ou PowerPoint. Le fichier reste sur cet appareil.',
+  },
   sidebar: {
     pages: 'Pages',
     blank: 'Vierge',

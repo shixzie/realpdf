@@ -76,7 +76,7 @@ export function PageView({ pageIndex }: PageViewProps) {
   const draftingRef = useRef(false)
   const draftRef = useRef<Draft | null>(null)
   const commitTimerRef = useRef<number | null>(null)
-  const loadTokenRef = useRef(0)
+  const loadRef = useRef<AbortController | null>(null)
   const textRunsRef = useRef<TextRun[] | null>(null)
   const hoverRectRef = useRef<FabricObject | null>(null)
   const textEditTokenRef = useRef(0)
@@ -90,6 +90,29 @@ export function PageView({ pageIndex }: PageViewProps) {
 
   const latest = useRef({ tool, settings, pageId: page?.id ?? '' })
   latest.current = { tool, settings, pageId: page?.id ?? '' }
+
+  // Aborting a superseded or unmounted load stops fabric before
+  // loadFromJSON clears and refills a canvas that a newer load owns or
+  // that has been disposed. loadFromJSON also switches renderOnAddRemove
+  // off and restores it only on success, from whatever value it found, so
+  // an overlapped load would leave it off; the current load turns it back on.
+  const loadAnnotations = (canvas: Canvas, json: ReturnType<typeof hydrateAnnotations>) => {
+    loadRef.current?.abort()
+    const load = new AbortController()
+    loadRef.current = load
+    const settle = (loaded: boolean) => {
+      const current = loadRef.current === load && canvasRef.current === canvas
+      if (current) canvas.renderOnAddRemove = true
+      return loaded && current
+    }
+    return canvas.loadFromJSON(json, undefined, { signal: load.signal }).then(
+      () => settle(true),
+      (error: unknown) => {
+        if (!load.signal.aborted) console.error(error)
+        return settle(false)
+      },
+    )
+  }
 
   const commitNow = useCallback(() => {
     if (commitTimerRef.current != null) {
@@ -418,10 +441,8 @@ export function PageView({ pageIndex }: PageViewProps) {
 
     suppressRef.current = true
     readyRef.current = false
-    const token = loadTokenRef.current + 1
-    loadTokenRef.current = token
-    void canvas.loadFromJSON(hydrateAnnotations(page.annotations)).then(() => {
-      if (loadTokenRef.current !== token || canvasRef.current !== canvas) return
+    void loadAnnotations(canvas, hydrateAnnotations(page.annotations)).then((current) => {
+      if (!current) return
       suppressRef.current = false
       readyRef.current = true
       canvas.setDimensions({ width: initialSize.width, height: initialSize.height })
@@ -438,6 +459,8 @@ export function PageView({ pageIndex }: PageViewProps) {
     return () => {
       unregisterFlush()
       commitNow()
+      loadRef.current?.abort()
+      loadRef.current = null
       unregisterCanvas(page.id, canvas)
       canvasRef.current = null
       hoverRectRef.current = null
@@ -470,13 +493,11 @@ export function PageView({ pageIndex }: PageViewProps) {
       window.clearTimeout(commitTimerRef.current)
       commitTimerRef.current = null
     }
-    const token = loadTokenRef.current + 1
-    loadTokenRef.current = token
     suppressRef.current = true
     readyRef.current = false
     canvas.discardActiveObject()
-    void canvas.loadFromJSON(hydrateAnnotations(page.annotations)).then(() => {
-      if (loadTokenRef.current !== token || canvasRef.current !== canvas) return
+    void loadAnnotations(canvas, hydrateAnnotations(page.annotations)).then((current) => {
+      if (!current) return
       suppressRef.current = false
       readyRef.current = true
       loadedExternalRef.current = page.externalRev
@@ -567,15 +588,16 @@ export function PageView({ pageIndex }: PageViewProps) {
   useEffect(() => {
     const element = baseRef.current
     if (!element || !page) return
-    let cancelled = false
-    let task: { cancel: () => void; promise: Promise<void> } | null = null
+    element.style.width = `${page.width * zoom}px`
+    element.style.height = `${page.height * zoom}px`
     if (sourceIndex == null || !pdf) {
       element.width = 1
       element.height = 1
-      element.style.width = `${page.width * zoom}px`
-      element.style.height = `${page.height * zoom}px`
       return
     }
+    let cancelled = false
+    let task: { cancel: () => void; promise: Promise<void> } | null = null
+    const scratch = document.createElement('canvas')
     const preview = previewPageRef.current === page.id ? previewRef.current : null
     const previewDoc = preview?.pdf ?? null
     const dpr = Math.min(window.devicePixelRatio || 1, 2)
@@ -584,17 +606,24 @@ export function PageView({ pageIndex }: PageViewProps) {
         const pdfPage = previewDoc ? await previewDoc.getPage(1) : await pdf.getPage(sourceIndex + 1)
         if (cancelled) return
         const viewport = pdfPage.getViewport({ scale: zoom * dpr })
-        element.width = Math.max(1, Math.floor(viewport.width))
-        element.height = Math.max(1, Math.floor(viewport.height))
-        element.style.width = `${page.width * zoom}px`
-        element.style.height = `${page.height * zoom}px`
-        const renderTask = pdfPage.render({ canvas: element, viewport })
+        scratch.width = Math.max(1, Math.floor(viewport.width))
+        scratch.height = Math.max(1, Math.floor(viewport.height))
+        const renderTask = pdfPage.render({ canvas: scratch, viewport })
         task = renderTask as unknown as { cancel: () => void; promise: Promise<void> }
         await renderTask.promise
+        if (cancelled) return
+        element.width = scratch.width
+        element.height = scratch.height
+        element.getContext('2d')?.drawImage(scratch, 0, 0)
+        element.dataset.painted = 'true'
         // Only drop the covers once the patched bitmap is actually painted.
-        if (!cancelled) applyTextEditPreviewBackgrounds(canvasRef.current, preview ? preview.removedIds : null)
+        applyTextEditPreviewBackgrounds(canvasRef.current, preview ? preview.removedIds : null)
       } catch (error) {
         if ((error as Error)?.name !== 'RenderingCancelledException') console.error(error)
+      } finally {
+        // iOS Safari caps total canvas memory; rapid zoom steps would pile these up.
+        scratch.width = 0
+        scratch.height = 0
       }
     })()
     return () => {

@@ -5,6 +5,7 @@ import { commitCanvas, getCanvas, insertImageObject } from '../lib/canvasRegistr
 import { prepareUploadedSignature, trimCanvas } from '../lib/signatureImage'
 import { startSigning } from '../lib/signController'
 import { useTranslation } from '../i18n'
+import { useActiveIndicator } from '../lib/useActiveIndicator'
 
 const WIDTH = 640
 const HEIGHT = 240
@@ -17,6 +18,7 @@ export function SignatureModal() {
   const drawingRef = useRef(false)
   const lastRef = useRef<{ x: number; y: number } | null>(null)
   const [mode, setMode] = useState<'draw' | 'upload'>('draw')
+  const modeRef = useActiveIndicator<HTMLDivElement>(mode)
   const [color, setColor] = useState('#111827')
   const [width, setWidth] = useState(2.6)
   const [uploadSrc, setUploadSrc] = useState<string | null>(null)
@@ -140,7 +142,8 @@ export function SignatureModal() {
           </button>
         </div>
 
-        <div className="segmented">
+        <div className="segmented" ref={modeRef}>
+          <span className="active-indicator" aria-hidden="true" />
           <button
             type="button"
             className={mode === 'draw' ? 'is-active' : ''}

@@ -112,6 +112,8 @@ export interface ToastMessage {
   message: string
 }
 
+export const TOAST_MS = 4200
+
 interface LoadArgs {
   bytes: Uint8Array
   fileName: string
@@ -726,7 +728,7 @@ export const useStore = create<AppState>()((set, get) => ({
     set({ toast: { id, kind, message } })
     setTimeout(() => {
       if (get().toast?.id === id) set({ toast: null })
-    }, 4200)
+    }, TOAST_MS)
   },
 
   clearToast: () => set({ toast: null }),
