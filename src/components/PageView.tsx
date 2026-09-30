@@ -91,18 +91,25 @@ export function PageView({ pageIndex }: PageViewProps) {
   const latest = useRef({ tool, settings, pageId: page?.id ?? '' })
   latest.current = { tool, settings, pageId: page?.id ?? '' }
 
-  // Resolves true when this is still the page's current load. Aborting a
-  // superseded or unmounted load stops fabric before loadFromJSON clears and
-  // refills a canvas that a newer load owns or that has been disposed.
+  // Aborting a superseded or unmounted load stops fabric before
+  // loadFromJSON clears and refills a canvas that a newer load owns or
+  // that has been disposed. loadFromJSON also switches renderOnAddRemove
+  // off and restores it only on success, from whatever value it found, so
+  // an overlapped load would leave it off; the current load turns it back on.
   const loadAnnotations = (canvas: Canvas, json: ReturnType<typeof hydrateAnnotations>) => {
     loadRef.current?.abort()
     const load = new AbortController()
     loadRef.current = load
+    const settle = (loaded: boolean) => {
+      const current = loadRef.current === load && canvasRef.current === canvas
+      if (current) canvas.renderOnAddRemove = true
+      return loaded && current
+    }
     return canvas.loadFromJSON(json, undefined, { signal: load.signal }).then(
-      () => loadRef.current === load && canvasRef.current === canvas,
+      () => settle(true),
       (error: unknown) => {
         if (!load.signal.aborted) console.error(error)
-        return false
+        return settle(false)
       },
     )
   }
