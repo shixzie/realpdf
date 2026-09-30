@@ -592,7 +592,9 @@ export function PageView({ pageIndex }: PageViewProps) {
     }
     let cancelled = false
     let task: { cancel: () => void; promise: Promise<void> } | null = null
-    const scratch = document.createElement('canvas')
+    // A painted page keeps its bitmap on screen while the next one renders offscreen.
+    const scratch = element.dataset.painted ? document.createElement('canvas') : null
+    const target = scratch ?? element
     const preview = previewPageRef.current === page.id ? previewRef.current : null
     const previewDoc = preview?.pdf ?? null
     const dpr = Math.min(window.devicePixelRatio || 1, 2)
@@ -601,15 +603,17 @@ export function PageView({ pageIndex }: PageViewProps) {
         const pdfPage = previewDoc ? await previewDoc.getPage(1) : await pdf.getPage(sourceIndex + 1)
         if (cancelled) return
         const viewport = pdfPage.getViewport({ scale: zoom * dpr })
-        scratch.width = Math.max(1, Math.floor(viewport.width))
-        scratch.height = Math.max(1, Math.floor(viewport.height))
-        const renderTask = pdfPage.render({ canvas: scratch, viewport })
+        target.width = Math.max(1, Math.floor(viewport.width))
+        target.height = Math.max(1, Math.floor(viewport.height))
+        const renderTask = pdfPage.render({ canvas: target, viewport })
         task = renderTask as unknown as { cancel: () => void; promise: Promise<void> }
         await renderTask.promise
         if (cancelled) return
-        element.width = scratch.width
-        element.height = scratch.height
-        element.getContext('2d')?.drawImage(scratch, 0, 0)
+        if (scratch) {
+          element.width = scratch.width
+          element.height = scratch.height
+          element.getContext('2d')?.drawImage(scratch, 0, 0)
+        }
         element.dataset.painted = 'true'
         // Only drop the covers once the patched bitmap is actually painted.
         applyTextEditPreviewBackgrounds(canvasRef.current, preview ? preview.removedIds : null)
@@ -617,8 +621,10 @@ export function PageView({ pageIndex }: PageViewProps) {
         if ((error as Error)?.name !== 'RenderingCancelledException') console.error(error)
       } finally {
         // iOS Safari caps total canvas memory; rapid zoom steps would pile these up.
-        scratch.width = 0
-        scratch.height = 0
+        if (scratch) {
+          scratch.width = 0
+          scratch.height = 0
+        }
       }
     })()
     return () => {
