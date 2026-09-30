@@ -18,6 +18,7 @@ import {
 import { useStore } from '../store'
 import { openDocumentFile } from '../lib/openDocument'
 import { getCanvas } from '../lib/canvasRegistry'
+import { toggleThemeFrom } from '../lib/themeTransition'
 import { useTranslation } from '../i18n'
 import { LanguagePicker } from './LanguagePicker'
 import { ExportControl } from './ExportControl'
@@ -199,7 +200,7 @@ export function TopBar() {
         className="icon-button theme-toggle"
         title={theme === 'dark' ? t('topbar.switchToLight') : t('topbar.switchToDark')}
         aria-label={t('topbar.toggleTheme')}
-        onClick={() => useStore.getState().toggleTheme()}
+        onClick={(event) => toggleThemeFrom(event.currentTarget)}
       >
         {theme === 'dark' ? <Sun size={17} /> : <Moon size={17} />}
       </button>

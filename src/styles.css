@@ -3842,6 +3842,33 @@ select.form-widget {
   flex-shrink: 0;
 }
 
+/* ---------- Theme reveal ---------- */
+
+/* Colours switch at once in the DOM. The only theme motion is this reveal of
+   the new frame from the toggle, and the page stays clickable meanwhile. */
+::view-transition {
+  pointer-events: none;
+}
+
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation: none;
+  mix-blend-mode: normal;
+}
+
+::view-transition-new(root) {
+  animation: theme-reveal 560ms var(--ease-in-out);
+}
+
+@keyframes theme-reveal {
+  from {
+    clip-path: circle(0 at var(--reveal-x) var(--reveal-y));
+  }
+  to {
+    clip-path: circle(var(--reveal-r) at var(--reveal-x) var(--reveal-y));
+  }
+}
+
 /* One reduced-motion policy for the whole app; spinners still spin. */
 @media (prefers-reduced-motion: reduce) {
   *,
