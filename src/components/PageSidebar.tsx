@@ -5,6 +5,7 @@ import { useTranslation } from '../i18n'
 import { quickExport } from '../lib/quickExport'
 import type { PageState } from '../types'
 import { useActiveIndicator } from '../lib/useActiveIndicator'
+import { queueRender, THUMBNAIL_RANK, viewportDistance } from '../lib/renderQueue'
 
 function Thumbnail({ page }: { page: PageState }) {
   const { t } = useTranslation()
@@ -26,25 +27,30 @@ function Thumbnail({ page }: { page: PageState }) {
     }
     let cancelled = false
     let task: { cancel: () => void } | null = null
+    let dequeue: (() => void) | null = null
     const observer = new IntersectionObserver(
       (entries) => {
         if (!entries.some((entry) => entry.isIntersecting)) return
         observer.disconnect()
-        void (async () => {
-          try {
-            const pdfPage = await pdf.getPage((page.sourceIndex as number) + 1)
-            if (cancelled) return
-            const viewport = pdfPage.getViewport({ scale })
-            element.width = Math.max(1, Math.floor(viewport.width))
-            element.height = Math.max(1, Math.floor(viewport.height))
-            const renderTask = pdfPage.render({ canvas: element, viewport })
-            task = renderTask
-            await renderTask.promise
-            if (!cancelled) setRendered(true)
-          } catch (error) {
-            if ((error as Error)?.name !== 'RenderingCancelledException') console.error(error)
-          }
-        })()
+        dequeue = queueRender(
+          () => THUMBNAIL_RANK + viewportDistance(element),
+          async () => {
+            try {
+              if (cancelled) return
+              const pdfPage = await pdf.getPage((page.sourceIndex as number) + 1)
+              if (cancelled) return
+              const viewport = pdfPage.getViewport({ scale })
+              element.width = Math.max(1, Math.floor(viewport.width))
+              element.height = Math.max(1, Math.floor(viewport.height))
+              const renderTask = pdfPage.render({ canvas: element, viewport })
+              task = renderTask
+              await renderTask.promise
+              if (!cancelled) setRendered(true)
+            } catch (error) {
+              if ((error as Error)?.name !== 'RenderingCancelledException') console.error(error)
+            }
+          },
+        )
       },
       { rootMargin: '300px' },
     )
@@ -52,6 +58,7 @@ function Thumbnail({ page }: { page: PageState }) {
     return () => {
       cancelled = true
       observer.disconnect()
+      dequeue?.()
       task?.cancel()
     }
   }, [pdf, page.sourceIndex, page.width, page.height])

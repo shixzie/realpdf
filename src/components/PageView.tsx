@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent } from 'react'
+import { useCallback, useEffect, useRef, useState, type DragEvent } from 'react'
+import { flushSync } from 'react-dom'
 import { Canvas, Line, util, type FabricObject, type TPointerEventInfo } from 'fabric'
 import { useStore } from '../store'
 import { hydrateAnnotations, serializeCanvas } from '../lib/serialize'
@@ -39,12 +40,15 @@ import {
   type TextEditPreviewState,
 } from '../lib/textEditPreview'
 import { imageFileToDataUrl } from '../lib/assets'
+import { queueRender, viewportDistance } from '../lib/renderQueue'
 import { useTranslation } from '../i18n'
 import { FormsLayer } from './FormsLayer'
 import { SignSpotsLayer } from './SignSpotsLayer'
 
 interface PageViewProps {
   pageIndex: number
+  /** On screen while the viewer is not scrolling. */
+  settled: boolean
 }
 
 type AnyObject = FabricObject & Record<string, any>
@@ -55,7 +59,7 @@ interface Draft {
   obj: FabricObject | null
 }
 
-export function PageView({ pageIndex }: PageViewProps) {
+export function PageView({ pageIndex, settled }: PageViewProps) {
   const { t } = useTranslation()
   const page = useStore((state) => state.pages[pageIndex])
   const zoom = useStore((state) => state.zoom)
@@ -203,27 +207,43 @@ export function PageView({ pageIndex }: PageViewProps) {
 
   const viewWidth = Math.max(1, (page?.width ?? 1) * zoom)
   const viewHeight = Math.max(1, (page?.height ?? 1) * zoom)
-  const initialSize = useMemo(() => ({ width: viewWidth, height: viewHeight }), [])
-  const zoomRef = useRef(zoom)
-  zoomRef.current = zoom
+  const viewRef = useRef({ width: viewWidth, height: viewHeight, zoom })
+  viewRef.current = { width: viewWidth, height: viewHeight, zoom }
+
+  /** Resizing a canvas reallocates and clears its bitmap, so only resize on a real change. */
+  const fitOverlay = useCallback((canvas: Canvas) => {
+    const { width, height, zoom: scale } = viewRef.current
+    if (canvas.getWidth() !== width || canvas.getHeight() !== height) canvas.setDimensions({ width, height })
+    if (canvas.getZoom() !== scale) canvas.setZoom(scale)
+  }, [])
+
+  // The annotation overlay is two more page-sized canvases, so a page only
+  // gets one once it shows annotations, settles on screen or is pointed at;
+  // pages scrolled past just show their bitmap.
+  const hasAnnotations = (page?.annotations.objects.length ?? 0) > 0
+  const [overlayRequested, setOverlayRequested] = useState(false)
+  const wantOverlay = overlayRequested || settled || hasAnnotations
+  useEffect(() => {
+    if (wantOverlay && !overlayRequested) setOverlayRequested(true)
+  }, [wantOverlay, overlayRequested])
 
   // Create the fabric overlay once per mounted page.
   useEffect(() => {
     const host = hostRef.current
-    if (!host || !page) return
+    if (!host || !page || !wantOverlay) return
     // Drop any canvas left behind by a previous mount of this page.
     host.replaceChildren()
     const element = document.createElement('canvas')
     host.appendChild(element)
     const canvas = new Canvas(element, {
-      width: initialSize.width,
-      height: initialSize.height,
+      width: viewRef.current.width,
+      height: viewRef.current.height,
       selection: false,
       preserveObjectStacking: true,
       stopContextMenu: true,
       fireRightClick: false,
     })
-    canvas.setZoom(zoomRef.current)
+    canvas.setZoom(viewRef.current.zoom)
     canvasRef.current = canvas
     registerCanvas(page.id, canvas)
     latest.current.pageId = page.id
@@ -440,8 +460,7 @@ export function PageView({ pageIndex }: PageViewProps) {
       if (!current) return
       suppressRef.current = false
       readyRef.current = true
-      canvas.setDimensions({ width: initialSize.width, height: initialSize.height })
-      canvas.setZoom(zoomRef.current)
+      fitOverlay(canvas)
       applyToolToCanvas(canvas, latest.current.tool, latest.current.settings)
       applyTextEditPreviewBackgrounds(
         canvas,
@@ -467,16 +486,15 @@ export function PageView({ pageIndex }: PageViewProps) {
       downTextRef.current = null
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [page?.id])
+  }, [page?.id, wantOverlay])
 
   // Keep the overlay in sync with the zoom level.
   useEffect(() => {
     const canvas = canvasRef.current
     if (!canvas) return
-    canvas.setDimensions({ width: viewWidth, height: viewHeight })
-    canvas.setZoom(zoom)
+    fitOverlay(canvas)
     canvas.requestRenderAll()
-  }, [viewWidth, viewHeight, zoom])
+  }, [viewWidth, viewHeight, zoom, fitOverlay])
 
   // Re-load annotations when they were replaced externally (undo/redo/page ops).
   useEffect(() => {
@@ -496,8 +514,7 @@ export function PageView({ pageIndex }: PageViewProps) {
       suppressRef.current = false
       readyRef.current = true
       loadedExternalRef.current = page.externalRev
-      canvas.setDimensions({ width: viewWidth, height: viewHeight })
-      canvas.setZoom(zoom)
+      fitOverlay(canvas)
       applyToolToCanvas(canvas, latest.current.tool, latest.current.settings)
       applyTextEditPreviewBackgrounds(
         canvas,
@@ -592,46 +609,59 @@ export function PageView({ pageIndex }: PageViewProps) {
     }
     let cancelled = false
     let task: { cancel: () => void; promise: Promise<void> } | null = null
-    // A painted page keeps its bitmap on screen while the next one renders offscreen.
-    const scratch = element.dataset.painted ? document.createElement('canvas') : null
-    const target = scratch ?? element
     const preview = previewPageRef.current === page.id ? previewRef.current : null
     const previewDoc = preview?.pdf ?? null
     const dpr = Math.min(window.devicePixelRatio || 1, 2)
-    void (async () => {
-      try {
-        const pdfPage = previewDoc ? await previewDoc.getPage(1) : await pdf.getPage(sourceIndex + 1)
+    const dequeue = queueRender(
+      () => viewportDistance(slotRef.current),
+      async () => {
         if (cancelled) return
-        const viewport = pdfPage.getViewport({ scale: zoom * dpr })
-        target.width = Math.max(1, Math.floor(viewport.width))
-        target.height = Math.max(1, Math.floor(viewport.height))
-        const renderTask = pdfPage.render({ canvas: target, viewport })
-        task = renderTask as unknown as { cancel: () => void; promise: Promise<void> }
-        await renderTask.promise
-        if (cancelled) return
-        if (scratch) {
+        // pdf.js asks for a CPU-backed context, so drawing straight into the
+        // on-screen canvas would re-upload the whole bitmap after every slice.
+        // It draws offscreen and the finished page is copied over once, which
+        // also keeps a painted page visible while the next zoom level renders.
+        const scratch = document.createElement('canvas')
+        try {
+          const pdfPage = previewDoc ? await previewDoc.getPage(1) : await pdf.getPage(sourceIndex + 1)
+          if (cancelled) return
+          const viewport = pdfPage.getViewport({ scale: zoom * dpr })
+          scratch.width = Math.max(1, Math.floor(viewport.width))
+          scratch.height = Math.max(1, Math.floor(viewport.height))
+          const renderTask = pdfPage.render({ canvas: scratch, viewport })
+          task = renderTask as unknown as { cancel: () => void; promise: Promise<void> }
+          await renderTask.promise
+          if (cancelled) return
           element.width = scratch.width
           element.height = scratch.height
           element.getContext('2d')?.drawImage(scratch, 0, 0)
-        }
-        element.dataset.painted = 'true'
-        // Only drop the covers once the patched bitmap is actually painted.
-        applyTextEditPreviewBackgrounds(canvasRef.current, preview ? preview.removedIds : null)
-      } catch (error) {
-        if ((error as Error)?.name !== 'RenderingCancelledException') console.error(error)
-      } finally {
-        // iOS Safari caps total canvas memory; rapid zoom steps would pile these up.
-        if (scratch) {
+          element.dataset.painted = 'true'
+          // Only drop the covers once the patched bitmap is actually painted.
+          applyTextEditPreviewBackgrounds(canvasRef.current, preview ? preview.removedIds : null)
+        } catch (error) {
+          if ((error as Error)?.name !== 'RenderingCancelledException') console.error(error)
+        } finally {
+          // iOS Safari caps total canvas memory; rapid zoom steps would pile these up.
           scratch.width = 0
           scratch.height = 0
         }
-      }
-    })()
+      },
+    )
     return () => {
       cancelled = true
+      dequeue()
       task?.cancel()
     }
   }, [pdf, sourceIndex, zoom, page?.width, page?.height, previewRev])
+
+  // Hand the bitmap back as soon as the page leaves the window.
+  useEffect(() => {
+    const element = baseRef.current
+    return () => {
+      if (!element) return
+      element.width = 0
+      element.height = 0
+    }
+  }, [])
 
   const onDrop = useCallback(
     async (event: DragEvent<HTMLDivElement>) => {
@@ -669,7 +699,14 @@ export function PageView({ pageIndex }: PageViewProps) {
       className={`page ${formMode ? 'is-form-mode' : ''}`}
       data-page-index={pageIndex}
       style={{ width: viewWidth, height: viewHeight }}
+      // Real pointer movement only (scrolling under a still pointer fires
+      // pointerover), committed synchronously so the overlay exists before
+      // the press that follows.
+      onPointerMove={() => {
+        if (!overlayRequested) flushSync(() => setOverlayRequested(true))
+      }}
       onDrop={onDrop}
+      onDragEnter={() => setOverlayRequested(true)}
       onDragOver={(event) => {
         if (Array.from(event.dataTransfer.types).includes('Files')) event.preventDefault()
       }}

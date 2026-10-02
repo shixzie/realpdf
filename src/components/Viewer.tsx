@@ -5,6 +5,8 @@ import { prefersReducedMotion } from '../lib/motion'
 
 const PAGE_GAP = 28
 const WINDOW_PAD = 700
+// How long the viewer must sit still before visible pages count as settled.
+const SETTLE_MS = 200
 
 export function Viewer() {
   const pages = useStore((state) => state.pages)
@@ -13,7 +15,8 @@ export function Viewer() {
   const scrollRequest = useStore((state) => state.scrollRequest)
 
   const containerRef = useRef<HTMLDivElement>(null)
-  const [range, setRange] = useState({ start: 0, end: 0 })
+  const [range, setRange] = useState({ start: 0, end: 0, visibleStart: 0, visibleEnd: 0 })
+  const [scrolling, setScrolling] = useState(false)
 
   const dimsKey = pages.map((page) => `${page.id}:${page.width}x${page.height}`).join('|')
 
@@ -40,17 +43,26 @@ export function Viewer() {
     const list = pagesRef.current
     const current = layoutRef.current
     if (!list.length) {
-      setRange({ start: 0, end: 0 })
+      setRange({ start: 0, end: 0, visibleStart: 0, visibleEnd: 0 })
       return
     }
-    const top = element.scrollTop - WINDOW_PAD
-    const bottom = element.scrollTop + element.clientHeight + WINDOW_PAD
-    let start = 0
-    while (start < list.length - 1 && current.offsets[start] + current.heights[start] < top) start += 1
-    let end = start
-    while (end < list.length && current.offsets[end] < bottom) end += 1
-    end = Math.min(list.length, end + 1)
-    setRange((prev) => (prev.start === start && prev.end === end ? prev : { start, end }))
+    const spanOf = (top: number, bottom: number) => {
+      let first = 0
+      while (first < list.length - 1 && current.offsets[first] + current.heights[first] < top) first += 1
+      let last = first
+      while (last < list.length && current.offsets[last] < bottom) last += 1
+      return [first, last] as const
+    }
+    const viewTop = element.scrollTop
+    const viewBottom = viewTop + element.clientHeight
+    const [start, padEnd] = spanOf(viewTop - WINDOW_PAD, viewBottom + WINDOW_PAD)
+    const end = Math.min(list.length, padEnd + 1)
+    const [visibleStart, visibleEnd] = spanOf(viewTop, viewBottom)
+    setRange((prev) =>
+      prev.start === start && prev.end === end && prev.visibleStart === visibleStart && prev.visibleEnd === visibleEnd
+        ? prev
+        : { start, end, visibleStart, visibleEnd },
+    )
 
     const center = element.scrollTop + element.clientHeight / 2
     let index = 0
@@ -70,7 +82,11 @@ export function Viewer() {
     const element = containerRef.current
     if (!element) return
     let frame = 0
+    let settle = 0
     const onScroll = () => {
+      setScrolling(true)
+      window.clearTimeout(settle)
+      settle = window.setTimeout(() => setScrolling(false), SETTLE_MS)
       if (frame) return
       frame = requestAnimationFrame(() => {
         frame = 0
@@ -88,6 +104,7 @@ export function Viewer() {
       element.removeEventListener('scroll', onScroll)
       element.removeEventListener('wheel', onWheel)
       if (frame) cancelAnimationFrame(frame)
+      window.clearTimeout(settle)
     }
   }, [updateRange])
 
@@ -144,7 +161,10 @@ export function Viewer() {
               className="page-slot"
               style={{ top: layout.offsets[index], width: Math.max(1, page.width * zoom) }}
             >
-              <PageView pageIndex={index} />
+              <PageView
+                pageIndex={index}
+                settled={!scrolling && index >= range.visibleStart && index < range.visibleEnd}
+              />
             </div>
           )
         })}
